@@ -1,83 +1,214 @@
-# Architecture
+# System Architecture & Technical Specifications — career-ops
 
-A high-level map of how career-ops is put together. For the precise system/user file boundary, see [DATA_CONTRACT.md](DATA_CONTRACT.md); for contribution mechanics, see [CONTRIBUTING.md](CONTRIBUTING.md); for runtime flow diagrams (evaluation steps, batch processing), see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+> **Document Status**: Production / Authoritative  
+> **Target Version**: v1.38.0  
+> **Audience**: Staff Engineers, Core Contributors, Solutions Architects, Security Auditors  
 
-## Principles
+---
 
-Career-ops is built on three commitments that every design decision serves:
+## 1. Executive Architectural Overview
 
-- **Local-first.** Everything runs on your machine against your files. No account required, no server in the loop for the core tool.
-- **AI-agnostic.** The logic lives in Markdown prompt files under `modes/`, executed by whatever AI coding CLI you use (Claude Code, Codex, OpenCode, Gemini, Qwen, Grok, Antigravity) or by standalone Node scripts. No single model is hardcoded.
-- **Human-in-the-loop.** The tool prepares and evaluates; the human reviews and clicks. It never submits applications on your behalf.
+`career-ops` is an industrial-grade, local-first candidate operations system. It reverses the asymmetric recruitment landscape by placing an autonomous, deterministic-gated AI operating system directly on the candidate's personal computer.
 
-## The two layers (the data contract)
+Unlike generic resume generators or cloud-hosted application bots, `career-ops` couples **stochastic LLM reasoning** with **deterministic verification gates**. The file system serves as the permanent single source of truth, while fast indices (SQLite) and visual interfaces (Next.js 16, Charm Bubbletea Go TUI) operate strictly as derived projections.
 
-The single most important architectural rule: **system files** and **user files** are strictly separated.
+```mermaid
+flowchart TD
+    subgraph StorageLayer ["Permanent Storage Layer (User Ground Truth)"]
+        CV["cv.md (Chronological Master CV)"]
+        Digest["article-digest.md (Quantified Proof Points)"]
+        Profile["config/profile.yml (Archetypes & Floors)"]
+        Tracker["data/applications.md (Git-Diffable Table)"]
+        Ledger["data/status-log.tsv (Append-Only Audit Log)"]
+        StoryBank["interview-prep/story-bank.md (STAR+R Stories)"]
+    end
 
-- **System layer** — the tool itself: `modes/`, scripts (`*.mjs`), templates, the dashboard. These are versioned and updated by `update-system.mjs`. Listed in `SYSTEM_PATHS`, in `lib/update-manifest.mjs`.
-- **User layer** — your data: `cv.md`, `config/profile.yml`, `modes/_profile.md`, `data/`, `reports/`, `jds/`, etc. The updater **never** touches these. Listed in `USER_PATHS`.
+    subgraph CoreEngine ["Deterministic Core Engine (Node.js ESM)"]
+        Scanners["providers/*.mjs (60+ Zero-Token ATS Scrapers)"]
+        Gates["check-liveness.mjs & Dealbreaker Filters"]
+        FactGate["verify-cv-facts.mjs (Zero-Fabrication AST Gate)"]
+        Renderer["generate-pdf.mjs (Playwright Chromium)"]
+        TrackerManager["tracker.mjs & dir-lock.mjs"]
+    end
 
-`DATA_CONTRACT.md` is the source of truth for this boundary, and `updater-migration-tests.mjs` enforces that no system path ever overlaps a user path.
+    subgraph AgentLayer ["AI Reasoning & Skill Layer"]
+        Router[".agents/skills/career-ops/SKILL.md (Skill Router)"]
+        SharedPrompt["modes/_shared.md (Scoring Rubric & Anti-Slop)"]
+        OfertaPrompt["modes/oferta.md (Blocks A-H Structure)"]
+        LLMConnectors["Claude / OpenRouter / Ollama / Gemini"]
+    end
 
-## Files are canonical — databases are derived
+    subgraph DerivedLayer ["Derived Read Index (Disposable)"]
+        SQLiteDB[("data/applications.db (node:sqlite)")]
+    end
 
-Settled doctrine ([#918](https://github.com/career-ops-hq/career-ops/issues/918)): the human-readable, git-diffable files (`data/applications.md`, `reports/`, `data/pipeline.md`) are the **permanent source of truth**. SQLite exists only as a derived index (fast queries, reindex-on-delete) and will never become a primary store — not even opt-in. The reason is ecosystem-wide: the web UI, the Go dashboard, community plugins, and thousands of fork scripts all read the files; a second canonical store would force every reader to support two modes forever. Performance work is welcome **on the derived layer**; the files stay the brain.
+    subgraph PresentationLayer ["User Presentation Surfaces"]
+        WebUI["web/ (Next.js 16 App Router on 127.0.0.1)"]
+        GoTUI["dashboard/ (Charm Bubbletea Go TUI)"]
+        CLIs["AI Coding CLIs (Claude, Codex, Antigravity, OpenCode)"]
+    end
 
-## Why the flat root
+    Scanners -->|Harvest Public Jobs| Gates
+    Gates -->|Verified Active & Compliant| Router
+    Router --> SharedPrompt --> OfertaPrompt --> LLMConnectors
+    LLMConnectors -->|Draft Tailored Bullets| FactGate
+    FactGate -->|100% Provenance Match| Renderer
+    Renderer -->|Compiled ATS PDF| TrackerManager
+    TrackerManager -->|Atomic Write| Tracker
+    TrackerManager -->|Append Transition Event| Ledger
+    TrackerManager -->|Auto-Rebuild on Hash Change| SQLiteDB
+    SQLiteDB --> WebUI
+    Tracker --> GoTUI
+    CLIs --> CoreEngine
+```
 
-The repo keeps its scripts at the root deliberately ([#1386](https://github.com/career-ops-hq/career-ops/issues/1386)). Path stability is a feature here, not an accident: the updater's `SYSTEM_PATHS` allowlist, community plugins, docs, guides, and the muscle memory of thousands of users (`node scan.mjs`) all reference these paths. A cosmetic reorganization would break forks and plugins for no functional gain. The conventions that keep the flat root navigable: one script = one job, and every script is registered in `SYSTEM_PATHS` (enforced in CI by the coverage guard).
+---
 
-Tests are the one thing the flat root does not hold. Suites live in `tests/`, and `test-all.mjs` discovers `tests/**/*.test.mjs` — no registration list, so a new suite runs the moment it is written and a typo cannot silently turn CI green ([#1440](https://github.com/career-ops-hq/career-ops/issues/1440)). Write new ones there; `*.test.mjs` at the repo root is not discovered and will not run.
+## 2. Core Architectural Principles
 
-Name a suite `{module}.test.mjs` when it covers exactly one root script. Name it for the behaviour it pins when it spans several scripts, or when it is one of a group carving up a large module — `outcome-tracker-local-dates.test.mjs`, `cover-unresolved-placeholders.test.mjs`. Behaviour naming is the common case by a wide margin: roughly four in five suites directly under `tests/` are named that way, so module naming is the exception and a behaviour name is not a deviation to be flagged in review. Neither form is enforced, because discovery is by glob — the name buys legibility and nothing else. `tests/providers/` is the one subtree where module naming is the norm, one suite per provider, alongside cross-provider behaviour suites like `ats-ssrf-hardening.test.mjs`; see `tests/README.md`.
+1. **Local-First Data Sovereignty**: All candidate intelligence, resume variations, notes, and compensation targets reside locally on the user's hard drive in human-readable plain text (Markdown, YAML, TSV). No central cloud database exists.
+2. **AI-Agnostic Execution Engine**: The system logic is expressed as modular Markdown prompts under `modes/`. Any tool following the [open agent skill standard](https://agentskills.io)—including Claude Code, Cursor, Codex, OpenCode, Antigravity, Gemini CLI, Grok, or offline Ollama instances—can execute the platform.
+3. **Deterministic Fact Grounding**: Stochastic models are never permitted to publish unverified assertions. The rule is absolute: *"Keywords get reformulated, never fabricated."* Every tool, metric, and company claim in tailored output must trace directly to primary user files.
+4. **Strict Human-in-the-Loop (HITL)**: career-ops prepares application dossiers and form answers, but the human candidate must verify the content and submit the application manually. Robotic auto-submission is rejected by design.
 
-Discovery imports a suite in-process and shares its counters; a `node:test` suite is child-processed instead, so its results survive ([#2828](https://github.com/career-ops-hq/career-ops/issues/2828)). A discovered suite therefore reports through `pass`/`fail` from `tests/helpers.mjs` and never calls `process.exit()` or `finish()`, both of which would forge the run's verdict.
+---
 
-This was three arrangements until recently — `tests/`, a `test/` directory, and suites sitting beside the scripts they covered — with the latter two registered by hand in `test-all.mjs`. Hand registration meant three suites shipped in `SYSTEM_PATHS` to every install while running nowhere ([#3247](https://github.com/career-ops-hq/career-ops/issues/3247), [#3303](https://github.com/career-ops-hq/career-ops/issues/3303)), which is what consolidated them ([#3306](https://github.com/career-ops-hq/career-ops/issues/3306)). Almost no suite is registered by hand any more. The residual is the `*-tests.mjs` naming convention: a few suites remain at the root, each registered by name in `test-all.mjs`'s `scripts` list alongside the `--self-test` entry points, or invoked by a workflow. Most stay for a stated reason — a flag-driven CI harness (`upgrade-tests.mjs`, run from `.github/workflows/test.yml`) and one that asserts on its own filename (`updater-migration-tests.mjs`). A per-script timeout is not a permanent reason to stay: a suite that imports `node:test` runs in a child process under `test-all.mjs`'s 30s cap, so a slow suite can be made fast and moved, as `tests/tracker-writer-lock.test.mjs` and `tests/tracker-columns.test.mjs` were ([#2906](https://github.com/career-ops-hq/career-ops/issues/2906), [#4759](https://github.com/career-ops-hq/career-ops/issues/4759); [#4010](https://github.com/career-ops-hq/career-ops/issues/4010), [#4758](https://github.com/career-ops-hq/career-ops/issues/4758)). So the convention is permanent rather than migration debt, and `tests/root-tests-registration.test.mjs` guards it: every root `*-tests.mjs` must be registered in the `scripts` list or invoked by a workflow ([#3735](https://github.com/career-ops-hq/career-ops/issues/3735)). The list here is by name rather than by count on purpose; a count goes stale the first time a suite is added. `tests/no-root-suites.test.mjs` separately keeps the root empty of `*.test.mjs`, where discovery does not reach. Playwright specs are the deliberate exception: `tests/cv-visual/` is named `*.spec.mjs`, which discovery does not match, and runs from `playwright.cv.config.mjs`.
+## 3. The Data Contract: System Layer vs. User Layer
 
-## Component map
+The fundamental organizing boundary in career-ops is the strict separation between the **System Layer** (the versioned, auto-updatable engine) and the **User Layer** (the candidate's personal ground truth).
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/architecture-component-map-dark.svg"><img src="docs/architecture-component-map-light.svg" alt="Component map: an AI coding CLI (or a script) reads the prompt files in modes/*.md, the brain: scoring, evaluation, apply, scan and interview prompts, with _shared.md as the scoring core. They drive five areas: scan (scan.mjs, providers/), evaluate (modes/oferta.md plus the eval scripts), generate (PDFs, CVs, cover letters), track (data/, reports/) and update (update-system.mjs)." width="760"></picture></p>
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ USER LAYER (Candidate Ground Truth — NEVER Auto-Updated)               │
+│ - Primary Facts: cv.md, article-digest.md, config/profile.yml          │
+│ - Personal Framing: modes/_profile.md, modes/_custom.md, voice-dna.md  │
+│ - Pipeline State: data/applications.md, data/status-log.tsv, pipeline  │
+│ - Dossiers: reports/*.md, output/*.pdf, interview-prep/*               │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Read & Written By
+┌───────────────────────────────────▼────────────────────────────────────┐
+│ SYSTEM LAYER (Tooling & Logic — Safely Auto-Updatable)                 │
+│ - Agent Prompts: modes/_shared.md, modes/oferta.md, modes/apply.md     │
+│ - Discovery Core: providers/*.mjs, scan.mjs, scan-ats-full.mjs         │
+│ - Deterministic Tools: verify-cv-facts.mjs, generate-pdf.mjs, tracker  │
+│ - Interfaces: dashboard/* (Go TUI), web/* (Next.js 16 Web UI)          │
+│ - Lifecycle: update-system.mjs, lib/update-manifest.mjs                │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
-### Discovery — `scan.mjs` + `providers/`
-Finds jobs from **open, no-auth public sources**. `scan.mjs` is zero-token: it calls public ATS APIs (Greenhouse, Ashby, Lever, BambooHR, Teamtailor, Workday, Breezy) and RSS/JSON boards via per-board modules in `providers/`. Auth-gated/login-required sources are intentionally out of core (they belong in the plugin layer). Results land in `data/pipeline.md`.
+### Path Resolution Precedence (`path-resolver.mjs`)
+The User Layer location (Data Root) is resolved dynamically using strict precedence:
+1. **Environment Variables**: `CAREER_OPS_ROOT` or `CAREER_OPS_DATA_DIR` (overrides all paths; checked for path traversal security).
+2. **Marker File**: A `.career-ops-data` file in the repository root pointing to an absolute or relative data path.
+3. **Plugin Install Default**: If running inside Claude Code plugin cache (`~/.claude/plugins/`), defaults to `~/career-ops-data` to prevent data deletion on plugin updates.
+4. **Repository Default**: The repository root itself.
 
-### Evaluation — `modes/oferta.md` + `modes/_shared.md`
-The heart of the tool. `oferta.md` defines the A–H evaluation blocks (H is conditional, on scores of 4.5 and above); `_shared.md` defines the 1–5 scoring system, archetype detection, posting-legitimacy signals, and global rules. The AI reads these plus your `cv.md` and produces a structured report.
+---
 
-**Standalone evaluators** let you run the same scoring without an interactive CLI, against cheaper/local models: `gemini-eval.mjs` (Google free tier), `ollama-eval.mjs` (fully local), and `openai-eval.mjs` (any OpenAI-compatible endpoint).
+## 4. Storage Architecture: Files as Canonical, Databases as Derived
 
-### Generation — PDFs, CVs, cover letters
-`generate-pdf.mjs` (Playwright HTML→PDF), `generate-latex.mjs` / `build-cv-latex.mjs`, `generate-cover-letter.mjs`. ATS-safe templates live in `templates/` and `fonts/`.
+Settled architectural doctrine (RFC #918) mandates that flat Markdown and TSV files remain the **permanent, git-diffable single source of truth**:
 
-### Tracking — `data/` + `reports/` + tracker scripts
-Every evaluated offer is registered. `data/applications.md` is the canonical tracker table; `reports/{NNN}-{company}-{date}.md` holds full evaluations. `tracker.mjs`, `merge-tracker.mjs`, `dedup-tracker.mjs`, `normalize-statuses.mjs`, and `reconcile-pipeline.mjs` keep it consistent (atomic writes + a SQLite index). Report numbers are claimed atomically via `reserve-report-num.mjs`.
+1. **`data/applications.md`**: Human-readable, git-diffable Markdown table tracking application state.
+2. **`data/status-log.tsv`**: Append-only transactional transition ledger (`{tracker_id}\t{date}\t{from}\t{to}\t{source}\t{note}`) recording the exact history of every status mutation.
+3. **Derived SQLite Cache (`data/applications.db`)**: Built dynamically using Node's built-in `node:sqlite`. Read queries (search, filter, stats) execute against SQLite for microsecond performance; however, SQLite is disposable and automatically rebuilds whenever the source Markdown file hash changes.
 
-### Liveness — never evaluate a dead posting
-`check-liveness.mjs` / `liveness-*.mjs` verify a posting is still open (zero-token) before it costs evaluation time.
+---
 
-### Self-update — `update-system.mjs`
-Safely pulls new system files from upstream without touching user data. It backs up, fetches, re-execs the target updater (resolving its import closure so a new import can't break the upgrade), then checks out only `SYSTEM_PATHS` (`lib/update-manifest.mjs`, which the updater reads rather than imports so it stays self-loading). `BOOTSTRAP_PATHS` covers very old installs.
+## 5. Subsystem Decomposition
 
-### Multi-CLI entry files
-`CLAUDE.md`, `OPENCODE.md` and `CODEX.md` are thin `@AGENTS.md` wrappers around the canonical `AGENTS.md`. `GEMINI.md` is a legacy no-op guard, so Antigravity does not load the project instructions twice. The `.agents/skills/` entrypoints follow the [open agent skill standard](https://agentskills.io) and route into the same modes.
+### 5.1 Discovery Subsystem (`scan.mjs` & `providers/`)
+Finds open roles from public, unauthenticated sources with zero LLM API cost:
+- **60+ Provider Adapters**: Covers Greenhouse, Ashby, Lever, Workday, BambooHR, SmartRecruiters, Taleo, SuccessFactors, Dayforce, etc.
+- **Reverse-ATS Keyword Sweeps**: `scan-ats-full.mjs` traverses complete public company datasets, checkpointing progress every 500 companies.
+- **SSRF Defense Core**: Every request routes through `providers/_ip-guard.mjs`, which patches `node:dns.lookup` inside an `AsyncLocalStorage` scope to reject loopback, RFC1918 private subnets, and cloud instance metadata (`169.254.169.254`).
 
-### Dashboard (optional)
-A standalone Go TUI under `dashboard/` for browsing the pipeline. Isolated from the core — never required.
+### 5.2 Pre-Flight Gating Subsystem
+Disqualifies invalid opportunities before spending tokens or time:
+- **Liveness Gate (`check-liveness.mjs`)**: Verifies HTTP 200 and examines the DOM for closure indicators ("no longer accepting applications", expired Ashby/Lever tags).
+- **Blacklist Gate (`data/blacklist.md`)**: Evaluates company names and domain patterns against candidate-defined exclusions.
+- **Dealbreaker Gate**: Quotas, salary floors, and remote jurisdiction rules evaluated against JD text.
 
-## Data flow (a typical run)
+### 5.3 AI Evaluation Subsystem (`modes/oferta.md` & `_shared.md`)
+Produces structured A–H evaluation dossiers:
+- **Block A**: Role summary, archetype match, culture screen.
+- **Block B**: Requirement mapping (CV match vs. gaps with mitigation strategy).
+- **Block C**: Leveling strategy (IC vs. Management, title calibration).
+- **Block D**: Compensation research (bounded WebSearch vs. market quartiles).
+- **Block E**: CV personalization plan (mapping candidate proof points).
+- **Block F**: STAR+R behavioral interview preparation.
+- **Block G**: Posting legitimacy screening (ghost job detection, age, repost churn).
+- **Block H**: Application form answer drafting (conditional on score $\ge 4.5$).
+- **Scoring**: Holistic 1.0–5.0 rating across 5 dimensions (no naive arithmetic averaging).
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/architecture-data-flow-dark.svg"><img src="docs/architecture-data-flow-light.svg" alt="Data flow of a typical run: scan (scan.mjs) adds URLs to data/pipeline.md; evaluate (oferta.md with cv.md) writes reports/NNN-*.md and a row in the tracker, data/applications.md, which links the report; then you apply: you review and click Submit yourself." width="760"></picture></p>
+### 5.4 Fact Verification Subsystem (`verify-cv-facts.mjs`)
+The platform's anti-hallucination firewall:
+- Parses generated Markdown, HTML, or LaTeX CV payloads.
+- Extracts every tool, language, framework, company, date range, and quantified metric.
+- Compares claims against the candidate's primary sources (`cv.md`, `article-digest.md`).
+- Halts generation and logs a fatal error if any novel assertion is introduced.
 
-## Quality gates
+### 5.5 Rendering Subsystem (`generate-pdf.mjs` & `generate-latex.mjs`)
+Compiles ATS-optimized documents:
+- **Playwright Chromium**: Converts clean HTML templates into single-column, pixel-perfect PDFs.
+- **Page Budgeting**: Enforces strict 1-page or 2-page ceilings with automated trimming guidance.
+- **LaTeX Engine**: Compiles academic and technical CVs via local `pdflatex` or Overleaf templates.
 
-- `test-all.mjs` — the full suite (500+ checks across scoring, scan, tracker, PDF, security, updater).
-- `updater-migration-tests.mjs` — enforces the system/user boundary and safe cross-version upgrades.
-- CI: `test` + CodeQL are required; CodeRabbit reviews every PR; Renovate keeps deps current.
+### 5.6 Concurrency & Locking Subsystem (`lib/dir-lock.mjs`)
+- Advisory file locking across Windows, Linux, and macOS.
+- Prevents write collisions during parallel batch runs (`batch/batch-runner.sh --parallel 3`).
+- Atomic write-temp-then-rename semantics via `writeFileAtomic`.
 
-## Where to start reading
+---
 
-- The boundary → `DATA_CONTRACT.md`
-- The scoring → `modes/_shared.md` + `modes/oferta.md`
-- Adding a job source → [`providers/ADDING_A_PROVIDER.md`](providers/ADDING_A_PROVIDER.md)
-- The updater → `update-system.mjs`; the paths it ships → `lib/update-manifest.mjs`
+## 6. Security Architecture & Threat Model
+
+```mermaid
+flowchart LR
+    subgraph InboundUntrusted ["Untrusted Inbound Data"]
+        ScrapedJD["Scraped Job Description HTML"]
+        RecruiterEmail["Pasted Recruiter Email"]
+    end
+
+    subgraph SecurityEnclave ["Security & Sanitization Enclave"]
+        InstructionFilter["Untrusted Content Rule\n(Data, Never Instructions)"]
+        PIIGuard["lib/pii-interceptor.mjs\n(Ambient Outbound Interceptor)"]
+        SSRFGuard["providers/_ip-guard.mjs\n(Dial-Time DNS Hook)"]
+    end
+
+    subgraph OutboundGuarded ["Guarded Outbound Channels"]
+        LLM["External LLM APIs (Anthropic/Google/OpenAI)"]
+        PublicATS["Public ATS Endpoints"]
+    end
+
+    ScrapedJD --> InstructionFilter
+    RecruiterEmail --> InstructionFilter
+    InstructionFilter --> PIIGuard
+    PIIGuard -->|Aborts on Sensitive PII| LLM
+    InstructionFilter --> SSRFGuard
+    SSRFGuard -->|Blocks 169.254.169.254 & RFC1918| PublicATS
+```
+
+1. **SSRF & DNS Rebinding**: Hooked at the socket connection level, preventing attacks aimed at AWS/GCP/Azure instance metadata services.
+2. **Prompt Injection Containment**: Inbound JD text is strictly labeled as untrusted data. Any imperative commands directed at the AI reviewer are quoted as Block G anomalies and ignored.
+3. **Ambient PII Interception**: All outbound requests to cloud LLMs are intercepted; candidate phone numbers, addresses, and secrets trigger a `PrivacyGuardError` unless explicitly opted into token redaction (`PRIVACY_REDACT=1`).
+4. **Local Loopback Isolation**: The Next.js web server binds exclusively to `127.0.0.1`, refusing external network connections at the OS socket layer.
+
+---
+
+## 7. Quality Assurance Architecture
+
+The codebase enforces a multi-tiered test pyramid:
+- **Syntax Check (`scripts/check-syntax.mjs`)**: Compiles 1,960+ `.mjs` files in $< 4.0$s using Node's native parser.
+- **Discovered Unit Suites (`tests/**/*.test.mjs`)**: Isolated suites testing parsers, locks, and providers.
+- **Data Contract & Migration Gates (`updater-migration-tests.mjs`)**: Asserts that upgrades never overwrite User Layer files.
+- **Visual Regression Testing (`playwright.cv.config.mjs`)**: Compares rendered PDF snapshots against golden images to detect layout drift.
+
+---
+
+## 8. Architectural Roadmap
+
+1. **Monolith Deconstruction**: Disassemble legacy inline sections in `test-all.mjs` into dedicated `tests/` suites.
+2. **TypeScript Domain Package**: Extract shared data models (`Job`, `Application`, `Report`) into a typed `@career-ops/types` package.
+3. **Autofill Browser Extension**: Implement an open-source, local-first browser extension bridging the local Next.js API with ATS application forms.
+4. **Local Audio Mock Interviewer**: WebRTC/Whisper audio agent providing conversational behavioral interview practice from the candidate's STAR story bank.

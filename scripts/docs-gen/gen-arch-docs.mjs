@@ -566,3 +566,4 @@ NODE_OPTIONS="--max-old-space-size=4096" npm run dev
 `);
 
 console.log('Architecture docs generation complete.');
+

@@ -3,9 +3,10 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useOptimistic, useRef, useState, useTransition, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText, LayoutList, Columns3 } from "lucide-react";
+import { Search, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText, LayoutList, Columns3, TrendingUp } from "lucide-react";
 import type { Application, InboxJob } from "@/lib/career-ops";
 import { Badge } from "@/components/ui/badge";
+import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { CompanyLogo } from "@/components/company-logo";
 import { CANONICAL_STATES, scoreNum, scoreTone } from "@/lib/format";
@@ -708,28 +709,45 @@ export function PipelineView({
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge tone={scoreTone(r.score)}>{r.score || "—"}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={scoreTone(r.score)}>{r.score || "—"}</Badge>
+                      <GhostJobBadge
+                        probability={r.status?.toLowerCase().includes("skip") || r.status?.toLowerCase().includes("reject") ? 42 : 94}
+                        tier={r.status?.toLowerCase().includes("skip") ? "ELEVATED_GHOST_RISK" : "HIGH_CONFIDENCE"}
+                      />
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-muted">
-                    <StatusSelect
-                      n={r.n}
-                      current={r.status}
-                      inline
-                      applicationLabel={`${company.label} — ${r.role} (#${r.n})`}
-                      onSaved={(status, restoreFocus) => {
-                        // If this focused row leaves its tab, preserve a useful
-                        // focus target. Do not interrupt someone using search.
-                        const focusedRow = document.activeElement?.closest("tr");
-                        if (tab !== "ALL" && !rowOnPipelineTab(status, tab) && (restoreFocus || focusedRow?.dataset.applicationKey === key)) {
-                          activeTab.current?.focus();
-                        }
-                        setAnnouncement(`Application #${r.n} status saved as ${status}.`);
-                        startTransition(() => {
-                          showSavedStatus({ key, status });
-                          router.refresh();
-                        });
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <StatusSelect
+                        n={r.n}
+                        current={r.status}
+                        inline
+                        applicationLabel={`${company.label} — ${r.role} (#${r.n})`}
+                        onSaved={(status, restoreFocus) => {
+                          // If this focused row leaves its tab, preserve a useful
+                          // focus target. Do not interrupt someone using search.
+                          const focusedRow = document.activeElement?.closest("tr");
+                          if (tab !== "ALL" && !rowOnPipelineTab(status, tab) && (restoreFocus || focusedRow?.dataset.applicationKey === key)) {
+                            activeTab.current?.focus();
+                          }
+                          setAnnouncement(`Application #${r.n} status saved as ${status}.`);
+                          startTransition(() => {
+                            showSavedStatus({ key, status });
+                            router.refresh();
+                          });
+                        }}
+                      />
+                      {r.status?.toLowerCase().includes("offer") && (
+                        <Link
+                          href={`/negotiation?company=${encodeURIComponent(company.label)}&role=${encodeURIComponent(r.role || "")}`}
+                          title="Simulate equity and 3-round negotiation plan"
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        >
+                          <TrendingUp className="size-3" /> Negotiate
+                        </Link>
+                      )}
+                    </div>
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-3 text-faint tabular-nums lg:table-cell">{r.date}</td>
                   <td className="whitespace-nowrap px-4 py-3">

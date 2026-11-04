@@ -337,3 +337,4 @@ node verify-cv-facts.mjs --self-test
 `);
 
 console.log('AI docs generation complete.');
+

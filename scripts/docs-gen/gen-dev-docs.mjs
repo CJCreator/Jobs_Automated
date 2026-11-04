@@ -417,3 +417,4 @@ export async function POST(request: Request) {
 `);
 
 console.log('Development docs generation complete.');
+

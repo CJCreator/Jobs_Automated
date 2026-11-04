@@ -14,6 +14,7 @@ import { ApplyProvider } from "@/components/apply/apply-provider";
 import { ExploreProvider } from "@/components/explore/explore-provider";
 import { FirstScoreView } from "@/components/explore/first-score-view";
 import { BetaBanner } from "@/components/beta/beta-banner";
+import { BottomNav } from "@/components/navigation/bottom-nav";
 import { WorkerPills } from "@/components/jobs/worker-pills";
 import { UsageMeter } from "@/components/usage-meter";
 import { instrumentSerif } from "@/lib/fonts";
@@ -83,11 +84,12 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
             </div>
           </div>
         </aside>
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-x-hidden focus:outline-none">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-x-hidden pb-16 md:pb-0 focus:outline-none">{children}</main>
         <AssistantConsole />
         <BackToTop />
         <FirstScoreView />
         <BetaBanner />
+        <BottomNav />
       </div>
       </ExploreProvider>
       </ApplyProvider>

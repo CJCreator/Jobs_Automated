@@ -48,6 +48,13 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
     setOpen(false);
   }, [pathname]);
 
+  // Listen for bottom-nav or external requests to open the mobile menu drawer.
+  useEffect(() => {
+    const onOpenMenu = () => setOpen(true);
+    window.addEventListener("co-open-menu", onOpenMenu);
+    return () => window.removeEventListener("co-open-menu", onOpenMenu);
+  }, []);
+
   // Scroll-lock + Escape + move focus into the drawer while open.
   useEffect(() => {
     if (!open) return;
