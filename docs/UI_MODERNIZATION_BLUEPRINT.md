@@ -123,11 +123,41 @@ All UI components adhere to the core design tokens: warm off-white (`#f7f6f3`) a
       * Block B Role & CV Match Breakdown.
       * Block C Location & Compensation Signals.
       * Block D Technical Requirements & Keyword Gaps.
+      * Ghost Job Forensics badge (`GhostJobBadge`).
     * **Right Pane**:
       * **Tab 1: Tailored CV**: Live preview of the tailored CV with customized bullet points.
-      * **Tab 2: Outreach & Cover Letter**: Recruiter email draft and tailored cover letter.
+      * **Tab 2: Outreach & Cover Letter**: Recruiter email draft, tailored cover letter, and "Negotiate Offer" integration.
       * **Tab 3: STAR+R Interview Pack**: Story mappings matched to this specific role.
   * **Quick Actions**: One-click copy for emails, download tailored PDF, and direct ATS application link.
+
+### 4.4. 8-Agent Autonomous Enclave (`agents/*`)
+
+* **Master Supervisor (`agents/supervisor.mjs`)**: Orchestrates end-to-end evaluation, tailoring, tracking, and interview preparation workflows.
+* **Specialized Autonomous Agents**:
+  1. `JobDiscoveryAgent`: Reverse-ATS radar traversing public ATS datasets.
+  2. `AtsScoringAgent`: 5-dimension deterministic fit gate executing Blocks A-G.
+  3. `ResumeOptimizationAgent`: AST fact-verifier ensuring zero-fabrication tailored CVs.
+  4. `CoverLetterAgent`: Synthesizes 3-paragraph executive narrative grounded in proof points.
+  5. `RecruiterResearchAgent`: Company health, panel profiles, and culture intelligence.
+  6. `InterviewCoachAgent`: STAR story matching and interview briefing dossiers.
+  7. `SalaryNegotiationAgent`: Compensation decompilation and collaborative counter-offer scripts.
+  8. `ApplicationTrackingAgent`: Atomic ledger updates and SQLite index synchronization.
+* **Blackboard Coordination**: File-backed event stream in `data/agent-events.jsonl`, queried via `/api/agents/events` and displayed on the dashboard via `AgentStatusHud`.
+
+### 4.5. Offer Negotiation & Monte Carlo Simulator (`/negotiation`)
+
+* **Route**: `/negotiation`
+* **Features**:
+  * **Compensation Decompilation**: 4-year vesting schedule, annual bonuses, signing incentives, and total target comp (TTC).
+  * **Equity Exit Modeling**: Bear, Base, Bull, and IPO scenarios with dilution factors.
+  * **3-Round Script Generator**: Collaborative counter-offer narratives, leverage points, and non-salary concession matrices.
+  * **Pipeline Integration**: 1-click deep links from Kanban cards and Table rows when an application reaches `Offer` status (`/negotiation?company=...&role=...`).
+
+### 4.6. Ghost Job Forensics (`GhostJobBadge`)
+
+* **Component**: `web/src/components/jobs/ghost-job-badge.tsx`
+* **Signals Tested**: Stale postings (>60 days), high repost frequency ($\ge 3$ reposts), layoff-active companies, and hiring velocity anomalies.
+* **Surface**: Displayed on Kanban cards, Pipeline table rows, and Job Dossier headers.
 
 ---
 
