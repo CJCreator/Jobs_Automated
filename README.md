@@ -106,6 +106,8 @@ cp config/cv-facts.example.json config/cv-facts.json
 2. Configure your target archetypes, location rules, and comp floors in `config/profile.yml`.
 3. Add curated companies or job boards to `portals.yml`.
 
+The full setup guide, including scanning through an outbound proxy, is in [docs/SETUP.md](docs/SETUP.md).
+
 ---
 
 ## Usage
@@ -376,6 +378,7 @@ Jobs_Automated/
 ## Community & Contributing
 
 `career-ops` is built by over 700+ open-source engineers, career coaches, and job seekers.
-- **Contributing**: Read the [Contribution Guide](docs/development/ContributionGuide.md) and [ADDING_A_PROVIDER.md](providers/ADDING_A_PROVIDER.md).
+- **Contributing**: Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Contribution Guide](docs/development/ContributionGuide.md) and [ADDING_A_PROVIDER.md](providers/ADDING_A_PROVIDER.md).
+- **Support**: Help questions go to [SUPPORT.md](SUPPORT.md), not the issue tracker.
 - **Security**: Review our SSRF and PII policies in [docs/architecture/SecurityArchitecture.md](docs/architecture/SecurityArchitecture.md) and [SECURITY.md](SECURITY.md).
-- **Licensing**: Open-source under the [MIT License](LICENSE).
+- **Licensing**: Open-source under the [MIT License](LICENSE). The career-ops name is governed by the [Trademark Policy](TRADEMARK.md). Use is also subject to the [Legal Disclaimer](LEGAL_DISCLAIMER.md).
