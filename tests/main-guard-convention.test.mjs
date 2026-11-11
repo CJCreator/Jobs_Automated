@@ -241,9 +241,6 @@ const COMMENT_LINE = /^\s*(\/\/|\*|\/\*)/;
 const SPARSE_CHECKOUT_SCRIPTS = new Set([
   '.github/scripts/ci-approve.mjs',
   '.github/scripts/depends-on.mjs',
-  '.github/scripts/direction-gate.mjs',
-  '.github/scripts/gfi-handoff.mjs',
-  '.github/scripts/label-bot.mjs',
   '.github/scripts/triage.bundle.mjs',
 ]);
 

@@ -18,7 +18,7 @@
  *
  * One more failure mode this pins: this is a manifest-mode monorepo that also
  * releases a sibling `web` component (`web-vX.Y.Z`), and RELEASES_API's
- * `/releases/latest` returns correctly ONLY because release.yml's "Keep the
+ * `/releases/latest` returns correctly ONLY because the upstream release.yml (removed in this fork)'s "Keep the
  * career-ops release marked as Latest" step re-asserts it on every push. If
  * that step ever silently stopped doing its job, `/releases/latest` would
  * hand back a `web-*` tag and, without a guard, apply() would fetch and
@@ -154,7 +154,7 @@ console.log('\n🧪 Testing updater channel resolution (release tag vs. main)...
 }
 
 // ── 8. A tag from the sibling `web` component is rejected, not installed ───
-// Reproduces release.yml's "Keep the career-ops release marked as Latest"
+// Reproduces the upstream release.yml (removed in this fork)'s "Keep the career-ops release marked as Latest"
 // step silently not running: /releases/latest hands back web's tag instead.
 {
   const fakeCurlGet = async () => JSON.stringify({ tag_name: 'web-v0.10.0' });
