@@ -24,7 +24,7 @@ flowchart TD
 ### Security Boundaries
 1. **Loopback Default Binding**:
    - `web/server.mjs` binds to `127.0.0.1` unless told otherwise, so by default only processes on the same machine can connect.
-   - Widening the bind is an explicit opt-in. Passing `-H <address>` to the launcher (`npm run dev -- -H 0.0.0.0`, for example) sets the bind directly, and the launcher reports that the run may be reachable from the network.
+   - Widening the bind is an explicit opt-in. Passing `-H <address>` to the launcher (`cd web && npm run dev -- -H 0.0.0.0`, for example) sets the bind directly, and the launcher reports that the run may be reachable from the network.
    - `CAREER_OPS_WEB_ALLOWED_HOSTS` (comma-separated) names the `Host` values the request guard accepts. Naming any non-loopback host makes `web/src/lib/bind-host.mjs` bind to that address, or to `0.0.0.0` when several hosts or a hostname are named. Naming only loopback names does not widen the bind.
    - There is no user authentication. The dashboard has no login, password, or session. Anyone who can reach the bound address can use it, so exposing it beyond loopback is a decision to make deliberately.
 2. **Third-Party API Authentication**:
@@ -38,12 +38,12 @@ flowchart TD
 ## Examples
 Starting the dashboard with the default loopback bind:
 ```bash
-npm run dev            # listens on 127.0.0.1 only
+cd web && npm run dev    # listens on 127.0.0.1 only
 ```
 
 Widening the bind to every interface (exposes the dashboard to your network, with no login):
 ```bash
-npm run dev -- -H 0.0.0.0
+cd web && npm run dev -- -H 0.0.0.0
 ```
 
 ## Future Enhancements

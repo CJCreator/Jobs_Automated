@@ -24,7 +24,7 @@ flowchart TD
 
 ### Visual Testing Configuration
 - Configuration file: `playwright.cv.config.mjs`.
-- Tests location: `tests/cv-visual/cv-visual.spec.mjs`.
+- Tests location: `tests/cv-visual/`. `playwright.cv.config.mjs` runs every `*.spec.mjs` and `*.test.mjs` there, including `tests/cv-visual/cv-visual.test.mjs`.
 - Viewport: Standard Letter (`8.5in x 11in`) and A4 at 96 DPI.
 - Snapshot update command: `npm run test:cv-visual:update`.
 
