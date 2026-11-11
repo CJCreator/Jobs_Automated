@@ -27,7 +27,7 @@ flowchart TD
 - Asserts Node.js runtime compatibility.
 - Confirms Playwright Chromium binary presence.
 - Verifies integrity of candidate configuration files.
-- Checks network connectivity to public ATS endpoints.
+- Probes network reachability of `portals.yml` entries only with `--strict` (`node doctor.mjs --strict`). A default run makes no network requests.
 
 ### Local Run Metrics (`data/scan-runs.tsv`)
 - Records timestamp, provider, listings harvested, listings skipped, and execution duration for every scan sweep.

@@ -287,7 +287,7 @@ export function CvEditor() {
             </span>
             <span className="text-border">|</span>
             <span className="inline-flex items-center gap-1 text-muted">
-              <Sparkles className="size-3 text-brand" /> {impactCount} metrics / impact claims
+              <Sparkles className="size-3 text-brand-text" /> {impactCount} metrics / impact claims
             </span>
           </div>
 

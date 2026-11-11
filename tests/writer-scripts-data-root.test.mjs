@@ -187,7 +187,7 @@ function markerFixture(script) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'career-ops-marker-')));
   const codeRoot = join(dir, 'code');
   const dataRoot = join(dir, 'data');
-  for (const sub of ['lib', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
+  for (const sub of ['lib', 'lib/services', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
   mkdirSync(join(dataRoot, 'data'), { recursive: true });
   mkdirSync(join(dataRoot, 'output'), { recursive: true });
 

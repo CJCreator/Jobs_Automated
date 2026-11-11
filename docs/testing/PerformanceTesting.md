@@ -1,19 +1,19 @@
 # Performance Testing & Benchmarking — career-ops
 
 ## Purpose
-Documents latency thresholds, throughput benchmarks, memory limits, and load testing.
+Describes how to measure career-ops performance by hand. It does not record benchmark results or budgets, because the repository contains no benchmark suite.
 
 ## Scope
-Covers ATS scraping throughput, SQLite indexing speed, and Playwright PDF generation latency.
+Covers ATS scraping, SQLite indexing and Playwright PDF generation.
 
 ## Overview
-Performance is critical when candidates sweep hundreds of company boards. career-ops establishes strict performance budgets to guarantee snappy local execution.
+Performance matters when candidates sweep hundreds of company boards. The timings below are illustrative only and were not measured in this repository.
 
 ## Diagrams
 
 ```mermaid
 gantt
-    title Typical Single-Offer Performance Profile
+    title Illustrative Single-Offer Flow (not measured)
     dateFormat X
     axisFormat %s ms
     section Pre-Flight
@@ -30,13 +30,10 @@ gantt
 ## Technical Details
 
 ### Performance Budgets
-- **Syntax Check (`check-syntax.mjs`)**: $< 5.0$ seconds for 1,900+ files.
-- **SQLite Index Sync (`tracker.mjs sync`)**: $< 100$ ms for 500 applications.
-- **Zero-Token Scrape Throughput**: $> 20$ job listings per second per ATS board.
-- **PDF Generation**: $< 2.0$ seconds per document via Playwright Chromium.
+The repository has no benchmark suite that enforces latency or throughput targets, so this document does not set any. Measure with the commands below and record the numbers yourself before treating them as a baseline.
 
 ## Best Practices
-- Use batch rendering (`generate-pdf.mjs --batch`) to share a single Chromium browser instance across multiple documents.
+- Use batch rendering (`generate-pdf.mjs --batch=<manifest.json>`) to share a single Chromium browser instance across multiple documents.
 
 ## Examples
 ```bash
