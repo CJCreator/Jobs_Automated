@@ -1,3 +1,5 @@
+> 注意: この翻訳は上流の career-ops プロジェクトについて説明しており、最新でない可能性があります。このリポジトリの英語版 README.md がこのフォークの基準です。
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">オープンソースの AI 求職エージェント。</p>

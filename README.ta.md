@@ -1,3 +1,5 @@
+> This translation describes the upstream career-ops project and may be out of date. The English README.md in this repository is the reference for this fork.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">வேலை தேடலுக்கான ஓப்பன் சோர்ஸ் AI ஏஜென்ட்.</p>

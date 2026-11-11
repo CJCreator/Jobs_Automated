@@ -1,3 +1,5 @@
+> Catatan: Terjemahan ini menjelaskan proyek upstream career-ops dan mungkin sudah tidak mutakhir. README.md berbahasa Inggris di repositori ini adalah acuan untuk fork ini.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Agen AI open-source untuk pencarian kerja.</p>

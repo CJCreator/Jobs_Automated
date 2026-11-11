@@ -1,3 +1,5 @@
+> 注意：本译文描述的是上游 career-ops 项目，可能已过时。本仓库中的英文 README.md 是此分支的参考版本。
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">开源的 AI 求职智能体。</p>

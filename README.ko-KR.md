@@ -1,3 +1,5 @@
+> 참고: 이 번역문은 upstream career-ops 프로젝트를 설명하며 최신이 아닐 수 있습니다. 이 저장소의 영문 README.md가 이 포크의 기준입니다.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">오픈 소스 AI 구직 에이전트.</p>

@@ -1,3 +1,5 @@
+> Hinweis: Diese Übersetzung beschreibt das Upstream-Projekt career-ops und ist möglicherweise veraltet. Die englische README.md in diesem Repository ist die Referenz für diesen Fork.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Der Open-Source-KI-Agent für die Jobsuche.</p>

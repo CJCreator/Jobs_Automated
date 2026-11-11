@@ -1,3 +1,5 @@
+> ملاحظة: تصف هذه الترجمة مشروع career-ops الأصلي (upstream) وقد تكون قديمة. ملف README.md الإنجليزي في هذا المستودع هو المرجع لهذا الفورك.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center" dir="rtl">وكيل ذكاء اصطناعي مفتوح المصدر للبحث عن عمل.</p>

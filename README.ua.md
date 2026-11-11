@@ -1,3 +1,5 @@
+> Примітка: Цей переклад описує upstream-проєкт career-ops і може бути застарілим. Англійський README.md у цьому репозиторії є орієнтиром для цього форку.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">AI-агент з відкритим кодом для пошуку роботи.</p>

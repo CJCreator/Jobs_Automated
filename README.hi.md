@@ -1,3 +1,5 @@
+> नोट: यह अनुवाद upstream career-ops प्रोजेक्ट का वर्णन करता है और पुराना हो सकता है। इस रिपॉज़िटरी का अंग्रेज़ी README.md इस फ़ोर्क के लिए संदर्भ है।
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">नौकरी की तलाश के लिए ओपन सोर्स AI एजेंट।</p>

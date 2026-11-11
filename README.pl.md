@@ -1,3 +1,5 @@
+> Uwaga: To tłumaczenie opisuje projekt nadrzędny career-ops i może być nieaktualne. Angielski plik README.md w tym repozytorium jest punktem odniesienia dla tego forka.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Open source'owy agent AI do szukania pracy.</p>

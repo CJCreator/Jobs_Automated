@@ -145,72 +145,78 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
         <div className="space-y-4 lg:col-span-4">
           <div className="rounded-xl border border-border bg-surface p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Briefcase className="size-4 text-brand" />
+              <Briefcase className="size-4 text-brand-text" />
               Offer Parameters
             </h3>
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <label className="text-xs font-medium text-muted">Company & Role</label>
+                <label htmlFor="offer-company" className="text-xs font-medium text-muted">Company & Role</label>
                 <div className="mt-1 grid grid-cols-2 gap-2">
                   <input
+                    id="offer-company"
                     type="text"
                     value={offer.company}
                     onChange={(e) => setOffer({ ...offer, company: e.target.value })}
-                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     placeholder="Company"
                   />
                   <input
                     type="text"
+                    aria-label="Role"
                     value={offer.role}
                     onChange={(e) => setOffer({ ...offer, role: e.target.value })}
-                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     placeholder="Role"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted">Annual Base Salary ($)</label>
+                <label htmlFor="offer-base" className="text-xs font-medium text-muted">Annual Base Salary ($)</label>
                 <input
+                  id="offer-base"
                   type="number"
                   step="5000"
                   value={offer.base}
                   onChange={(e) => setOffer({ ...offer, base: Number(e.target.value) || 0 })}
-                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-muted">Target Bonus (%)</label>
+                  <label htmlFor="offer-bonus" className="text-xs font-medium text-muted">Target Bonus (%)</label>
                   <input
+                    id="offer-bonus"
                     type="number"
                     value={offer.bonusPercent}
                     onChange={(e) => setOffer({ ...offer, bonusPercent: Number(e.target.value) || 0 })}
-                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted">Sign-On Bonus ($)</label>
+                  <label htmlFor="offer-signing" className="text-xs font-medium text-muted">Sign-On Bonus ($)</label>
                   <input
+                    id="offer-signing"
                     type="number"
                     step="5000"
                     value={offer.signingBonus}
                     onChange={(e) => setOffer({ ...offer, signingBonus: Number(e.target.value) || 0 })}
-                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted">Total Equity Grant ($ / 4 yrs)</label>
+                <label htmlFor="offer-equity" className="text-xs font-medium text-muted">Total Equity Grant ($ / 4 yrs)</label>
                 <input
+                  id="offer-equity"
                   type="number"
                   step="25000"
                   value={offer.equityGrant}
                   onChange={(e) => setOffer({ ...offer, equityGrant: Number(e.target.value) || 0 })}
-                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
             </div>
@@ -232,6 +238,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
                   key={scenKey}
                   type="button"
                   onClick={() => setScenario(scenKey)}
+                  aria-pressed={scenario === scenKey}
                   className={`rounded-lg border p-2.5 text-left transition-all ${
                     scenario === scenKey
                       ? "border-brand bg-brand-soft/30 text-foreground ring-1 ring-brand"
@@ -334,7 +341,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
           <div className="rounded-xl border border-border bg-surface p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-brand" />
+                <Sparkles className="size-4 text-brand-text" />
                 <h3 className="text-base font-semibold text-foreground">
                   3-Round Game-Theoretic Counter Strategy
                 </h3>
@@ -353,6 +360,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
                   key={tab.r}
                   type="button"
                   onClick={() => setActiveRound(tab.r)}
+                  aria-pressed={activeRound === tab.r}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     activeRound === tab.r
                       ? "bg-brand text-brand-foreground"

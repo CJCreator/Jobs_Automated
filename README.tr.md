@@ -1,3 +1,5 @@
+> Not: Bu çeviri üst proje career-ops'u anlatır ve güncel olmayabilir. Bu depodaki İngilizce README.md, bu fork için referanstır.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Açık kaynaklı yapay zekâ iş arama ajanı.</p>

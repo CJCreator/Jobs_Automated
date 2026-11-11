@@ -1,3 +1,5 @@
+> Bemærk: Denne oversættelse beskriver det upstream career-ops-projekt og kan være forældet. Den engelske README.md i dette repository er referencen for denne fork.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Open source-AI-agenten til jobsøgning.</p>

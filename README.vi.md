@@ -1,3 +1,5 @@
+> Lưu ý: Bản dịch này mô tả dự án upstream career-ops và có thể đã lỗi thời. README.md tiếng Anh trong kho này là tài liệu tham chiếu cho bản fork này.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Agent tìm việc bằng AI mã nguồn mở.</p>

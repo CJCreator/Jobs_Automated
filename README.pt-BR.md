@@ -1,3 +1,5 @@
+> Aviso: Esta tradução descreve o projeto upstream career-ops e pode estar desatualizada. O README.md em inglês deste repositório é a referência para este fork.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">O agente de IA open source para buscar emprego.</p>
