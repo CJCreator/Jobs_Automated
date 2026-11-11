@@ -253,7 +253,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case screens.PipelineOpenURLMsg:
-		return m, openCmd(msg.URL)
+		return m, openURLCmd(msg.URL)
 
 	case screens.PipelineOpenPDFMsg:
 		return m, openCmd(msg.Path)
@@ -305,6 +305,19 @@ func openCmd(target string) tea.Cmd {
 		}
 		return nil
 	}
+}
+
+// openURLCmd opens a job or report URL. Only an absolute http(s) URL with a
+// host reaches the OS opener; anything else is reported back as a failed open,
+// so a hostile or malformed posting URL never becomes an xdg-open/start argument.
+// openCmd itself also serves local CV PDF paths, so the check lives here.
+func openURLCmd(target string) tea.Cmd {
+	if !screens.IsWebURL(target) {
+		return func() tea.Msg {
+			return screens.PipelineOpenFailedMsg{Target: target, Err: "refusing to open a non-http(s) URL"}
+		}
+	}
+	return openCmd(target)
 }
 
 // runGeneratePDF runs the checkout's generate-pdf.mjs against the selected data root,
