@@ -1145,6 +1145,24 @@ export function makeCliFailUsage({ argv, usage, defaultMessage }) {
  * @returns {Promise<{release: Function}|null>}
  */
 export async function acquireTrackerLockForCli(appsFile, { dryRun, failWith }) {
+  const lock = await acquireTrackerLockForWriter(appsFile, { dryRun, failWith });
+  if (lock) process.once('exit', () => lock.release());
+  return lock;
+}
+
+/**
+ * Same acquisition and failure routing as acquireTrackerLockForCli, but with
+ * NO process-level `exit` hook. For in-process callers (lib/services/*) that
+ * may run many times in one long-lived process, such as the web server: each
+ * call to acquireTrackerLockForCli adds a `process.once('exit')` listener that
+ * is never removed. The caller must release the returned lock itself, in a
+ * finally block.
+ *
+ * @param {string} appsFile - Canonical tracker path (resolveTrackerPath()).
+ * @param {{dryRun: boolean, failWith: (exitCode: number, code: string, message: string, extra?: object) => never}} options
+ * @returns {Promise<{release: Function}|null>}
+ */
+export async function acquireTrackerLockForWriter(appsFile, { dryRun, failWith }) {
   if (dryRun) return null;
   let lock;
   try {
@@ -1170,6 +1188,5 @@ export async function acquireTrackerLockForCli(appsFile, { dryRun, failWith }) {
     // loudly instead.
     throw err;
   }
-  process.once('exit', () => lock.release());
   return lock;
 }

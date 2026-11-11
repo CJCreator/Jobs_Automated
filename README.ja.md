@@ -1,3 +1,5 @@
+> 注意: この翻訳は上流の career-ops プロジェクトについて説明しており、最新でない可能性があります。このリポジトリの英語版 README.md がこのフォークの基準です。
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">オープンソースの AI 求職エージェント。</p>
@@ -132,18 +134,6 @@ npx @santifer/career-ops init
 [修正はここで書かれる](CONTRIBUTING.md)。クラブではなく、部屋。**一緒に作ろう。**
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord：career-ops サーバーのメンバー数（ライブ）"></a></p>
-
-## スポンサー
-
-career-ops は求職者にとって永久に無料。以下の企業がこのプロジェクトをスポンサーしている：
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> スポンサーシップが買うのは明確に表示された露出であって、影響力ではない。どんな金額もロードマップを変えず、プロダクトの中に何も置かない。スポンサーが評価、順位付け、推薦に現れることは決してない。
 
 ## career-ops があなたにしてくれること
 

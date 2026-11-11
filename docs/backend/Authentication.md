@@ -22,21 +22,28 @@ flowchart TD
 ## Technical Details
 
 ### Security Boundaries
-1. **Loopback Only Binding**:
-   - Web server scripts (`web/server.mjs`) explicitly bind to `127.0.0.1`. Requests originating from outside the host machine are rejected at the operating system socket layer.
+1. **Loopback Default Binding**:
+   - `web/server.mjs` binds to `127.0.0.1` unless told otherwise, so by default only processes on the same machine can connect.
+   - Widening the bind is an explicit opt-in. Passing `-H <address>` to the launcher (`cd web && npm run dev -- -H 0.0.0.0`, for example) sets the bind directly, and the launcher reports that the run may be reachable from the network.
+   - `CAREER_OPS_WEB_ALLOWED_HOSTS` (comma-separated) names the `Host` values the request guard accepts. Naming any non-loopback host makes `web/src/lib/bind-host.mjs` bind to that address, or to `0.0.0.0` when several hosts or a hostname are named. Naming only loopback names does not widen the bind.
+   - There is no user authentication. The dashboard has no login, password, or session. Anyone who can reach the bound address can use it, so exposing it beyond loopback is a decision to make deliberately.
 2. **Third-Party API Authentication**:
    - Outbound LLM calls authenticate using standard API keys stored in local environment variables (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`).
    - Keys are never stored in browser cookies or transmitted to client-side bundles.
 
 ## Best Practices
-- Never bind career-ops to `0.0.0.0` without placing a password-authenticated reverse proxy (e.g., Caddy with basic auth) in front.
+- Keep the default loopback bind unless you need network access.
+- Never widen the bind (`-H` or `CAREER_OPS_WEB_ALLOWED_HOSTS`) without placing an authenticating reverse proxy (e.g., Caddy with basic auth) in front, because the dashboard itself checks no credentials.
 
 ## Examples
-```javascript
-// web/server.mjs explicit loopback binding
-server.listen(port, '127.0.0.1', () => {
-  console.log(`Server listening on http://127.0.0.1:${port}`);
-});
+Starting the dashboard with the default loopback bind:
+```bash
+cd web && npm run dev    # listens on 127.0.0.1 only
+```
+
+Widening the bind to every interface (exposes the dashboard to your network, with no login):
+```bash
+cd web && npm run dev -- -H 0.0.0.0
 ```
 
 ## Future Enhancements

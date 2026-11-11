@@ -16,6 +16,18 @@ export const runtime = "nodejs";
 
 const EXIT_TO_HTTP: Record<number, number> = { 2: 404, 3: 409, 4: 503 };
 const CLIENT_ERROR_CODES = new Set(["usage", "invalid-state", "undo-unknown-prior", "not-found", "ambiguous"]);
+const GENERIC_FAILURE = "status update failed";
+// The in-process write holds the tracker lock; a request that waits longer than
+// this is answered 504 instead of hanging the browser. The write itself is not
+// cancelled and may still complete after the response.
+const STATUS_TIMEOUT_MS = 30_000;
+
+type TrackerServiceModule = {
+  executeSetStatus: (options: Record<string, unknown>) => Promise<{ newStatus?: string; changed?: boolean; statusLogged?: boolean }>;
+  TrackerServiceError: new (...args: never[]) => Error & { code?: string; exitCode?: number };
+};
+
+class StatusTimeoutError extends Error {}
 
 export async function POST(req: Request) {
   const body = await readJsonObject<{ n?: string; status?: string; undo?: boolean }>(req);
@@ -56,20 +68,28 @@ async function writeStatus(n: unknown, canon: string | null) {
     );
   }
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let service: TrackerServiceModule | null = null;
   try {
-    const { executeSetStatus } = await import(
+    service = (await import(
       /* webpackIgnore: true */ pathToFileURL(serviceFile).href
-    );
+    )) as TrackerServiceModule;
 
-    const result = await executeSetStatus({
-      row,
-      state: canon,
-      undo: !canon,
-      source: "web",
-      detachJdArchive: true,
-      codeRoot,
-      dataRoot: careerOpsRoot(),
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new StatusTimeoutError("status update timed out")), STATUS_TIMEOUT_MS);
     });
+    const result = await Promise.race([
+      service.executeSetStatus({
+        row,
+        state: canon,
+        undo: !canon,
+        source: "web",
+        detachJdArchive: true,
+        codeRoot,
+        dataRoot: careerOpsRoot(),
+      }),
+      timeout,
+    ]);
 
     return Response.json({
       ok: true,
@@ -77,20 +97,35 @@ async function writeStatus(n: unknown, canon: string | null) {
       changed: result.changed === true,
       statusLogged: result.statusLogged === true,
     });
-  } catch (err: any) {
-    const exitCode = typeof err?.exitCode === "number" ? err.exitCode : 1;
-    const errCode = typeof err?.code === "string" ? err.code : "error";
-    const httpStatus =
-      exitCode === 1
-        ? (CLIENT_ERROR_CODES.has(errCode) ? 400 : 500)
-        : (EXIT_TO_HTTP[exitCode] ?? 500);
+  } catch (err: unknown) {
+    if (err instanceof StatusTimeoutError) {
+      console.error("[api/status] in-process status update exceeded the timeout");
+      return Response.json({ error: "status update timed out", code: "timeout" }, { status: 504 });
+    }
 
-    return Response.json(
-      { error: err?.message || "status update failed", code: errCode },
-      {
-        status: httpStatus,
-        ...(httpStatus === 503 ? { headers: { "Retry-After": "5" } } : {}),
-      },
-    );
+    // Only the service's own errors carry a message fit for the caller. Anything
+    // else (filesystem paths, stack detail) is logged server-side and replaced.
+    const ServiceError = service?.TrackerServiceError;
+    if (ServiceError && err instanceof ServiceError) {
+      const exitCode = typeof err.exitCode === "number" ? err.exitCode : 1;
+      const errCode = typeof err.code === "string" ? err.code : "error";
+      const httpStatus =
+        exitCode === 1
+          ? (CLIENT_ERROR_CODES.has(errCode) ? 400 : 500)
+          : (EXIT_TO_HTTP[exitCode] ?? 500);
+
+      return Response.json(
+        { error: err.message || GENERIC_FAILURE, code: errCode },
+        {
+          status: httpStatus,
+          ...(httpStatus === 503 ? { headers: { "Retry-After": "5" } } : {}),
+        },
+      );
+    }
+
+    console.error("[api/status] status update failed:", err);
+    return Response.json({ error: GENERIC_FAILURE, code: "error" }, { status: 500 });
+  } finally {
+    clearTimeout(timer);
   }
 }

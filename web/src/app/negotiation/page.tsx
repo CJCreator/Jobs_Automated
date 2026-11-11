@@ -5,7 +5,7 @@ import { OfferSimulator } from "@/components/negotiation/offer-simulator";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Offer Negotiation & Monte Carlo Simulator — career-ops",
+  title: "Offer Negotiation & Scenario Calculator — career-ops",
   description: "Decompile complex tech compensation offers, simulate equity exit multiples, and generate 3-round counter-offer scripts.",
 };
 

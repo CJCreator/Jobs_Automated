@@ -1,3 +1,5 @@
+> Uwaga: To tłumaczenie opisuje projekt nadrzędny career-ops i może być nieaktualne. Angielski plik README.md w tym repozytorium jest punktem odniesienia dla tego forka.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Open source'owy agent AI do szukania pracy.</p>
@@ -132,18 +134,6 @@ Rekrutacja sama się nie naprawi. Ludzie, którzy przez nią przechodzą, mogą,
 [Tu pisze się poprawkę](CONTRIBUTING.md). Pokój, nie klub. **Budujmy razem.**
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: liczba członków serwera career-ops na żywo"></a></p>
-
-## Sponsorzy
-
-career-ops jest darmowy dla kandydatów, na zawsze. Te firmy sponsorują projekt:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> Sponsoring kupuje wyraźnie oznaczoną widoczność, nigdy wpływ: żadna kwota nie zmienia planu rozwoju ani nie umieszcza niczego w produkcie. Sponsorzy nigdy nie pojawiają się w ocenach, rankingach ani rekomendacjach.
 
 ## Co career-ops robi dla ciebie
 

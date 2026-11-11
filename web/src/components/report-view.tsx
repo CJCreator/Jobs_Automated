@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, FileText, ExternalLink, ChevronDown, Copy, Sparkles, BookOpen, Send, CheckCircle2, Columns2, FileCode, TrendingUp } from "lucide-react";
 import type { Application } from "@/lib/career-ops";
 import { Badge } from "@/components/ui/badge";
-import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
 import { ScoreGauge } from "@/components/ui/score-gauge";
 import { useToast } from "@/components/ui/toast";
 import { scoreTone, legitimacyTone, parseReport } from "@/lib/format";
@@ -210,10 +209,6 @@ export function ReportView({
 
         {(archetype || date || applyUrl) && (
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-            <GhostJobBadge
-              probability={app?.status?.toLowerCase().includes("skip") ? 42 : 94}
-              tier={app?.status?.toLowerCase().includes("skip") ? "ELEVATED_GHOST_RISK" : "HIGH_CONFIDENCE"}
-            />
             {archetype && <span className="max-w-full truncate">{archetype}</span>}
             {date && <span className="tabular-nums text-faint">{date}</span>}
             {applyUrl && (

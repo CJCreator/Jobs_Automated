@@ -29,7 +29,6 @@ import { Drawer } from "@/components/ui/drawer";
 import { useToast } from "@/components/ui/toast";
 import { saveStatus } from "@/lib/pipeline-status.mjs";
 import { postingHref } from "@/lib/posting-url.mjs";
-import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
 import { cn } from "@/lib/cn";
 
 export interface KanbanColumnDef {
@@ -268,8 +267,17 @@ export function KanbanBoard({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <CompanyLogo name={app.company} size={24} />
                             <div className="min-w-0">
-                              <h4 className="truncate text-xs font-semibold text-foreground group-hover:text-brand-text">
-                                {app.company}
+                              <h4 className="truncate text-xs font-semibold text-foreground">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedApp(app);
+                                  }}
+                                  className="block max-w-full truncate rounded-sm text-left group-hover:text-brand-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                                >
+                                  {app.company}
+                                </button>
                               </h4>
                               <p className="truncate text-[11px] text-muted">
                                 {app.role || "Untitled Role"}
@@ -335,10 +343,6 @@ export function KanbanBoard({
                             ) : (
                               <span className="text-[10px] text-faint">Unscored</span>
                             )}
-                            <GhostJobBadge
-                              probability={app.status?.toLowerCase().includes("skip") || app.status?.toLowerCase().includes("reject") ? 42 : 94}
-                              tier={app.status?.toLowerCase().includes("skip") ? "ELEVATED_GHOST_RISK" : "HIGH_CONFIDENCE"}
-                            />
                             {tailoredCvExists && (
                               <span
                                 title="Tailored CV ready"

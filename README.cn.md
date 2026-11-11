@@ -1,3 +1,5 @@
+> 注意：本译文描述的是上游 career-ops 项目，可能已过时。本仓库中的英文 README.md 是此分支的参考版本。
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">开源的 AI 求职智能体。</p>
@@ -134,18 +136,6 @@ npx @santifer/career-ops init
 [修复就是在这里写出来的](CONTRIBUTING.md)。是房间，不是俱乐部。**一起来建。**
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord：career-ops 服务器的实时成员数"></a></p>
-
-## 赞助商
-
-career-ops 对求职者永久免费。这些公司赞助了本项目：
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> 赞助买到的是清楚标注的曝光，绝不是影响力：再多的钱也改变不了路线图，也放不进产品里任何东西。赞助商绝不会出现在评估、排名或推荐中。
 
 ## career-ops 为你做什么
 

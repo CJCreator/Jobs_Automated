@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MarkdownProjector } from '../../lib/storage/markdown-projector.mjs';
 import { SqliteClient } from '../../lib/storage/sqlite-client.mjs';
+import { makeTrackerFixture, FIXTURE_AVG_SCORE } from './tracker-fixture.mjs';
 
-test('MarkdownProjector: sync, query, cache hit, and KPI summary', async () => {
+test('MarkdownProjector: sync, query, cache hit, and KPI summary', async (t) => {
+  const dataRoot = makeTrackerFixture(t);
   // Use in-memory SQLite for test isolation
   const sqlite = new SqliteClient(':memory:');
-  const projector = new MarkdownProjector({ sqliteClient: sqlite });
+  const projector = new MarkdownProjector({ dataRoot, sqliteClient: sqlite });
 
   // 1. Initial sync from data/applications.md
   const syncResult = projector.syncFromMarkdown({ force: true });
@@ -17,7 +19,7 @@ test('MarkdownProjector: sync, query, cache hit, and KPI summary', async () => {
   const app3 = projector.getApplicationById(3);
   assert.ok(app3);
   assert.equal(app3.id, 3);
-  assert.equal(app3.company, 'Stripe');
+  assert.equal(app3.company, 'Initech');
   assert.equal(app3.status, 'Evaluated');
   assert.equal(app3.score_numeric, 4.5);
 
@@ -25,13 +27,13 @@ test('MarkdownProjector: sync, query, cache hit, and KPI summary', async () => {
   const evaluatedApps = projector.queryApplications({ status: 'Evaluated' });
   assert.ok(Array.isArray(evaluatedApps));
   assert(evaluatedApps.length >= 1);
-  assert.equal(evaluatedApps[0].company, 'Stripe');
+  assert.equal(evaluatedApps[0].company, 'Initech');
 
   // 4. Instant KPI summary
   const summary = projector.getPipelineSummary();
-  assert(summary.total >= 1);
+  assert.equal(summary.total, 3);
   assert.equal(summary.byStatus['Evaluated'], 1);
-  assert.equal(summary.avgScore, 4.5);
+  assert.equal(summary.avgScore, FIXTURE_AVG_SCORE);
 
   // 5. Subsequent sync without file changes is cached
   const cachedSync = projector.syncFromMarkdown();

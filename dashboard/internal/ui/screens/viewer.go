@@ -129,6 +129,12 @@ func isWebURL(raw string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
+// IsWebURL is the exported form of isWebURL, for callers outside this package
+// that must not hand a non-web target to the OS opener.
+func IsWebURL(raw string) bool {
+	return isWebURL(raw)
+}
+
 // rebuildRender recomputes renderedLines from raw lines using the current width.
 func (m *ViewerModel) rebuildRender() {
 	m.renderedLines = m.renderAll()

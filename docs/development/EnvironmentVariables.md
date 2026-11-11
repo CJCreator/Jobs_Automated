@@ -46,7 +46,7 @@ flowchart LR
 ## Examples
 ```bash
 # Example .env configuration
-CAREER_OPS_ROOT=/Users/alex/my-job-search
+CAREER_OPS_ROOT=/path/to/my-job-search
 PRIVACY_REDACT=1
 OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxx
 ```

@@ -23,7 +23,7 @@ import {
   makeCliFailUsage,
 } from './tracker-utils.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
-import { executeSetStatus, TrackerServiceError } from './lib/services/tracker-service.mjs';
+import { executeSetStatus, TrackerServiceError, WRITER_SOURCES } from './lib/services/tracker-service.mjs';
 
 const CODE_ROOT = dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = getCareerOpsRoot();
@@ -160,8 +160,6 @@ if (wantsHelp(rawArgs)) {
   process.exit(EXIT_OK);
 }
 
-const WRITER_SOURCES = new Set(['set-status', 'web', 'reply-watch', 'agent']);
-
 const failUsage = makeCliFailUsage({
   argv: rawArgs,
   usage: USAGE,
@@ -252,6 +250,9 @@ try {
     replaceNote: flags.replaceNote,
     on: flags.on,
     source: flags.source ?? 'set-status',
+    // Machine output owns stdout: the follow-up and archive progress lines stay off it.
+    quiet: flags.json,
+    json: flags.json,
     force: flags.force,
     dryRun: flags.dryRun,
     undo: flags.undo,
@@ -272,7 +273,7 @@ try {
 }
 
 const oldLabel = resolveCanonicalState(result.oldStatus, states);
-if (!flags.undo && result.changed && !flags.dryRun && states.find(s => s.label === oldLabel)?.terminal) {
+if (!flags.undo && result.statusChanged && !flags.dryRun && states.find(s => s.label === oldLabel)?.terminal) {
   console.warn(`⚠ #${result.num} was ${oldLabel}, a terminal state. Reopened as ${result.newStatus}.`);
 }
 
@@ -283,7 +284,7 @@ if (flags.json) {
 } else {
   const verb = flags.undo ? (flags.dryRun ? 'would undo' : 'undid') : flags.dryRun ? 'would set' : result.changed ? 'set' : 'already';
   console.log(`✅ #${result.num} ${result.company} — ${result.role}: ${verb} ${result.oldStatus} → ${result.newStatus}${result.note ? ` (note: ${result.note})` : ''}`);
-  if (!flags.undo && result.changed && !flags.dryRun && result.newStatus === 'Applied' && !result.followupSeeded?.seeded && result.followupSeeded?.reason !== 'disabled') {
+  if (!flags.undo && result.statusChanged && !flags.dryRun && result.newStatus === 'Applied' && !result.followupSeeded?.seeded && result.followupSeeded?.reason !== 'disabled') {
     console.error('ℹ️  Status is Applied — consider seeding follow-ups in data/follow-ups.md (#1430: node followup-cadence.mjs)');
   }
 }

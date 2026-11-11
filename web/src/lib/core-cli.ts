@@ -61,7 +61,3 @@ export function runCoreCli(script: string, args: string[]): Promise<CliResult> {
     );
   });
 }
-
-export function runSetStatus(args: string[]): Promise<CliResult> {
-  return runCoreCli("set-status", args);
-}

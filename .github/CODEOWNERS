@@ -16,59 +16,59 @@
 # PR, for every owner, including this file's.
 
 # Repo docs & governance
-/README*.md            @santifer
-/CONTRIBUTING.md       @santifer
-/GOVERNANCE.md         @santifer
-/MAINTAINERS.md        @santifer
-/ARCHITECTURE.md       @santifer
-/.github/CODEOWNERS    @santifer
+/README*.md            @CJCreator
+/CONTRIBUTING.md       @CJCreator
+/GOVERNANCE.md         @CJCreator
+/MAINTAINERS.md        @CJCreator
+/ARCHITECTURE.md       @CJCreator
+/.github/CODEOWNERS    @CJCreator
 
 # Coding-agent configuration (instructions, agent profiles, setup job):
 # a change here rewrites what an autonomous session is allowed to do.
-/.github/copilot-instructions.md  @santifer
-/.github/agents/                  @santifer
+/.github/copilot-instructions.md  @CJCreator
+/.github/agents/                  @CJCreator
 
 # Agent behavior & the multi-CLI contract (prompt layer — CI-blind)
-/CLAUDE.md             @santifer
-/AGENTS.md             @santifer
-/CODEX.md              @santifer
-/OPENCODE.md           @santifer
-/GEMINI.md             @santifer
-/KIMI.md               @santifer
+/CLAUDE.md             @CJCreator
+/AGENTS.md             @CJCreator
+/CODEX.md              @CJCreator
+/OPENCODE.md           @CJCreator
+/GEMINI.md             @CJCreator
+/KIMI.md               @CJCreator
 # The skill router. Every CLI's skill entrypoint (.claude/, .cursor/,
 # .opencode/, .qwen/, .kimi/, .grok/, .antigravitycli/) is a symlink to this
 # one file, so an edit here changes only this path — the symlinks never show
 # up in the diff.
-/.agents/skills/career-ops/SKILL.md  @santifer
+/.agents/skills/career-ops/SKILL.md  @CJCreator
 
 # Scoring & the system/user data contract (CI-blind; silent-danger)
-/modes/_shared.md      @santifer
-/DATA_CONTRACT.md      @santifer
+/modes/_shared.md      @CJCreator
+/DATA_CONTRACT.md      @CJCreator
 
 # The self-updater (catastrophic if wrong — touches user installs)
-/update-system.mjs     @santifer
+/update-system.mjs     @CJCreator
 # Its system-layer list (#5554). Kept here: the run-time checks refuse an entry
 # that names the user layer, not one that ships a file installs should not get.
-/lib/update-manifest.mjs  @santifer
-/updater-migration-tests.mjs  @santifer
+/lib/update-manifest.mjs  @CJCreator
+/updater-migration-tests.mjs  @CJCreator
 
 # Plugin governance chokepoint (a bad change here ships unreviewed code to
 # every user — the registry pin, the gates, and the CI must stay single-owner).
 # The registry is one file per plugin under plugins-registry/ (#1401).
-/plugins-registry/             @santifer
-/validate-plugin-registry.mjs  @santifer
-/plugin-install.mjs            @santifer
-/plugin-audit.mjs              @santifer
-/plugins/_engine.mjs           @santifer
-/plugins/_lock.mjs             @santifer
-/plugins/_net.mjs              @santifer
-/plugins/_registry.mjs         @santifer
-/.github/workflows/            @santifer
-/docs/PLUGIN_REVIEW.md         @santifer
+/plugins-registry/             @CJCreator
+/validate-plugin-registry.mjs  @CJCreator
+/plugin-install.mjs            @CJCreator
+/plugin-audit.mjs              @CJCreator
+/plugins/_engine.mjs           @CJCreator
+/plugins/_lock.mjs             @CJCreator
+/plugins/_net.mjs              @CJCreator
+/plugins/_registry.mjs         @CJCreator
+/.github/workflows/            @CJCreator
+/docs/PLUGIN_REVIEW.md         @CJCreator
 
 # The experimental web UI — owned by the web track (dual-track review with the
 # core maintainer on any PR that also touches root files).
-/web/ @santifer
+/web/ @CJCreator
 
 # ── Area owners ────────────────────────────────────────────────────────────
 # Not red lines: these are the day-to-day areas, routed to whoever has been

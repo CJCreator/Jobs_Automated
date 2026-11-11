@@ -49,3 +49,29 @@ func TestOpenCmdReturnsNilOnSuccess(t *testing.T) {
 		t.Fatalf("expected no message on success, got %#v", msg())
 	}
 }
+
+// A job URL that is not an absolute http(s) URL never reaches the OS opener.
+func TestOpenURLCmdRefusesNonWebURL(t *testing.T) {
+	previous := runOpenCommand
+	defer func() { runOpenCommand = previous }()
+
+	called := false
+	runOpenCommand = func(name string, args ...string) error {
+		called = true
+		return nil
+	}
+
+	for _, target := range []string{"javascript:alert(1)", "file:///etc/passwd", "--help", "relative/path"} {
+		msg := openURLCmd(target)()
+		failed, ok := msg.(screens.PipelineOpenFailedMsg)
+		if !ok {
+			t.Fatalf("%q: expected screens.PipelineOpenFailedMsg, got %T", target, msg)
+		}
+		if failed.Target != target {
+			t.Fatalf("Target = %q, want %q", failed.Target, target)
+		}
+	}
+	if called {
+		t.Fatal("opener was invoked for a non-web URL")
+	}
+}

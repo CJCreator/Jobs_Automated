@@ -6,6 +6,8 @@ services:
     image: career-ops:local
     container_name: career-ops
     working_dir: /app
+    # Run as the host user so files written into the bind mount keep host ownership.
+    user: "${UID:-1000}:${GID:-1000}"
     # Long-running shell so `docker compose exec` is instant.
     command: ["tail", "-f", "/dev/null"]
     init: true
