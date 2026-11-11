@@ -135,18 +135,6 @@ Việc tuyển dụng sẽ không tự sửa. Những người đang trải qua 
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: số thành viên của máy chủ career-ops theo thời gian thực"></a></p>
 
-## Nhà tài trợ
-
-career-ops miễn phí cho ứng viên, mãi mãi. Các công ty sau tài trợ cho dự án:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> Tài trợ chỉ mua được sự hiển thị có gắn nhãn rõ ràng, không bao giờ mua được ảnh hưởng: không khoản tiền nào thay đổi lộ trình hay đặt bất cứ thứ gì vào sản phẩm. Nhà tài trợ không bao giờ xuất hiện trong đánh giá, xếp hạng hay đề xuất.
-
 ## career-ops làm gì cho bạn
 
 Dán một tin tuyển dụng. Nó cho bạn biết buổi tối đó có đáng không.

@@ -135,18 +135,6 @@ npx @santifer/career-ops init
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: career-ops சர்வரின் உறுப்பினர்களின் நேரடி எண்ணிக்கை"></a></p>
 
-## ஆதரவாளர்கள்
-
-career-ops விண்ணப்பதாரர்களுக்கு எப்போதும் இலவசம். இந்த நிறுவனங்கள் இந்தத் திட்டத்திற்கு நிதியுதவி அளிக்கின்றன:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> ஆதரவு வாங்குவது தெளிவாகக் குறிக்கப்பட்ட தெரிவுநிலையை மட்டுமே, செல்வாக்கை அல்ல: எந்தத் தொகையும் திட்டவரைபடத்தை மாற்றாது, தயாரிப்பில் எதையும் வைக்காது. ஆதரவாளர்கள் மதிப்பீடுகள், தரவரிசைகள் அல்லது பரிந்துரைகளில் ஒருபோதும் தோன்றுவதில்லை.
-
 ## career-ops உங்களுக்காக என்ன செய்கிறது
 
 ஒரு வேலையை ஒட்டுங்கள். அந்த இரவு அதற்குத் தகுமா என்று சொல்கிறது.

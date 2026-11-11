@@ -4,7 +4,7 @@
 
 **Do NOT open a public issue for security vulnerabilities.**
 
-Instead, please email **hi@santifer.io** with:
+Instead, report it privately through this repository's **Security → Report a vulnerability** page, or contact the maintainer CJCreator, with:
 
 1. Description of the vulnerability
 2. Steps to reproduce

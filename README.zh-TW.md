@@ -137,18 +137,6 @@ npx @santifer/career-ops init
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord：career-ops 伺服器的即時成員數"></a></p>
 
-## 贊助商
-
-career-ops 對求職者永久免費。這些公司贊助了本專案：
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> 贊助買到的是清楚標示的曝光，絕不是影響力：再多的錢也改變不了路線圖，也放不進產品裡任何東西。贊助商絕不會出現在評估、排名或推薦中。
-
 ## career-ops 為你做什麼
 
 貼上一個職缺。它告訴你這個晚上值不值得。

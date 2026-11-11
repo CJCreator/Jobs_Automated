@@ -17,7 +17,7 @@ flowchart TD
 Local CLI, Markdown, Go TUI, Local Web"] --> Funnel["Commercial Conversion Funnel"]
     
     subgraph Revenue_Streams ["Revenue Streams"]
-        SaaS["CareerOps Cloud ($29 - $49/mo)
+        SaaS["Hosted tier ($29 - $49/mo)
 Managed Proxies, Zero-Install Web, Background Sweeps"]
         Feed["Verified High-Signal Feed ($19/mo)
 Curated Ghost-Free Job Feed"]
@@ -33,7 +33,7 @@ Curated LaTeX Templates & Voice Agents"]
 ## Technical Details
 
 ### Commercial Pillars
-1. **CareerOps Cloud (Managed SaaS)**:
+1. **Hosted tier (managed SaaS)**:
    - Targets non-technical candidates or professionals on locked-down corporate laptops.
    - Provides a hosted web container with residential IP rotation, pre-installed Playwright browsers, and encrypted sync.
 2. **Verified High-Signal Job Feed**:

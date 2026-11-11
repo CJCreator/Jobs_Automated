@@ -135,18 +135,6 @@ npx @santifer/career-ops init
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: career-ops सर्वर के सदस्यों की लाइव संख्या"></a></p>
 
-## प्रायोजक
-
-career-ops उम्मीदवारों के लिए हमेशा मुफ़्त है। ये कंपनियाँ इस प्रोजेक्ट को प्रायोजित करती हैं:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> प्रायोजन साफ़ तौर पर चिह्नित दृश्यता खरीदता है, प्रभाव कभी नहीं: कोई भी रकम रोडमैप नहीं बदलती और न ही प्रोडक्ट में कुछ रखती है। प्रायोजक कभी भी मूल्यांकन, रैंकिंग या सिफ़ारिशों में नहीं आते।
-
 ## career-ops आपके लिए क्या करता है
 
 एक नौकरी पेस्ट करें। यह बताता है कि वह रात लगाने लायक है या नहीं।
