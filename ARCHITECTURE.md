@@ -117,6 +117,8 @@ Settled architectural doctrine (RFC #918) mandates that flat Markdown and TSV fi
 
 ## 5. Subsystem Decomposition
 
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/architecture-component-map-dark.svg"><img src="docs/architecture-component-map-light.svg" alt="Component map: an AI coding CLI (or a script) reads the prompt files in modes/*.md, the brain: scoring, evaluation, apply, scan and interview prompts, with _shared.md as the scoring core. They drive five areas: scan (scan.mjs, providers/), evaluate (modes/oferta.md plus the eval scripts), generate (PDFs, CVs, cover letters), track (data/, reports/) and update (update-system.mjs)." width="760"></picture></p>
+
 ### 5.1 Discovery Subsystem (`scan.mjs` & `providers/`)
 Finds open roles from public, unauthenticated sources with zero LLM API cost:
 - **60+ Provider Adapters**: Covers Greenhouse, Ashby, Lever, Workday, BambooHR, SmartRecruiters, Taleo, SuccessFactors, Dayforce, etc.
@@ -161,6 +163,8 @@ Compiles ATS-optimized documents:
 
 ---
 
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/architecture-data-flow-dark.svg"><img src="docs/architecture-data-flow-light.svg" alt="Data flow of a typical run: scan (scan.mjs) adds URLs to data/pipeline.md; evaluate (oferta.md with cv.md) writes reports/NNN-*.md and a row in the tracker, data/applications.md, which links the report; then you apply: you review and click Submit yourself." width="760"></picture></p>
+
 ## 6. Security Architecture & Threat Model
 
 ```mermaid
@@ -192,7 +196,7 @@ flowchart LR
 1. **SSRF & DNS Rebinding**: Hooked at the socket connection level, preventing attacks aimed at AWS/GCP/Azure instance metadata services.
 2. **Prompt Injection Containment**: Inbound JD text is strictly labeled as untrusted data. Any imperative commands directed at the AI reviewer are quoted as Block G anomalies and ignored.
 3. **Ambient PII Interception**: All outbound requests to cloud LLMs are intercepted; candidate phone numbers, addresses, and secrets trigger a `PrivacyGuardError` unless explicitly opted into token redaction (`PRIVACY_REDACT=1`).
-4. **Local Loopback Isolation**: The Next.js web server binds exclusively to `127.0.0.1`, refusing external network connections at the OS socket layer.
+4. **Local Loopback Default**: The Next.js web server binds to loopback (`127.0.0.1`) by default and refuses non-loopback hosts. `-H` or `CAREER_OPS_WEB_ALLOWED_HOSTS` widens the bind and the host allow-list. There is no authentication, so any widened bind exposes the dashboard to whoever can reach that port.
 
 ---
 

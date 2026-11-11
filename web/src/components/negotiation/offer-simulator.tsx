@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 interface OfferState {
   company: string;
   role: string;
-  base: number;
+  base: number | "";
   bonusPercent: number;
   signingBonus: number;
   equityGrant: number;
@@ -32,9 +32,9 @@ export function OfferSimulator() {
   const queryRole = searchParams?.get("role") ?? "";
 
   const [offer, setOffer] = useState<OfferState>({
-    company: queryCompany || "Stripe",
-    role: queryRole || "Staff AI Engineer",
-    base: 220000,
+    company: queryCompany || "",
+    role: queryRole || "",
+    base: "",
     bonusPercent: 15,
     signingBonus: 30000,
     equityGrant: 400000,
@@ -56,20 +56,21 @@ export function OfferSimulator() {
   const [copiedRound, setCopiedRound] = useState<number | null>(null);
 
   // Financial calculations
-  const annualBonus = Math.round(offer.base * (offer.bonusPercent / 100));
+  const base = typeof offer.base === "number" ? offer.base : 0;
+  const annualBonus = Math.round(base * (offer.bonusPercent / 100));
   
   const scenarios = {
     bear: { label: "Bear (-50%)", multiplier: 0.5, desc: "Down-round / market contraction" },
     base: { label: "Base (1.5x)", multiplier: 1.5, desc: "Healthy 15% CAGR steady state" },
     bull: { label: "Bull (3.5x)", multiplier: 3.5, desc: "Category leader outperformance" },
-    ipo: { label: "IPO (10x)", multiplier: 8.5, desc: "10x valuation with 15% dilution" },
+    ipo: { label: "IPO (8.5x)", multiplier: 8.5, desc: "8.5x valuation with 15% dilution" },
   };
 
   const projectedEquity = Math.round(offer.equityGrant * scenarios[scenario].multiplier);
   const annualEquity = Math.round(projectedEquity / 4);
-  const year1TTC = offer.base + annualBonus + offer.signingBonus + annualEquity;
-  const subsequentYearTTC = offer.base + annualBonus + annualEquity;
-  const fourYearTotal = (offer.base * 4) + (annualBonus * 4) + offer.signingBonus + projectedEquity;
+  const year1TTC = base + annualBonus + offer.signingBonus + annualEquity;
+  const subsequentYearTTC = base + annualBonus + annualEquity;
+  const fourYearTotal = (base * 4) + (annualBonus * 4) + offer.signingBonus + projectedEquity;
 
   const handleCopy = (text: string, roundNum: number) => {
     navigator.clipboard.writeText(text);
@@ -78,8 +79,8 @@ export function OfferSimulator() {
   };
 
   const targetTTC = Math.round(year1TTC * 1.15);
-  const targetBase = Math.round(offer.base * 1.10);
-  const targetSignon = Math.round(offer.signingBonus > 0 ? offer.signingBonus * 1.5 : offer.base * 0.10);
+  const targetBase = Math.round(base * 1.10);
+  const targetSignon = Math.round(offer.signingBonus > 0 ? offer.signingBonus * 1.5 : base * 0.10);
   const targetEquity = Math.round(offer.equityGrant * 1.25);
 
   const round1Email = `Subject: Excited about the ${offer.role} offer / Next steps
@@ -99,7 +100,7 @@ I want to be transparent: ${offer.company} is my preferred team to join. If we c
 Could we connect briefly for 10 minutes tomorrow to align on what is possible?
 
 Warm regards,
-Santiago`;
+[Your name]`;
 
   const round2Script = `Round 2 Multi-Lever Trade-Off Protocol:
 1. If Base is Capped: "I understand that internal compensation bands may place constraints on base adjustments. To bridge the remaining gap, could we structure this through a signing bonus of ${offer.currency} ${targetSignon.toLocaleString('en-US')} or an accelerated 6-month compensation review?"
@@ -122,7 +123,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
               <Badge tone="good">Game-Theoretic Engine</Badge>
             </div>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
-              Offer Decompiler & Monte Carlo Exit Simulator
+              Offer Decompiler & Scenario calculator
             </h2>
             <p className="mt-1 text-sm text-muted">
               Model multi-year cash vs. equity trajectories across 4 exit horizons and generate 3-round counter-offer scripts.
@@ -132,7 +133,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
             <div className="text-right">
               <div className="text-xs text-muted">Year 1 Total Comp</div>
               <div className="text-2xl font-bold tabular-nums text-foreground">
-                ${year1TTC.toLocaleString("en-US")}
+                {offer.currency} {year1TTC.toLocaleString("en-US")}
               </div>
             </div>
           </div>
@@ -215,7 +216,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
             </div>
           </div>
 
-          {/* Monte Carlo Scenario Selector */}
+          {/* Scenario selector */}
           <div className="rounded-xl border border-border bg-surface p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <TrendingUp className="size-4 text-emerald-500" />
@@ -260,14 +261,14 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone="info">Equity Value: ${projectedEquity.toLocaleString("en-US")}</Badge>
-                <Badge tone="muted">Base + Bonus: ${(offer.base * 4 + annualBonus * 4 + offer.signingBonus).toLocaleString("en-US")}</Badge>
+                <Badge tone="muted">Base + Bonus: ${(base * 4 + annualBonus * 4 + offer.signingBonus).toLocaleString("en-US")}</Badge>
               </div>
             </div>
 
             {/* 4-Year Bar Breakdown */}
             <div className="mt-6 space-y-4">
               {[1, 2, 3, 4].map((year) => {
-                const yrBase = offer.base;
+                const yrBase = base;
                 const yrBonus = annualBonus;
                 const yrSignon = year === 1 ? offer.signingBonus : 0;
                 const yrEq = annualEquity;

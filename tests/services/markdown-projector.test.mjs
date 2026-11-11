@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MarkdownProjector } from '../../lib/storage/markdown-projector.mjs';
 import { SqliteClient } from '../../lib/storage/sqlite-client.mjs';
+import { makeTrackerFixture, FIXTURE_AVG_SCORE } from './tracker-fixture.mjs';
 
-test('MarkdownProjector: sync, query, cache hit, and KPI summary', async () => {
+test('MarkdownProjector: sync, query, cache hit, and KPI summary', async (t) => {
+  const dataRoot = makeTrackerFixture(t);
   // Use in-memory SQLite for test isolation
   const sqlite = new SqliteClient(':memory:');
-  const projector = new MarkdownProjector({ sqliteClient: sqlite });
+  const projector = new MarkdownProjector({ dataRoot, sqliteClient: sqlite });
 
   // 1. Initial sync from data/applications.md
   const syncResult = projector.syncFromMarkdown({ force: true });

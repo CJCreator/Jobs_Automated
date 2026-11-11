@@ -29,7 +29,6 @@ import { Drawer } from "@/components/ui/drawer";
 import { useToast } from "@/components/ui/toast";
 import { saveStatus } from "@/lib/pipeline-status.mjs";
 import { postingHref } from "@/lib/posting-url.mjs";
-import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
 import { cn } from "@/lib/cn";
 
 export interface KanbanColumnDef {
@@ -335,10 +334,6 @@ export function KanbanBoard({
                             ) : (
                               <span className="text-[10px] text-faint">Unscored</span>
                             )}
-                            <GhostJobBadge
-                              probability={app.status?.toLowerCase().includes("skip") || app.status?.toLowerCase().includes("reject") ? 42 : 94}
-                              tier={app.status?.toLowerCase().includes("skip") ? "ELEVATED_GHOST_RISK" : "HIGH_CONFIDENCE"}
-                            />
                             {tailoredCvExists && (
                               <span
                                 title="Tailored CV ready"
