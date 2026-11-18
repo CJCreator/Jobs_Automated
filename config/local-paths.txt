@@ -1,0 +1,4 @@
+# Files this fork owns that upstream career-ops does not ship.
+# See config/local-paths.example.txt and DATA_CONTRACT.md ("Fork-local paths").
+# The Rolewright hosted app:
+rolewright/

@@ -2,23 +2,9 @@
 // should leave the deployment that the user was not told about.
 process.env.NEXT_TELEMETRY_DISABLED = "1";
 
-const isDev = process.env.NODE_ENV !== "production";
-
-// A user's AI key lives in the browser, so an injected script is the main way
-// to steal one. Scripts and connections are limited to this origin; the AI
-// providers are only ever called from the server.
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self'",
-  `connect-src 'self'${isDev ? " ws:" : ""}`,
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self' https://accounts.google.com",
-  "object-src 'none'",
-].join("; ");
+// Pages get their Content-Security-Policy, with a per-request script nonce,
+// from src/proxy.ts. API routes return JSON or a PDF and need no resources.
+const apiCsp = "default-src 'none'; frame-ancestors 'none'";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -34,9 +20,12 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: "/api/:path*",
+        headers: [{ key: "Content-Security-Policy", value: apiCsp }],
+      },
+      {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: csp },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },

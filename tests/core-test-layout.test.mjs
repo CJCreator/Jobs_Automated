@@ -21,7 +21,9 @@ console.log('\ncore test layout — every suite lives where a runner can find it
 
 // The two trees a runner actually discovers: test-all.mjs's discoverTests()
 // over tests/, and web/'s own `npm test` glob over web/tests/.
-const DISCOVERED_ROOTS = ['tests/', 'web/tests/'];
+// rolewright/ is this fork's hosted app; its own `npm test` glob covers
+// rolewright/tests/, the same arrangement as web/.
+const DISCOVERED_ROOTS = ['tests/', 'web/tests/', 'rolewright/tests/'];
 
 // collectMjsFiles() skips node_modules, output/, data/ and any nested checkout
 // (a linked worktree marks itself with a `.git` FILE, #3499), so a developer

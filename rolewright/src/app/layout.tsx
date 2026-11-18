@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { en } from "@/i18n/en";
 import "./globals.css";
@@ -14,7 +15,10 @@ export const viewport: Viewport = {
   colorScheme: "light dark",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Every page is rendered per request: the script nonce in the Content-Security-Policy
+  // (src/proxy.ts) is new each time and cannot be baked into a prebuilt page.
+  await connection();
   return (
     <html lang="en">
       <body>

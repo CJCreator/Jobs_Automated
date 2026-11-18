@@ -292,3 +292,7 @@ data/interview-prep/
 .next/
 web/.next/
 web/out/
+
+# This fork commits its fork-local path list so the test suite can see it
+# (see config/local-paths.example.txt). Keep this after the rule above.
+!config/local-paths.txt

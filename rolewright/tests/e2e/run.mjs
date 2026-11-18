@@ -160,6 +160,7 @@ const axeFindings = [];
 const sizeFindings = [];
 const pageErrors = [];
 const consoleErrors = [];
+const cspViolations = [];
 
 async function saveArtifacts(name) {
   if (!currentPage || currentPage.isClosed()) return;
@@ -194,6 +195,8 @@ function watch(page) {
   page.setDefaultNavigationTimeout(120_000);
   page.on("pageerror", (e) => pageErrors.push(`${page.url()}: ${e.message}`));
   page.on("console", (m) => {
+    // Chromium reports a blocked script or style as a console message naming the policy.
+    if (/content security policy|violates the following/i.test(m.text())) cspViolations.push(`${page.url()}: ${m.text().slice(0, 300)}`);
     if (m.type() !== "error") return;
     const text = m.text();
     if (/favicon/i.test(text)) return;
@@ -904,12 +907,13 @@ try {
     { fatal: false },
   );
   await step(
-    "9. no uncaught page errors or hydration errors in the browser console",
+    "9. no uncaught page errors, hydration errors or Content Security Policy violations in the browser console",
     async () => {
       for (const e of consoleErrors) console.log(`     console error (note): ${e}`);
       assert.deepEqual(pageErrors, [], "uncaught page errors");
       const hydration = consoleErrors.filter((e) => /hydrat|did not match|Minified React|Warning:/i.test(e));
       assert.deepEqual(hydration, [], "hydration or React warnings");
+      assert.deepEqual(cspViolations, [], "Content Security Policy violations during the whole run");
     },
     { fatal: false },
   );

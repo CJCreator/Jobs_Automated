@@ -335,6 +335,37 @@ export function updateTailoringSuggestions(db, userId, id, suggestions) {
   });
 }
 
+/** `months` calendar months before `now`, clamped so 29 February minus 12 months is 28 February, not 1 March. */
+function monthsBefore(now, months) {
+  const d = new Date(now.getTime());
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() - months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d;
+}
+
+/**
+ * The privacy screen promises that an account with no sign-in for 12 months is
+ * deleted. Deletes every user whose last sign-in is strictly older than
+ * `months` calendar months before `now` (exactly on the line is kept); every
+ * table's user_id foreign key cascades, so all their data goes too.
+ * Nothing in the app calls this: scripts/purge-inactive.mjs must be scheduled.
+ *
+ * @returns {Promise<number>} how many users were deleted
+ */
+export async function purgeInactiveUsers(db, { months = 12, now = new Date() } = {}) {
+  if (!Number.isInteger(months) || months < 1) throw new RangeError("months must be a whole number of at least 1.");
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new RangeError("now must be a valid date.");
+  const cutoff = monthsBefore(now, months).toISOString();
+  const { rows } = await db.system.query(
+    "DELETE FROM users WHERE COALESCE(last_seen_at, created_at) < $1::timestamptz RETURNING id",
+    [cutoff],
+  );
+  return rows.length;
+}
+
 /** Deletes the user row; every table's user_id foreign key cascades. */
 export async function deleteUserData(db, userId) {
   if (!isUuid(userId)) return false;

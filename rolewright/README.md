@@ -30,6 +30,8 @@ Both flags are refused when `NODE_ENV` is `production`, and so is a missing `AUT
 |---|---|
 | `npm test` | Unit tests (`tests/**/*.test.mjs`), no server needed. |
 | `npm run test:flow` | The whole flow over real HTTP: starts `next dev` on a free port (3111 if free) with the dev flags and a temporary database, signs in two users, uploads a PDF, tailors, reviews, exports, checks isolation, cross-site refusal and key hygiene, deletes an account. Prints PASS or FAIL per step. Set `FLOW_SHOW_SERVER_OUTPUT=1` to print what the server logged. It uses its own build folder (`.next-flow`) so it does not disturb a `next dev` already running. `tsconfig.json` already lists the type folders `next dev` adds for `.next`, `.next-flow` and `.next-e2e`, so a run leaves it unchanged; `next-env.d.ts` is rewritten for the last folder used and is not tracked. |
+| `npm run test:prod` | Production-mode smoke test: `next build` into `.next-prod`, `next start` on port 3124 with `NODE_ENV=production` and no development flags, a session cookie minted with Auth.js's own `encode`, and a seeded database. Checks the database and row-level security, the engine fact gate (a stale stored pass is recomputed to a block), PDF export, isolation between users, cross-site refusal, the security headers with a per-request script nonce, the absence of the mock AI provider, and that the pages hydrate in Chromium with no Content Security Policy violation. |
+| `npm run purge:inactive` | Deletes accounts idle for 12 months, with all their data, and prints the number deleted. Must be scheduled (see below). |
 | `npm run typecheck` | TypeScript check of `src/`. |
 | `npm run build` | Production build. |
 
@@ -113,10 +115,25 @@ The schema (`src/lib/db/schema.mjs`, a JavaScript module holding the SQL, so no 
 
 This set-up has not yet been run against a real Postgres server (see below); `tests/db.test.mjs` is written to check exactly it.
 
+### Deleting inactive accounts (schedule this)
+
+The privacy screen tells people that an account with no sign-in for 12 months is deleted. The app does not do this by itself: run `npm run purge:inactive` (it calls `purgeInactiveUsers` in `src/lib/db/repo.mjs`) **once a day** from a scheduler such as cron, a Kubernetes CronJob or your host's job runner, with the same `DATABASE_URL` as the app. It deletes every user whose last sign-in (`last_seen_at`) is more than 12 calendar months before now, and everything they own (resumes, facts, jobs, tailorings, linked accounts) goes with them. It prints only the number deleted and never emails anyone. If it is not scheduled, the promise on the privacy screen is not kept.
+
+## Screenshots
+
+Taken by the browser test (`E2E_SCREENS_DIR=<folder> npm run test:e2e`).
+
+![Landing page](docs/screenshots/01-landing-1280-light.png)
+![Resume facts to confirm](docs/screenshots/08-resume-review-1280-light.png)
+![Review screen, fresh suggestions](docs/screenshots/11-review-fresh-1280-light.png)
+![Review screen, a claim you cannot confirm](docs/screenshots/13-review-cannot-confirm-1280-light.png)
+![Review screen at 360 pixels wide](docs/screenshots/23-review-360-light.png)
+![Review screen in dark mode](docs/screenshots/11-review-fresh-1280-dark.png)
+
 ## Not yet verified
 
 - **Google sign-in and email-link sign-in have never been run.** They are wired (provider set-up, the database adapter, the verified-email rule for Google), but no credentials were available. Only the development sign-in was exercised.
-- **The production build has only been started, not used.** `npm run build` finishes with no warnings, and `next start` on that build answers `/api/auth/csrf` and refuses unsigned requests with 401. Nothing past sign-in has run on a production build (the development sign-in is refused there, and no Google or Resend credentials were available), so loading the engine and Playwright from their runtime paths, and PDF export are checked under `next dev` only.
+- **The production build is smoke-tested with `npm run test:prod`** (database, engine fact gate, PDF export, isolation, headers, hydration). What it cannot cover is real sign-in (Google, email link) and real AI providers.
 - **Real AI providers.** The flow test uses the mock provider only. Uploading and tailoring with Gemini, OpenAI, Anthropic, OpenRouter or Groq keys has not been tried end to end.
 - **Postgres.** Everything ran on the embedded database. `tests/db.test.mjs` can run against a real server (`ROLEWRIGHT_TEST_DATABASE_URL`, `ROLEWRIGHT_TEST_ADMIN_URL`) and includes the checks that only mean something there: 20 interleaved `withUser` calls for two users on one pool, pooled connections coming back without the role or user id, two concurrent review actions both landing under the row locks, and a negative control showing an update is lost without them. That run has not happened yet (no Postgres server was available), so the `pg` driver path, the role set-up above, the row locks under real concurrency, and behaviour with several server processes are all unverified. On the embedded database every transaction runs alone, so the lock tests pass there without proving anything about Postgres.
 - **Scanned PDFs, password-protected PDFs and very long resumes** are refused or capped by code paths that no test has exercised with a real file of that kind.

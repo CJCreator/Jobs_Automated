@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "test:flow": "node tests/integration/run.mjs",
-    "test:e2e": "node tests/e2e/run.mjs"
+    "test:e2e": "node tests/e2e/run.mjs",
+    "test:prod": "node tests/integration/prod-smoke.mjs",
+    "purge:inactive": "node scripts/purge-inactive.mjs"
   },
   "engines": {
     "node": "^22.13.0 || >=23.4.0"

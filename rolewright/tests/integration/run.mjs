@@ -293,6 +293,8 @@ try {
     assert.equal(good.data.ok, true);
     assert.deepEqual(good.data.models.map((m) => m.id), ["mock-1"]);
     assert.equal(good.data.recommended, "mock-1");
+    // The accepted key is the success path: it must not come back either.
+    assert.ok(!JSON.stringify(good.data).includes(MOCK_KEY), "the accepted key is not echoed in the response");
     const bad = await request(state.A, "POST", "/api/keys/verify", { headers: ai("mock-wrong-key-123") });
     assert.equal(bad.status, 200);
     assert.equal(bad.data.ok, false);
@@ -543,6 +545,8 @@ try {
   child = null;
 
   await step("11. key hygiene (storage half): the key is in no log line and no database column", async () => {
+    // MOCK_KEY was accepted and used on the successful verify, upload and tailoring calls of steps 3 to 5,
+    // so searching for it as well as the sentinel covers the success path, not only failing calls.
     assert.ok(serverOutput.length > 0, "server output was captured");
     assert.ok(!serverOutput.includes(SENTINEL), "the key is not in the server output");
     assert.ok(!serverOutput.includes(MOCK_KEY), "the valid key is not in the server output either");
