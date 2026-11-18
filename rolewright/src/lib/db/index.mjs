@@ -132,9 +132,11 @@ const KEY = Symbol.for("rolewright.db");
 export function getDb() {
   if (!globalThis[KEY]) {
     const url = process.env.DATABASE_URL;
-    const opening = url
-      ? createDb({ connectionString: url })
-      : createDb({ dataDir: path.join(process.cwd(), ".data", "pglite") });
+    // ROLEWRIGHT_DATA_DIR lets a test run point the embedded database at a temp directory.
+    const dataDir = process.env.ROLEWRIGHT_DATA_DIR
+      ? path.resolve(process.env.ROLEWRIGHT_DATA_DIR)
+      : path.join(process.cwd(), ".data", "pglite");
+    const opening = url ? createDb({ connectionString: url }) : createDb({ dataDir });
     globalThis[KEY] = opening;
     // A failed start must not be cached forever.
     opening.catch(() => {
