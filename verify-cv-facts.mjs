@@ -2367,6 +2367,38 @@ export function verifyFacts(targetText, {
   // ahead of a .tex one as if it were that document's preamble.
   const sourceText = sourcePaths.map(path => latexBody(readIfExists(resolveInputPath(path, cwd)))).join('\n');
   const { missing: configMissing, config } = loadFactConfig(resolveInputPath(configPath, cwd));
+  return verifyFactsFromText(targetText, { sourceText, planTexts, config, configMissing });
+}
+
+const FACT_CONFIG_KEYS = ['allow_metrics', 'allow_facts', 'forbidden_phrases', 'warn_phrases'];
+
+/**
+ * The same gate as verifyFacts, with the sources and the config passed in as
+ * values instead of read from disk. A caller that keeps each user's facts in a
+ * database (a hosted, multi-user deployment) has no per-user cv.md to point at,
+ * and writing one to a temp file per request only to read it back is a second
+ * place for one user's facts to leak into another's check.
+ *
+ * Nothing here reads the filesystem or the data root.
+ *
+ * @param {string} targetText generated candidate-facing HTML/Markdown/text
+ * @param {{ sourceText?: string, planTexts?: string[], config?: object, configMissing?: boolean }} options
+ *   sourceText: the user's own confirmed facts, already joined. config: the
+ *   four phrase/allow lists; a missing key reads as an empty list.
+ * @returns {ReturnType<typeof verifyFacts>}
+ */
+export function verifyFactsFromText(targetText, {
+  sourceText = '',
+  planTexts = [],
+  config: rawConfig = {},
+  configMissing = false,
+} = {}) {
+  const config = Object.fromEntries(FACT_CONFIG_KEYS.map((key) => {
+    const value = rawConfig?.[key];
+    if (value == null) return [key, []];
+    if (!Array.isArray(value)) throw new Error(`${key} must be an array`);
+    return [key, value];
+  }));
   const allowed = allowedMetricSet(sourceText, config.allow_metrics);
   const targetClaims = metricClaims(targetText);
   const planned = plannedClaims(targetText, planTexts);

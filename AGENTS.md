@@ -592,6 +592,14 @@ Headless worker command per CLI:
 
 **Parallel fan-outs — reserve report numbers first.** Before spawning N parallel evaluators, reserve the range: `node reserve-report-num.mjs --count N` (prints e.g. `042-049`); hand each worker its own number. The allocator treats report files, sentinels, tracker row IDs, tracker report links, and tracker numbers still named in `status-log.tsv`, `data/follow-ups.md`, `data/salary-observations.tsv` or `data/contacts.tsv` as occupied, so a deleted or merged-away row's number is never handed to a new application; each slot claim is individually atomic (on collision, claimed slots are released and the reservation restarts past it — permanent, harmless gaps). Release with `node reserve-report-num.mjs --release 042-049` when done; stale sentinels are GC'd after 4h, so reserve right before spawning. Never let parallel workers compute `max+1` themselves — that is the #749 race.
 
+## Verifying changes
+
+Run the checks for the area you changed before reporting work as done, and report failures with their output.
+
+- Engine (repo root): `npm run lint`, then `node test-all.mjs` (about 30 minutes; `node --test tests/<file>.test.mjs` runs one suite)
+- Web UI (`web/`): `npm run typecheck`, `npm test`, `npm run build`
+- Rolewright hosted app (`rolewright/`, fork-local): `npm run typecheck`, `npm test`, `npm run test:flow`, `npm run test:e2e`, `npm run test:prod`, `npm run build`
+
 ## Stack and Conventions
 
 - Node.js (`.mjs`), Playwright (PDF + scraping), YAML (config), HTML/CSS (template), Markdown (data), Canva MCP (optional visual CV)
