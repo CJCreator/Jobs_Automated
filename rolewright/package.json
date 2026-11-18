@@ -1,0 +1,39 @@
+{
+  "name": "rolewright",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rolewright: hosted resume tailoring with a fact check on every claim. Based on career-ops.",
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:e2e": "node tests/e2e/run.mjs"
+  },
+  "engines": {
+    "node": "^22.13.0 || >=23.4.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "@electric-sql/pglite": "^0.5.16",
+    "next": "16.4.1",
+    "next-auth": "5.0.0-beta.32",
+    "pdfjs-dist": "^6.4.299",
+    "pg": "^8.23.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "25.9.5",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "axe-core": "^4.14.1",
+    "playwright-core": "1.64.1",
+    "postcss": "^8.5.18",
+    "tailwindcss": "^4.2.2",
+    "typescript": "7.0.2"
+  }
+}
