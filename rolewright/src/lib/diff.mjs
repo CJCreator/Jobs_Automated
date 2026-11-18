@@ -11,7 +11,16 @@
 const MAX_CELLS = 4_000_000;
 
 /** @param {string} s */
-const tokenize = (s) => (s ?? "").split(/(\s+)/).filter((t) => t !== "");
+// Sentence punctuation after a word is its own token, so "payments." against
+// "payments and refunds." marks only what changed, not the whole word.
+const tokenize = (s) =>
+  (s ?? "")
+    .split(/(\s+)/)
+    .flatMap((t) => {
+      const m = /^(.*[^.,;:!?\s])([.,;:!?]+)$/.exec(t);
+      return m ? [m[1], m[2]] : [t];
+    })
+    .filter((t) => t !== "");
 
 /**
  * @param {string} before

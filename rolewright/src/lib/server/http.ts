@@ -7,6 +7,7 @@
 // output, email address, key or an error's message (which can echo any of them).
 
 import { LlmError } from "@/lib/llm/index.mjs";
+import { errorLabel } from "./log-label.mjs";
 
 export class HttpError extends Error {
   readonly status: number;
@@ -66,14 +67,6 @@ function toResponse(err: unknown): { res: Response; code: string } {
     return { res: errorJson(err.status, err.code, err.message), code: err.code };
   }
   return { res: errorJson(500, "internal", "Something went wrong on our side. Try again."), code: "internal" };
-}
-
-/** A safe label for an unexpected error: its class name and a short code, never its message. */
-function errorLabel(err: unknown): string {
-  if (!(err instanceof Error)) return "";
-  const code = (err as { code?: unknown }).code;
-  const safeCode = typeof code === "string" && /^[\w-]{1,40}$/.test(code) ? `/${code}` : "";
-  return ` cause=${err.name.replace(/[^\w]/g, "").slice(0, 40)}${safeCode}`;
 }
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);

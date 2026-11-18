@@ -149,6 +149,28 @@ export function createJob(db, userId, { title, company, jdText }) {
   });
 }
 
+/**
+ * A job and its tailoring in one transaction, so a failure part-way never
+ * leaves behind a job description the user has no screen to see or delete.
+ * @returns {Promise<{ id: string, jobId: string }>}
+ */
+export function createJobWithTailoring(db, userId, { title, company, jdText, suggestions, provider, model }) {
+  const jobId = newId();
+  const id = newId();
+  return db.withUser(userId, async (tx) => {
+    await tx.query(
+      "INSERT INTO jobs (id, user_id, title, company, jd_text) VALUES ($1, $2, $3, $4, $5)",
+      [jobId, userId, title ?? null, company ?? null, jdText ?? null],
+    );
+    await tx.query(
+      `INSERT INTO tailorings (id, user_id, job_id, suggestions, provider, model)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+      [id, userId, jobId, JSON.stringify(suggestions ?? []), provider ?? null, model ?? null],
+    );
+    return { id, jobId };
+  });
+}
+
 export function createTailoring(db, userId, { jobId, suggestions, provider, model }) {
   const id = newId();
   return db.withUser(userId, async (tx) => {
@@ -165,30 +187,117 @@ export function createTailoring(db, userId, { jobId, suggestions, provider, mode
   });
 }
 
+const TAILORING_SELECT = `SELECT t.id, t.job_id, t.suggestions, t.provider, t.model, t.created_at, t.updated_at,
+         j.title, j.company, j.jd_text
+  FROM tailorings t JOIN jobs j ON j.id = t.job_id
+  WHERE t.id = $1`;
+
+const toTailoring = (r) =>
+  r
+    ? {
+        id: r.id,
+        jobId: r.job_id,
+        title: r.title,
+        company: r.company,
+        jdText: r.jd_text,
+        suggestions: r.suggestions,
+        provider: r.provider,
+        model: r.model,
+        createdAt: iso(r.created_at),
+        updatedAt: iso(r.updated_at),
+      }
+    : null;
+
 export function getTailoring(db, userId, id) {
   if (!isUuid(id)) return Promise.resolve(null);
   return db.withUser(userId, async (tx) => {
-    const { rows } = await tx.query(
-      `SELECT t.id, t.job_id, t.suggestions, t.provider, t.model, t.created_at, t.updated_at,
-              j.title, j.company, j.jd_text
-       FROM tailorings t JOIN jobs j ON j.id = t.job_id
-       WHERE t.id = $1`,
-      [id],
-    );
-    const r = rows[0];
-    if (!r) return null;
-    return {
-      id: r.id,
-      jobId: r.job_id,
-      title: r.title,
-      company: r.company,
-      jdText: r.jd_text,
-      suggestions: r.suggestions,
-      provider: r.provider,
-      model: r.model,
-      createdAt: iso(r.created_at),
-      updatedAt: iso(r.updated_at),
-    };
+    const { rows } = await tx.query(TAILORING_SELECT, [id]);
+    return toTailoring(rows[0]);
+  });
+}
+
+// ---- locked read-modify-write ----------------------------------------------
+//
+// A review action reads a tailoring and the Fact Base, changes them and writes
+// them back. Two such requests at once (two tabs, a double click) would each
+// read the same starting point and the second write would silently drop the
+// first one's change, for example a "can't confirm" entry. So these functions
+// lock the rows before reading them, in one transaction, and always in the same
+// order (the tailoring row, then the fact_bases row) so two requests can never
+// wait on each other. On PGlite, which runs one transaction at a time, the
+// locks change nothing; on Postgres they make the second request wait and then
+// read the first one's result.
+
+/** The tailoring row, locked until the transaction ends. Only the tailoring is locked, not its job. */
+async function lockTailoring(tx, id) {
+  const { rows } = await tx.query(`${TAILORING_SELECT} FOR UPDATE OF t`, [id]);
+  return toTailoring(rows[0]);
+}
+
+/**
+ * The user's Fact Base row, locked until the transaction ends. A lock on a row
+ * that does not exist yet would lock nothing, so an empty row is created first;
+ * it reads the same as no row, and a rollback removes it again.
+ */
+async function lockFacts(tx, userId) {
+  await tx.query(
+    "INSERT INTO fact_bases (user_id, facts) VALUES ($1, $2::jsonb) ON CONFLICT (user_id) DO NOTHING",
+    [userId, JSON.stringify(emptyFacts())],
+  );
+  const { rows } = await tx.query("SELECT facts FROM fact_bases WHERE user_id = $1 FOR UPDATE", [userId]);
+  return { ...emptyFacts(), ...rows[0].facts };
+}
+
+async function writeFacts(tx, userId, facts) {
+  await tx.query("UPDATE fact_bases SET facts = $2::jsonb, updated_at = now() WHERE user_id = $1", [
+    userId,
+    JSON.stringify(facts),
+  ]);
+}
+
+/**
+ * Change the user's Fact Base atomically.
+ *
+ * @param {any} db
+ * @param {string} userId
+ * @param {(current: any) => any} change gets the stored facts and returns the
+ *   facts to save. It must not use the database (on PGlite a query outside the
+ *   transaction deadlocks). Anything it throws rolls the transaction back.
+ * @returns {Promise<any>} the saved facts
+ */
+export function changeFacts(db, userId, change) {
+  return db.withUser(userId, async (tx) => {
+    const next = await change(await lockFacts(tx, userId));
+    await writeFacts(tx, userId, next);
+    return next;
+  });
+}
+
+/**
+ * Change one tailoring's suggestions, and the Fact Base if needed, atomically.
+ *
+ * @param {any} db
+ * @param {string} userId
+ * @param {string} id the tailoring id
+ * @param {(current: { tailoring: any, facts: any }) => { suggestions: any[], facts?: any }} change
+ *   returns the suggestions to save, plus `facts` only when the facts changed.
+ *   Same rules as in changeFacts.
+ * @returns {Promise<{ tailoring: any, facts: any, suggestions: any[] } | null>}
+ *   null when the tailoring is not found among this user's own.
+ */
+export function changeTailoring(db, userId, id, change) {
+  if (!isUuid(id)) return Promise.resolve(null);
+  return db.withUser(userId, async (tx) => {
+    const tailoring = await lockTailoring(tx, id);
+    if (!tailoring) return null;
+    const facts = await lockFacts(tx, userId);
+    const next = await change({ tailoring, facts });
+    if (next.facts) await writeFacts(tx, userId, next.facts);
+    await tx.query("UPDATE tailorings SET suggestions = $2::jsonb, updated_at = now() WHERE id = $1", [
+      id,
+      JSON.stringify(next.suggestions ?? []),
+    ]);
+    return { tailoring, facts: next.facts ?? facts, suggestions: next.suggestions ?? [] };
   });
 }
 

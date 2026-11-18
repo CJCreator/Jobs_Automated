@@ -21,10 +21,18 @@ export class EngineUnavailableError extends Error {
   }
 }
 
-/** Absolute path of the engine checkout. */
+/**
+ * Absolute path of the engine checkout.
+ *
+ * The checkout is chosen at runtime, so these paths must stay out of the
+ * bundler's static analysis: without the ignore comments, `next build` sees
+ * `process.cwd()/..` and traces the whole project into the server output.
+ */
 export function engineCodeRoot() {
   const explicit = (process.env.CAREER_OPS_CODE_ROOT || "").trim();
-  return explicit ? path.resolve(process.cwd(), explicit) : path.resolve(process.cwd(), "..");
+  return explicit
+    ? path.resolve(/* turbopackIgnore: true */ process.cwd(), explicit)
+    : path.resolve(/* turbopackIgnore: true */ process.cwd(), "..");
 }
 
 /**

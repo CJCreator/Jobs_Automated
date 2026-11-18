@@ -46,7 +46,7 @@ export function DeleteAccount({ signOutAction }: { signOutAction: () => Promise<
           />
         )}
       </Field>
-      <Button variant="danger" onClick={onDelete} disabled={typed !== t.deleteWord || busy}>
+      <Button variant="danger" onClick={onDelete} disabled={typed !== t.deleteWord} loading={busy}>
         {busy ? <Spinner /> : null}
         {busy ? t.deleting : t.deleteButton}
       </Button>

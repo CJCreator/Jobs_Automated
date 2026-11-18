@@ -16,6 +16,7 @@
   --warn: #9a4b00;
   --warn-soft: #fbeedd;
   --danger: #a4262c;
+  --danger-ink: #ffffff;
   --danger-soft: #fbe6e7;
   --add-bg: #e3f2ea;
   --remove-bg: #fbe6e7;
@@ -38,6 +39,7 @@
   --warn: #f0a55a;
   --warn-soft: #3a2a15;
   --danger: #ff8a90;
+  --danger-ink: #2a0709;
   --danger-soft: #3d1b1e;
   --add-bg: #173126;
   --remove-bg: #3d1b1e;
@@ -59,6 +61,7 @@
     --warn: #f0a55a;
     --warn-soft: #3a2a15;
     --danger: #ff8a90;
+    --danger-ink: #2a0709;
     --danger-soft: #3d1b1e;
     --add-bg: #173126;
     --remove-bg: #3d1b1e;
@@ -80,6 +83,7 @@
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
   --color-danger-soft: var(--danger-soft);
   --color-add: var(--add-bg);
   --color-remove: var(--remove-bg);
@@ -193,6 +197,16 @@ ins.diff-add {
   font-weight: 700;
   background: var(--add-bg);
   color: var(--ink);
+}
+
+/* A replaced word reads "old new"; keep a gap between the two marks. */
+del.diff-remove + ins.diff-add {
+  margin-inline-start: 0.35em;
+}
+del.diff-remove,
+ins.diff-add {
+  padding-inline: 0.15em;
+  border-radius: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

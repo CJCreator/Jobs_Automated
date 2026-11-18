@@ -12,6 +12,7 @@ import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import { getDb } from "@/lib/db/index.mjs";
 import * as repo from "@/lib/db/repo.mjs";
+import { assertSafeEnv } from "@/lib/server/env-guard.mjs";
 
 declare module "next-auth" {
   interface Session {
@@ -19,25 +20,24 @@ declare module "next-auth" {
   }
 }
 
+// Every page and route that needs a session imports this module, so a
+// production server with the development sign-in, the mock AI or no secret
+// fails here, before it can answer anything. Skipped during `next build`.
+assertSafeEnv(process.env);
+
 const isProduction = process.env.NODE_ENV === "production";
 const devLogin = process.env.ROLEWRIGHT_DEV_LOGIN === "1";
-
-// Checked only when the flag is set, so `next build` (which runs with
-// NODE_ENV=production and imports this file) is unaffected by default.
-if (devLogin && isProduction) {
-  throw new Error(
-    "ROLEWRIGHT_DEV_LOGIN=1 lets anyone sign in as any email address without proof. " +
-      "It is for local development only and must not be set when NODE_ENV is production. Remove it and restart.",
-  );
-}
 
 const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const emailEnabled = Boolean(process.env.AUTH_RESEND_KEY && process.env.EMAIL_FROM);
 
-// Development only. In production Auth.js refuses every request without a
-// secret (MissingSecret), which is the "required" check; failing here instead
-// would break `next build` on a machine that has no secret.
+// Development only: in production assertSafeEnv above has already refused to
+// run without AUTH_SECRET.
 const DEV_ONLY_SECRET = "rolewright-development-only-secret-never-use-in-production";
+
+// A stolen or copied cookie works until it expires (signing out does not
+// revoke it), so sessions are kept short.
+const SESSION_MAX_AGE_S = 7 * 24 * 60 * 60;
 
 /** Which sign-in methods this deployment offers. */
 export function signInMethods(): { google: boolean; email: boolean; dev: boolean } {
@@ -149,7 +149,7 @@ const config: NextAuthConfig = {
   providers,
   // Credentials sign-in only works with JWT sessions, and an adapter would
   // otherwise switch the default to database sessions.
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_S },
   secret: process.env.AUTH_SECRET || (isProduction ? undefined : DEV_ONLY_SECRET),
   pages: { signIn: "/sign-in", error: "/sign-in" },
   callbacks: {

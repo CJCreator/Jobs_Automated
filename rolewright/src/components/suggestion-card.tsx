@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CheckIssue, Suggestion, SuggestionAction } from "@/lib/client/types";
 import { DiffText } from "@/components/diff-text";
 import { cn } from "@/components/ui/cn";
@@ -42,6 +42,43 @@ export function SuggestionCard({
   const [sideBySide, setSideBySide] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
 
+  // After an action the control the user pressed can disappear (Accept turns
+  // the card into a one-line summary, for example). Ask for focus to land on a
+  // sensible control inside this same card; the effect tries each candidate
+  // until one is on the page and enabled.
+  const focusWanted = useRef<string[] | null>(null);
+  const [, bump] = useState(0);
+  const moveFocusTo = (...candidates: string[]) => {
+    focusWanted.current = candidates;
+    bump((n) => n + 1);
+    // Do not let an old request grab focus much later.
+    window.setTimeout(() => {
+      if (focusWanted.current === candidates) focusWanted.current = null;
+    }, 2000);
+  };
+  const run = async (action: ActInput, ...focus: string[]) => {
+    const ok = await onAct(action);
+    // On failure the pressed control was disabled while it worked; point focus at the message.
+    moveFocusTo(...(ok ? focus : ["error", "edit-btn", "undo"]));
+    return ok;
+  };
+  useEffect(() => {
+    const wanted = focusWanted.current;
+    if (!wanted) return;
+    const card = document.getElementById(`sug-${s.id}`);
+    for (const c of wanted) {
+      const el =
+        c === "issue-action"
+          ? card?.querySelector<HTMLElement>("[data-issue-actions] button:not([disabled])")
+          : document.getElementById(`${c}-${s.id}`);
+      if (el && !(el as HTMLButtonElement).disabled) {
+        el.focus();
+        focusWanted.current = null;
+        return;
+      }
+    }
+  });
+
   const blocked = s.check.verdict === "block";
   const context = s.kind === "summary" ? t.summaryContext : s.context;
   const wrapper = cn(
@@ -60,14 +97,24 @@ export function SuggestionCard({
               <Badge tone={accepted ? "ok" : "neutral"}>{accepted ? t.acceptedLine : t.rejectedLine}</Badge>
               <span className="text-sm text-muted">{context}</span>
             </p>
-            <p className={cn("max-w-[70ch] truncate", !accepted && "text-muted line-through")}>{accepted ? s.finalText : s.before}</p>
+            <p className={cn("max-w-[70ch] line-clamp-3", !accepted && "text-muted line-through")}>{accepted ? s.finalText : s.before}</p>
             {accepted && blocked ? (
               <p className="text-sm font-medium text-danger">{t.exportReasonBlocked}</p>
             ) : null}
-            {error ? <p className="text-sm font-medium text-danger">{error}</p> : null}
+            {error ? (
+              <p id={`error-${s.id}`} tabIndex={-1} role="alert" className="text-sm font-medium text-danger">
+                {error}
+              </p>
+            ) : null}
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" disabled={busy} onClick={() => onAct({ action: "edit", text: s.finalText })}>
+            <Button
+              id={`undo-${s.id}`}
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => run({ action: "edit", text: s.finalText }, "accept-btn", "edit-btn")}
+            >
               {busy ? <Spinner /> : <UndoIcon />}
               {t.undo}
               <span className="sr-only">{`: ${context}`}</span>
@@ -81,7 +128,7 @@ export function SuggestionCard({
   const saveEdit = async () => {
     const text = draft.trim();
     if (!text) return;
-    if (await onAct({ action: "edit", text })) setEditing(false);
+    if (await run({ action: "edit", text }, "accept-btn", "edit-btn")) setEditing(false);
   };
 
   const openEdit = () => {
@@ -93,7 +140,7 @@ export function SuggestionCard({
 
   return (
     <li id={`sug-${s.id}`} tabIndex={-1} className={wrapper} aria-label={t.cardLabel(index + 1, total)}>
-      <Card className="space-y-4">
+      <Card className={cn("space-y-4 border-s-4", blocked ? "border-s-danger" : s.check.verdict === "warn" ? "border-s-warn" : "border-s-ok")}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-semibold text-muted">{context}</p>
           <StatusBadge verdict={s.check.verdict} />
@@ -145,25 +192,25 @@ export function SuggestionCard({
         ) : null}
 
         {blocked ? (
-          <div className="space-y-3 rounded-lg border border-danger bg-danger-soft p-4">
+          <div data-testid="issues" className="space-y-3 rounded-lg border border-danger bg-danger-soft p-4">
             <h4 className="font-semibold">{t.issuesTitle}</h4>
             <ul className="space-y-4">
-              {s.check.issues.map((issue: CheckIssue) => (
+              {s.check.issues.map((issue: CheckIssue, ii: number) => (
                 <li key={`${issue.kind}-${issue.value}`} className="space-y-2">
                   <p>{issue.message}</p>
                   {issue.kind === "blocked" ? (
                     <div className="space-y-2">
                       <p className="text-sm text-muted">
                         {t.blockedKindNote}{" "}
-                        <Link href="/app/resume" className="font-semibold text-brand underline underline-offset-4">
+                        <Link href="/app/resume" className="inline-block min-h-6 py-0.5 font-semibold text-brand underline underline-offset-4">
                           {t.blockedKindLink}
                         </Link>
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                      <div data-issue-actions className="flex flex-wrap gap-2">
                         <Button variant="secondary" size="sm" onClick={openEdit} disabled={busy}>
                           {t.editWording}
                         </Button>
-                        <Button variant="secondary" size="sm" onClick={() => onAct({ action: "reject" })} disabled={busy}>
+                        <Button variant="secondary" size="sm" onClick={() => run({ action: "reject" }, "undo")} disabled={busy}>
                           {t.reject}
                         </Button>
                       </div>
@@ -173,31 +220,51 @@ export function SuggestionCard({
                       <p>{t.confirmAttest(issue.value)}</p>
                       <div className="flex flex-wrap gap-2">
                         <Button
+                          id={`confirm-yes-${ii}-${s.id}`}
                           size="sm"
                           disabled={busy}
                           onClick={async () => {
-                            if (await onAct({ action: "attest", value: issue.value })) setConfirming(null);
+                            if (await run({ action: "attest", value: issue.value }, "accept-btn", "issue-action", "edit-btn")) {
+                              setConfirming(null);
+                            }
                           }}
                         >
                           {busy ? <Spinner /> : null}
                           {t.confirmAttestYes}
                         </Button>
-                        <Button variant="secondary" size="sm" onClick={() => setConfirming(null)}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setConfirming(null);
+                            moveFocusTo(`attest-${ii}`);
+                          }}
+                        >
                           {t.confirmAttestNo}
                         </Button>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" size="sm" disabled={busy} onClick={() => setConfirming(issue.value)}>
+                    <div data-issue-actions className="flex flex-wrap gap-2">
+                      <Button
+                        id={`attest-${ii}-${s.id}`}
+                        variant="secondary"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setConfirming(issue.value);
+                          moveFocusTo(`confirm-yes-${ii}`);
+                        }}
+                      >
                         {t.attest}
                         <span className="sr-only">{`: ${issue.value}`}</span>
                       </Button>
                       <Button
+                        id={`cannot-${ii}-${s.id}`}
                         variant="secondary"
                         size="sm"
                         disabled={busy}
-                        onClick={() => onAct({ action: "cannot_confirm", value: issue.value })}
+                        onClick={() => run({ action: "cannot_confirm", value: issue.value }, "issue-action", "edit-btn")}
                       >
                         {t.cannotConfirm}
                         <span className="sr-only">{`: ${issue.value}`}</span>
@@ -234,22 +301,29 @@ export function SuggestionCard({
         ) : null}
 
         {error ? (
-          <Notice tone="danger" role="alert">
-            {error}
-          </Notice>
+          <div id={`error-${s.id}`} tabIndex={-1}>
+            <Notice tone="danger" role="alert">
+              {error}
+            </Notice>
+          </div>
         ) : null}
 
         <div className="space-y-2 border-t border-line pt-4">
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy || blocked} aria-describedby={blocked ? `blocked-${s.id}` : undefined} onClick={() => onAct({ action: "accept" })}>
+            <Button
+              id={`accept-btn-${s.id}`}
+              disabled={busy || blocked}
+              aria-describedby={blocked ? `blocked-${s.id}` : undefined}
+              onClick={() => run({ action: "accept" }, "undo")}
+            >
               {t.accept}
               <span className="sr-only">{`: ${context}`}</span>
             </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => onAct({ action: "reject" })}>
+            <Button id={`reject-btn-${s.id}`} variant="secondary" disabled={busy} onClick={() => run({ action: "reject" }, "undo")}>
               {t.reject}
               <span className="sr-only">{`: ${context}`}</span>
             </Button>
-            <Button variant="secondary" disabled={busy || editing} onClick={openEdit}>
+            <Button id={`edit-btn-${s.id}`} variant="secondary" disabled={busy || editing} onClick={openEdit}>
               {t.edit}
               <span className="sr-only">{`: ${context}`}</span>
             </Button>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AuthError } from "next-auth";
 import { auth, signIn, signInMethods } from "@/auth";
 import { Button, Card, Field, Input, Notice } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
@@ -9,30 +10,45 @@ export const metadata: Metadata = { title: "Sign in" };
 
 const t = en.signIn;
 
+// A failed sign-in throws AuthError, which would otherwise surface as a 500
+// page. Send the person back here with a flag so the page can say so. The
+// redirect that a successful sign-in throws is not an AuthError and passes through.
+async function attempt(provider: string, options: Record<string, string>) {
+  try {
+    await signIn(provider, { ...options, redirectTo: "/app" });
+  } catch (e) {
+    if (e instanceof AuthError) redirect("/sign-in?error=1");
+    throw e;
+  }
+}
+
 async function googleAction() {
   "use server";
-  await signIn("google", { redirectTo: "/app" });
+  await attempt("google", {});
 }
 
 async function emailAction(formData: FormData) {
   "use server";
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return;
-  await signIn("resend", { email, redirectTo: "/app" });
+  await attempt("resend", { email });
 }
 
 async function devAction(formData: FormData) {
   "use server";
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return;
-  await signIn("dev", { email, redirectTo: "/app" });
+  await attempt("dev", { email });
 }
 
-export default async function SignInPage() {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string | string[] }> }) {
   const session = await auth();
   if (session) redirect("/app");
   const methods = signInMethods();
   const any = methods.google || methods.email || methods.dev;
+  // Auth.js sends a failed sign-in back here with ?error=<code>. The code is
+  // never shown; one plain sentence covers every cause.
+  const failed = Boolean((await searchParams).error);
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto w-full max-w-md space-y-6 px-4 py-12 sm:py-20">
@@ -41,6 +57,12 @@ export default async function SignInPage() {
         <h1 className="font-heading text-3xl font-semibold">{t.title}</h1>
         {any ? <p className="text-muted">{t.intro}</p> : null}
       </div>
+
+      {failed ? (
+        <Notice tone="danger" role="alert" title={t.failedTitle}>
+          {t.failedBody}
+        </Notice>
+      ) : null}
 
       {!any ? (
         <Notice tone="warn" title={t.notConfigured} />

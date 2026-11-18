@@ -1,6 +1,14 @@
 // Response shapes of the server routes (see the shared spec).
 
-export type ProviderId = "gemini" | "openai" | "anthropic" | "openrouter" | "groq";
+// Which providers exist is decided by the server (GET /api/providers).
+export type ProviderId = string;
+
+export interface ProviderOption {
+  id: ProviderId;
+  label: string;
+  keyUrl: string;
+  keyHint: string;
+}
 
 export interface StoredLlmKey {
   provider: ProviderId;
@@ -86,6 +94,12 @@ export interface Facts {
 export interface Counts {
   confirmed: number;
   total: number;
+}
+
+/** Body of PUT /api/facts. The server keeps its own cannotConfirm list; removals are sent separately. */
+export interface FactsSave {
+  facts: Facts;
+  removeCannotConfirm: string[];
 }
 
 export interface FactsResponse {

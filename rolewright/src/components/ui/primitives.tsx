@@ -21,7 +21,7 @@ const buttonVariants: Record<ButtonVariant, string> = {
   primary: "btn-fill bg-brand text-brand-ink hover:opacity-90 border border-transparent",
   secondary: "bg-surface text-ink border border-line hover:bg-brand-soft",
   ghost: "bg-transparent text-brand hover:bg-brand-soft border border-transparent",
-  danger: "btn-fill bg-danger text-white border border-transparent hover:opacity-90",
+  danger: "btn-fill bg-danger text-danger-ink border border-transparent hover:opacity-90",
 };
 const buttonSizes = { md: "min-h-11 px-4 py-2 text-base", sm: "min-h-8 px-3 py-1 text-sm" };
 
@@ -32,10 +32,24 @@ export function buttonClass(variant: ButtonVariant = "primary", size: "md" | "sm
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: "md" | "sm";
+  /**
+   * Work is in progress. Unlike `disabled`, the button stays focusable, so a
+   * keyboard user who pressed it is not thrown to the top of the page when the
+   * work ends.
+   */
+  loading?: boolean;
 }
 
-export function Button({ variant = "primary", size = "md", className, type = "button", ...rest }: ButtonProps) {
-  return <button type={type} className={buttonClass(variant, size, className)} {...rest} />;
+export function Button({ variant = "primary", size = "md", className, type = "button", loading, onClick, ...rest }: ButtonProps) {
+  return (
+    <button
+      type={type}
+      aria-disabled={loading || undefined}
+      onClick={loading ? (e) => e.preventDefault() : onClick}
+      className={buttonClass(variant, size, cn(loading && "cursor-progress opacity-70", className))}
+      {...rest}
+    />
+  );
 }
 
 /* ---------- Field, Label, Input, Textarea, Select ---------- */

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { getDb } from "@/lib/db/index.mjs";
 import { getUserById, touchUser } from "@/lib/db/repo.mjs";
+import { assertSafeEnv } from "./env-guard.mjs";
 import { HttpError, type RouteState } from "./http";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,6 +17,9 @@ const TOUCH_EVERY_MS = 60 * 60 * 1000;
  * inside a withUser transaction.
  */
 export async function requireUser(state: RouteState): Promise<string> {
+  // auth.ts runs the same check when it loads. Every data route passes through
+  // here, so the refusal does not depend on how the bundler orders module loading.
+  assertSafeEnv(process.env);
   const session = await auth();
   const id = session?.user?.id;
   const unauthorized = () => new HttpError(401, "unauthorized", "Sign in to continue.");

@@ -129,19 +129,6 @@ async function freePort(preferred) {
   return (await tryPort(preferred)) ?? (await tryPort(0));
 }
 
-// `next dev` with its own dist directory rewrites tsconfig.json and
-// next-env.d.ts to point at it. Put both back exactly as they were.
-const GENERATED = ["tsconfig.json", "next-env.d.ts"].map((name) => path.join(appDir, name));
-function snapshotGenerated() {
-  return GENERATED.map((file) => [file, fs.existsSync(file) ? fs.readFileSync(file) : null]);
-}
-function restoreGenerated(snapshot) {
-  for (const [file, content] of snapshot) {
-    if (content === null) fs.rmSync(file, { force: true });
-    else if (!fs.existsSync(file) || !fs.readFileSync(file).equals(content)) fs.writeFileSync(file, content);
-  }
-}
-
 function startServer(port, dataDir) {
   const env = {
     ...process.env,
@@ -194,6 +181,17 @@ async function waitForServer(child) {
   throw new Error(`next dev did not answer in time.\n${serverOutput.slice(-3000)}`);
 }
 
+// A copied session cookie keeps working until it expires, so the lifetime is
+// part of the security story: seven days, not Auth.js's default thirty.
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+function assertSevenDaySession(setCookie) {
+  assert.ok(setCookie, "the sign-in response sets the session cookie");
+  const expires = /;\s*expires=([^;]+)/i.exec(setCookie)?.[1];
+  assert.ok(expires, "the session cookie has an expiry");
+  const left = Date.parse(expires) - Date.now();
+  assert.ok(Math.abs(left - SEVEN_DAYS_MS) < 10 * 60 * 1000, `session lifetime is about 7 days, got ${(left / 3_600_000).toFixed(1)} hours`);
+}
+
 async function signIn(email) {
   const jar = new CookieJar();
   const csrf = await request(jar, "GET", "/api/auth/csrf");
@@ -204,6 +202,7 @@ async function signIn(email) {
   });
   assert.ok(res.status === 302 || res.status === 303, `sign-in answered ${res.status}`);
   assert.ok(jar.hasSession(), "a session cookie was set");
+  assertSevenDaySession(res.headers.getSetCookie().find((c) => c.includes("authjs.session-token")));
   // A failed sign-in also redirects, so prove the session with a data route.
   const facts = await request(jar, "GET", "/api/facts");
   assert.equal(facts.status, 200, "the new session reaches a data route");
@@ -250,11 +249,10 @@ async function step(name, fn) {
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "rolewright-flow-"));
 const dbDir = path.join(dataDir, "pglite");
-const generated = snapshotGenerated();
 let child = null;
 const state = {};
 
-// If the run is interrupted, still stop the server and put the files back.
+// If the run is interrupted, still stop the server.
 function killServerSync() {
   if (!child || child.exitCode !== null) return;
   try {
@@ -264,31 +262,17 @@ function killServerSync() {
     // Already gone.
   }
 }
-process.once("exit", () => {
-  killServerSync();
-  restoreGenerated(generated);
-});
+process.once("exit", killServerSync);
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, () => process.exit(130));
 }
 
 try {
   await step("1. next dev starts with the dev sign-in, the mock AI and a temp database", async () => {
-    // `next dev` sometimes exits right after start-up to print a notice
-    // (Next 16.4.1 does this for an upgrade recommendation), so one restart is allowed.
-    for (let attempt = 1; ; attempt++) {
-      const port = await freePort(3111);
-      base = `http://localhost:${port}`;
-      child = startServer(port, dbDir);
-      try {
-        await waitForServer(child);
-        return;
-      } catch (err) {
-        if (attempt >= 2 || child.exitCode === null) throw err;
-        console.log("     next dev exited before answering; starting it once more");
-        await stopServer(child);
-      }
-    }
+    const port = await freePort(3111);
+    base = `http://localhost:${port}`;
+    child = startServer(port, dbDir);
+    await waitForServer(child);
   });
 
   await step("2. two users sign in through the real Auth.js endpoints", async () => {
@@ -296,6 +280,7 @@ try {
     state.B = await signIn("bala.flow@example.com");
     const sa = await request(state.A, "GET", "/api/auth/session");
     const sb = await request(state.B, "GET", "/api/auth/session");
+    assert.ok(Math.abs(Date.parse(sa.data.expires) - Date.now() - SEVEN_DAYS_MS) < 10 * 60 * 1000, `session expires ${sa.data.expires}`);
     assert.match(sa.data.user.id, /^[0-9a-f-]{36}$/);
     assert.notEqual(sa.data.user.id, sb.data.user.id);
     state.aId = sa.data.user.id;
@@ -315,6 +300,15 @@ try {
     const unknown = await request(state.A, "POST", "/api/keys/verify", { headers: { ...ai(), "x-llm-provider": "acme-ai" } });
     assert.equal(unknown.data.ok, false);
     assert.equal(unknown.data.code, "not_allowed");
+    // The model id is stored with a tailoring, so a junk one is refused for every provider, the mock included.
+    const junkModel = await request(state.A, "POST", "/api/keys/verify", { headers: { ...ai(), "x-llm-model": `m${"x".repeat(300)}` } });
+    assert.equal(junkModel.data.ok, false);
+    assert.equal(junkModel.data.code, "model_not_found");
+    assertError(
+      await request(state.A, "POST", "/api/tailorings", { json: { title: "X", company: "Y", jdText: JD }, headers: { ...ai(), "x-llm-model": "../etc" } }),
+      400,
+      "model_not_found",
+    );
     assertError(await request(null, "POST", "/api/keys/verify", { headers: ai() }), 401, "unauthorized");
   });
 
@@ -415,6 +409,35 @@ try {
     assert.ok(text.includes(squash("Managed and mentored a team of 4 analysts")));
     assert.ok(text.includes(squash("Cut month-end close time by 30% with SQL and Power BI reporting")));
     assert.ok(!text.includes(squash("12 analysts")));
+  });
+
+  await step("7b. a stale facts page cannot undo can't-confirm, an explicit removal can, and two actions at once both land", async () => {
+    // A facts page opened before the cannot_confirm in step 7 sends a list without "12".
+    const current = (await request(state.A, "GET", "/api/facts")).data.facts;
+    assert.deepEqual(current.cannotConfirm, ["12"]);
+    const stale = await request(state.A, "PUT", "/api/facts", { json: { facts: { ...current, cannotConfirm: [] } } });
+    assert.equal(stale.status, 200);
+    assert.deepEqual(stale.data.facts.cannotConfirm, ["12"], "the stored list is kept");
+    assert.deepEqual((await request(state.A, "GET", "/api/facts")).data.facts.cannotConfirm, ["12"]);
+    // Nor can a page add to it: the list only grows through review actions.
+    const planted = await request(state.A, "PUT", "/api/facts", { json: { facts: { ...current, cannotConfirm: ["12", "Power BI"] } } });
+    assert.deepEqual(planted.data.facts.cannotConfirm, ["12"]);
+
+    assertError(await request(state.A, "PUT", "/api/facts", { json: { facts: current, removeCannotConfirm: "12" } }), 400, "invalid_removals");
+    assertError(await request(state.A, "PUT", "/api/facts", { json: { facts: current, removeCannotConfirm: [12] } }), 400, "invalid_removals");
+    const removed = await request(state.A, "PUT", "/api/facts", { json: { facts: current, removeCannotConfirm: [" 12 ", "never listed"] } });
+    assert.equal(removed.status, 200);
+    assert.deepEqual(removed.data.facts.cannotConfirm, []);
+    assert.deepEqual((await request(state.A, "GET", "/api/facts")).data.facts.cannotConfirm, []);
+
+    // Two review actions sent at the same moment: neither overwrites the other.
+    const patch = (sid, body) => request(state.A, "PATCH", `/api/tailorings/${state.tid}/suggestions/${sid}`, { json: body });
+    const [r1, r2] = await Promise.all([patch(state.s.crore.id, { action: "reject" }), patch(state.s.tableau.id, { action: "reject" })]);
+    assert.equal(r1.status, 200);
+    assert.equal(r2.status, 200);
+    const after = (await request(state.A, "GET", `/api/tailorings/${state.tid}`)).data.tailoring.suggestions;
+    assert.equal(after.find((s) => s.id === state.s.crore.id).decision, "rejected");
+    assert.equal(after.find((s) => s.id === state.s.tableau.id).decision, "rejected");
   });
 
   await step("8. tampering: no body can force a decision or verdict, and a stale stored pass does not export", async () => {
@@ -518,7 +541,6 @@ try {
 
   await stopServer(child);
   child = null;
-  restoreGenerated(generated);
 
   await step("11. key hygiene (storage half): the key is in no log line and no database column", async () => {
     assert.ok(serverOutput.length > 0, "server output was captured");
@@ -559,7 +581,6 @@ try {
   // Reported by step(); fall through to cleanup.
 } finally {
   await stopServer(child);
-  restoreGenerated(generated);
   await closeBrowser();
   if (process.env.FLOW_SHOW_SERVER_OUTPUT === "1") {
     console.log("\n--- server output ---");

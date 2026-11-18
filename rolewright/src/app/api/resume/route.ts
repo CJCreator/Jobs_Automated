@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index.mjs";
-import { getFacts, saveFacts, saveResume } from "@/lib/db/repo.mjs";
+import { changeFacts, saveResume } from "@/lib/db/repo.mjs";
 import { confirmationCounts, normalizeFacts } from "@/lib/facts.mjs";
 import { extractFacts } from "@/lib/llm/index.mjs";
 import { readBodyBytes } from "@/lib/server/body";
@@ -64,11 +64,14 @@ export const POST = route("resume.upload", async (req, { state }) => {
   const proposed = normalizeFacts(raw, { trustConfirmed: false });
 
   const db = await getDb();
-  const existing = await getFacts(db, userId);
-  // A new resume replaces the proposal, all unconfirmed, but never what the
-  // user stated themselves or said they cannot confirm.
-  const facts = { ...proposed, extras: existing.extras ?? [], cannotConfirm: existing.cannotConfirm ?? [] };
   await saveResume(db, userId, { filename: cleanFilename(file.name), rawText: text });
-  await saveFacts(db, userId, facts);
+  // A new resume replaces the proposal, all unconfirmed, but never what the
+  // user stated themselves or said they cannot confirm. Read and written under
+  // the facts row lock, so a review action at the same moment is not lost.
+  const facts = await changeFacts(db, userId, (existing) => ({
+    ...proposed,
+    extras: existing.extras ?? [],
+    cannotConfirm: existing.cannotConfirm ?? [],
+  }));
   return json({ facts, counts: confirmationCounts(facts) });
 });

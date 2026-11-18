@@ -9,16 +9,16 @@
 // non-superuser role `rolewright_app` and records the user id for the policies.
 // Querying user data any other way would run as a superuser and see every row.
 
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { SCHEMA_SQL } from "./schema.mjs";
 
 const APP_ROLE = "rolewright_app";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Arbitrary constant so two app processes starting at once do not run DDL concurrently.
 const SCHEMA_LOCK_KEY = 727274;
 
-const schemaUrl = new URL("./schema.sql", import.meta.url);
-const loadSchema = () => readFile(schemaUrl, "utf8");
+const loadSchema = async () => SCHEMA_SQL;
 
 /** Throws before any database call if the id is not a UUID. */
 function assertUserId(userId) {
@@ -88,7 +88,7 @@ async function createPgDb({ connectionString }) {
     async withUser(userId, fn) {
       assertUserId(userId);
       const client = await pool.connect();
-      let failed = false;
+      let broken = false;
       try {
         await client.query("BEGIN");
         await client.query(ENTER_SCOPE);
@@ -97,16 +97,20 @@ async function createPgDb({ connectionString }) {
         await client.query("COMMIT");
         return result;
       } catch (err) {
-        failed = true;
+        // A refused action (a 409 thrown by the callback) lands here too; after a
+        // clean ROLLBACK the role and user id are gone (both were LOCAL), so the
+        // connection is safe to reuse.
         try {
           await client.query("ROLLBACK");
         } catch {
-          // The connection is broken; it is destroyed below so it never returns to the pool.
+          // Rollback itself failed: the connection may still be inside the
+          // scope, so it is destroyed below and never returns to the pool.
+          broken = true;
         }
         throw err;
       } finally {
         // Passing an error to release() discards the connection instead of reusing it.
-        client.release(failed ? true : undefined);
+        client.release(broken ? true : undefined);
       }
     },
     close: () => pool.end(),

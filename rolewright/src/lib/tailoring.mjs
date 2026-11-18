@@ -164,7 +164,8 @@ export function applyAction(facts, suggestions, sid, { action, text, value } = {
       const v = requireValue(value);
       // Checked first: something the user said they can't confirm stays out for good.
       if ((facts.cannotConfirm ?? []).some((c) => sameText(c, v))) {
-        throw new TailoringError(409, "cannot_confirm", `You marked "${v}" as something you can't confirm, so it can't be added as a fact.`);
+        // The message does not repeat the value: error text never carries request content.
+        throw new TailoringError(409, "cannot_confirm", "You marked this as something you can't confirm, so it can't be added as a fact.");
       }
       const issue = currentIssue(target, ctxNow, v);
       if (!issue) throw new TailoringError(400, "not_an_issue", "You can only confirm an item that is flagged on this change.");

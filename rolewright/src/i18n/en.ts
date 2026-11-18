@@ -22,7 +22,7 @@ export const en = {
     added: "added",
   },
   landing: {
-    headline: "Tailor your resume to each job without inventing anything",
+    headline: "Tailor your resume to each job, and keep every line true",
     lead: "Rolewright rewords the lines you already wrote so they speak to a job description. Every change is checked against facts you confirmed yourself.",
     signIn: "Sign in",
     stepsTitle: "How it works",
@@ -32,7 +32,7 @@ export const en = {
       { title: "Review every change", body: "See each change as a before and after. Accept it, reject it or reword it. Then download a PDF." },
     ],
     promiseTitle: "Our promise",
-    promise: "No claim reaches your exported resume unless it is in your own confirmed facts.",
+    promise: "Every figure and every name in a suggestion is checked against facts you confirmed yourself. You still read and approve each change before it goes in.",
     audienceTitle: "Who it is for",
     audience: "Job seekers in India applying for roles at home and abroad, who want a resume that fits each posting and still tells the truth.",
     howKeyTitle: "You bring your own AI key",
@@ -45,7 +45,7 @@ export const en = {
     exampleAfter: "Resolved customer queries about failed payments and refunds.",
     exampleOk: "Checked against your facts",
     exampleBlocked: "Not in your facts",
-    exampleBlockedNote: "A line that adds something you never confirmed, such as a tool you have not used, is held back until you confirm it or reword it.",
+    exampleBlockedNote: "A line that adds a figure or a name you never confirmed, such as a bigger team size or a tool you have not used, is held back until you confirm it or reword it.",
   },
   signIn: {
     title: "Sign in to Rolewright",
@@ -60,6 +60,8 @@ export const en = {
     notConfigured: "Sign-in is not set up on this server yet. The person running Rolewright needs to turn on at least one sign-in method.",
     back: "Back to the home page",
     or: "or",
+    failedTitle: "We could not sign you in",
+    failedBody: "Check the details and try again. If it keeps happening, try another sign-in method.",
   },
   app: {
     nav: {
@@ -148,6 +150,7 @@ export const en = {
       rule: "Only facts you confirm are used. Anything you don't confirm is ignored when we check suggestions and when you export.",
       emptyTitle: "No facts yet",
       emptyBody: "Upload your resume to get a list of facts to review, or add facts by hand below.",
+      needsCheck: "Needs your check",
       confirmAll: "Confirm all in this section",
       confirmAllDone: (section: string) => `All items in ${section} confirmed.`,
       sections: {

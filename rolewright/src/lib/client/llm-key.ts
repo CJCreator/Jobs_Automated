@@ -5,7 +5,6 @@ import { useSyncExternalStore } from "react";
 import type { ProviderId, StoredLlmKey } from "./types";
 
 const STORAGE_KEY = "rolewright.llm";
-const PROVIDER_IDS: ProviderId[] = ["gemini", "openai", "anthropic", "openrouter", "groq"];
 
 const listeners = new Set<() => void>();
 let cachedRaw: string | null | undefined;
@@ -21,9 +20,10 @@ function parse(raw: string | null): StoredLlmKey | null {
       v.key &&
       typeof v.model === "string" &&
       typeof v.verifiedAt === "string" &&
-      PROVIDER_IDS.includes(v.provider as ProviderId)
+      typeof v.provider === "string" &&
+      /^[a-z0-9-]{1,30}$/.test(v.provider)
     ) {
-      return { provider: v.provider as ProviderId, key: v.key, model: v.model, verifiedAt: v.verifiedAt };
+      return { provider: v.provider, key: v.key, model: v.model, verifiedAt: v.verifiedAt };
     }
   } catch {
     // Corrupt value: treat as no key.

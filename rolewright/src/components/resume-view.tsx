@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { useLlmKey } from "@/lib/client/llm-key";
-import { providerLabel } from "@/lib/client/providers";
-import type { Facts, FactsResponse } from "@/lib/client/types";
+import { providerLabel, useProviders } from "@/lib/client/providers";
+import type { Facts, FactsResponse, FactsSave } from "@/lib/client/types";
 import { confirmationCounts } from "@/lib/facts.mjs";
 import { FactEditor } from "@/components/fact-editor";
 import { AlertIcon, CheckIcon } from "@/components/ui/icons";
@@ -17,6 +17,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 
 export function ResumeView() {
   const { llm, ready } = useLlmKey();
+  const { providers } = useProviders();
 
   const [facts, setFacts] = useState<Facts | null>(null);
   const [saved, setSaved] = useState("");
@@ -32,6 +33,7 @@ export function ResumeView() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadDone, setUploadDone] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const focusAfterUpload = useRef<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
@@ -109,19 +111,36 @@ export function ResumeView() {
       setFile(null);
       if (fileInput.current) fileInput.current.value = "";
       setAnnouncement(t.done);
+      focusAfterUpload.current = "facts-heading";
     } catch (e) {
       setUploadError(e instanceof ApiError ? e.message : en.common.loadError);
+      focusAfterUpload.current = "upload-error";
     } finally {
       setUploading(false);
     }
   };
+
+  // The upload form is disabled while it works, which drops focus to the top of
+  // the page. Put it on the result instead: the facts to review, or the error.
+  useEffect(() => {
+    if (uploading || !focusAfterUpload.current) return;
+    const el = document.getElementById(focusAfterUpload.current);
+    if (el) {
+      el.focus();
+      focusAfterUpload.current = null;
+    }
+  });
 
   const onSave = async () => {
     if (!facts) return;
     setSaving(true);
     setSaveMessage(null);
     try {
-      const res = await api<FactsResponse>("/api/facts", { method: "PUT", json: { facts } });
+      // The server keeps its own can't-confirm list; entries the user removed here are named explicitly.
+      const stored = JSON.parse(saved) as Facts;
+      const removeCannotConfirm = stored.cannotConfirm.filter((c) => !facts.cannotConfirm.includes(c));
+      const body: FactsSave = { facts, removeCannotConfirm };
+      const res = await api<FactsResponse>("/api/facts", { method: "PUT", json: body });
       setFacts(res.facts);
       setSaved(JSON.stringify(res.facts));
       setSaveMessage({ tone: "ok", text: t.saveDone });
@@ -180,7 +199,7 @@ export function ResumeView() {
                 setConsent(e.target.checked);
                 if (e.target.checked) setConsentError(null);
               }}
-              label={t.consent(llm ? providerLabel(llm.provider) : t.providerFallback)}
+              label={t.consent(llm ? providerLabel(llm.provider, providers) : t.providerFallback)}
             />
             {consentError ? (
               <p id="resume-consent-error" className="text-sm font-medium text-danger">
@@ -189,7 +208,7 @@ export function ResumeView() {
             ) : null}
           </div>
 
-          <Button onClick={onUpload}>
+          <Button id="upload-resume" onClick={onUpload}>
             {uploading ? <Spinner /> : null}
             {t.uploadButton}
           </Button>
@@ -207,13 +226,17 @@ export function ResumeView() {
           {uploadDone ? <Notice tone="ok">{t.done}</Notice> : null}
         </div>
         {uploadError ? (
-          <Notice tone="danger" role="alert">
-            {uploadError}
-          </Notice>
+          <div id="upload-error" tabIndex={-1}>
+            <Notice tone="danger" role="alert">
+              {uploadError}
+            </Notice>
+          </div>
         ) : null}
       </Card>
 
-      <h2 className="font-heading text-3xl font-semibold">{t.factsTitle}</h2>
+      <h2 id="facts-heading" tabIndex={-1} className="font-heading text-3xl font-semibold">
+        {t.factsTitle}
+      </h2>
 
       {loading ? (
         <LoadingBlock label={en.common.loading} lines={6} />
@@ -244,7 +267,7 @@ export function ResumeView() {
                 ) : (
                   <p className="max-w-[28ch] text-sm text-muted">{t.needBullet}</p>
                 )}
-                <Button onClick={onSave} disabled={saving || !dirty}>
+                <Button id="save-facts" onClick={onSave} loading={saving}>
                   {saving ? <Spinner /> : null}
                   {t.saveFacts}
                 </Button>

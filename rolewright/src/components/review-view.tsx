@@ -195,7 +195,7 @@ export function ReviewView({ id }: { id: string }) {
 
       <Card className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={onExport} disabled={exporting || Boolean(exportReason)} aria-describedby={exportReason ? "export-reason" : "export-note"}>
+          <Button id="export-pdf" onClick={onExport} disabled={Boolean(exportReason)} loading={exporting} aria-describedby={exportReason ? "export-reason" : "export-note"}>
             {exporting ? <Spinner /> : null}
             {exporting ? t.exporting : t.export}
           </Button>

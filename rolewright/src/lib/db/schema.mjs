@@ -1,7 +1,10 @@
--- Rolewright schema. Safe to run on every start: every statement is idempotent.
+// The database schema as a string, so it is bundled like any other module and
+// never read from disk at runtime (a file read breaks inside Next server bundles).
+// Safe to run on every start: every statement is idempotent.
+export const SCHEMA_SQL = `-- Rolewright schema. Safe to run on every start: every statement is idempotent.
 --
 -- Isolation model: user-data tables have row-level security, and the app only
--- touches them after `SET LOCAL ROLE rolewright_app` (see withUser in index.mjs).
+-- touches them after \`SET LOCAL ROLE rolewright_app\` (see withUser in index.mjs).
 -- A superuser or table owner would bypass the policies, which is exactly why
 -- the role switch is not optional.
 
@@ -122,3 +125,4 @@ CREATE POLICY tailorings_isolation ON tailorings
 
 -- Privileges: user-data tables only. Nothing on users, accounts or verification_tokens.
 GRANT SELECT, INSERT, UPDATE, DELETE ON resumes, fact_bases, jobs, tailorings TO rolewright_app;
+`;

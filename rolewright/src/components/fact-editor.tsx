@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import type { Bullet, Education, Extra, Facts, Job, Skill } from "@/lib/client/types";
 import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/components/ui/cn";
-import { Button, Card, Checkbox, Field, Input, Textarea } from "@/components/ui/primitives";
+import { Badge, Button, Card, Checkbox, Field, Input, Textarea } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
 
 const t = en.app.resume;
@@ -46,9 +46,16 @@ function Section({
 }
 
 /** One editable item. The bar on its start edge, and the checkbox text, show whether it is confirmed. */
-function Item({ confirmed, children }: { confirmed: boolean; children: ReactNode }) {
+function Item({ confirmed, label = true, children }: { confirmed: boolean; label?: boolean; children: ReactNode }) {
   return (
-    <Card className={cn("space-y-4 border-s-4 p-4! sm:p-5!", confirmed ? "border-s-ok" : "border-s-warn")}>{children}</Card>
+    <Card className={cn("space-y-4 border-s-4 p-4! sm:p-5!", confirmed ? "border-s-ok" : "border-s-warn")}>
+      {label ? (
+        <div className="flex justify-end">
+          <Badge tone={confirmed ? "ok" : "warn"}>{confirmed ? en.common.confirmed : t.needsCheck}</Badge>
+        </div>
+      ) : null}
+      {children}
+    </Card>
   );
 }
 
@@ -381,7 +388,7 @@ export function FactEditor({ facts, onChange, announce }: Props) {
         <ul className="grid gap-3 sm:grid-cols-2">
           {facts.skills.map((k) => (
             <li key={k.id}>
-              <Item confirmed={k.confirmed}>
+              <Item confirmed={k.confirmed} label={false}>
                 <Field id={`skill-${k.id}`} label={t.fields.skill}>
                   {(f) => <Input id={f.id} autoComplete="off" value={k.name} onChange={(e) => setSkill(k.id, { name: e.target.value, source: "user" })} />}
                 </Field>

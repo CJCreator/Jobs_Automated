@@ -43,9 +43,12 @@ test("₹ amounts and percentages are single tokens", () => {
   assert.deepEqual(added, ["₹15", "40%"]);
 });
 
-test("punctuation stays attached to its word", () => {
+test("trailing punctuation is its own token, so only the change is marked", () => {
   const parts = assertRoundTrip("Shipped it, fast.", "Shipped it fast.");
-  assert.ok(parts.some((p) => p.type === "remove" && p.text.includes("it,")));
+  const removed = parts.filter((p) => p.type === "remove").map((p) => p.text.trim());
+  assert.deepEqual(removed, [","]);
+  const end = assertRoundTrip("Handled failed payments.", "Handled failed payments and refunds.");
+  assert.ok(!end.some((p) => p.type === "remove" && p.text.includes("payments")), "the unchanged word is not struck through");
 });
 
 test("empty inputs", () => {

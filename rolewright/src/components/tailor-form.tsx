@@ -92,7 +92,7 @@ export function TailorForm() {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6" aria-busy={busy}>
       <p className="max-w-[65ch] text-lg text-muted">{t.intro}</p>
-      <fieldset disabled={busy} className="space-y-6 border-0 p-0">
+      <fieldset className="space-y-6 border-0 p-0">
         <legend className="sr-only">{t.title}</legend>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field id="job-title" label={t.jobTitleLabel} error={errors.title}>
@@ -100,6 +100,7 @@ export function TailorForm() {
               <Input
                 id={f.id}
                 value={title}
+                readOnly={busy}
                 autoComplete="off"
                 aria-describedby={f.describedBy}
                 aria-invalid={f.invalid || undefined}
@@ -112,6 +113,7 @@ export function TailorForm() {
               <Input
                 id={f.id}
                 value={company}
+                readOnly={busy}
                 autoComplete="off"
                 aria-describedby={f.describedBy}
                 aria-invalid={f.invalid || undefined}
@@ -127,6 +129,7 @@ export function TailorForm() {
                 id={f.id}
                 rows={14}
                 value={jd}
+                readOnly={busy}
                 aria-describedby={`${f.describedBy ?? ""} job-jd-count`.trim()}
                 aria-invalid={f.invalid || undefined}
                 onChange={(e) => setJd(e.target.value)}
@@ -137,7 +140,7 @@ export function TailorForm() {
             </>
           )}
         </Field>
-        <Button type="submit">
+        <Button id="tailor-submit" type="submit" loading={busy}>
           {busy ? <Spinner /> : null}
           {t.submit}
         </Button>

@@ -215,6 +215,27 @@ test("attest is refused for a value the user said they can't confirm, before any
   expectError(() => applyAction(facts, list, list[0].id, { action: "attest", value: "12" }, { engineGate: gate }), 409, "cannot_confirm");
 });
 
+test("no refusal message repeats what the request sent", () => {
+  const marker = "Zq9 marker <b>";
+  const facts = ashaFacts({ cannotConfirm: [marker] });
+  const { gate } = stubGate();
+  const list = [suggestion(REF.team, `Led a team of 12 analysts ${marker}`)];
+  const attempts = [
+    { action: "attest", value: marker },
+    { action: "attest", value: ` ${marker.toUpperCase()} ` },
+    { action: "cannot_confirm", value: `${marker} x` },
+    { action: "edit", text: `${marker}`.repeat(100) },
+    { action: marker },
+  ];
+  for (const input of attempts) {
+    assert.throws(() => applyAction(facts, list, list[0].id, input, { engineGate: gate }), (err) => {
+      assert.ok(err instanceof TailoringError);
+      assert.ok(!err.message.toLowerCase().includes("zq9"), `${input.action}: ${err.message}`);
+      return true;
+    });
+  }
+});
+
 test("cannot_confirm needs a current issue, records it, and un-accepts an accepted suggestion that contains it", () => {
   // The user had confirmed "12" and accepted a line using it, then removed that fact.
   const facts = ashaFacts();

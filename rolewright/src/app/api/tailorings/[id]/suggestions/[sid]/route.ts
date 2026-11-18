@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index.mjs";
-import { getFacts, getTailoring, saveFacts, updateTailoringSuggestions } from "@/lib/db/repo.mjs";
+import { changeTailoring } from "@/lib/db/repo.mjs";
 import { readJsonObject } from "@/lib/server/body";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { json, route } from "@/lib/server/http";
@@ -17,24 +17,22 @@ export const PATCH = route<{ id: string; sid: string }>("suggestions.patch", asy
   const userId = await requireUser(state);
   const { id, sid } = await params;
   const body = await readJsonObject(req);
-  const db = await getDb();
-  const tailoring = await getTailoring(db, userId, id);
-  if (!tailoring) throw notFound();
+  const input = { action: optionalString(body.action), text: body.text, value: body.value };
+  // Loaded before the transaction opens: once loaded, the gate and every check
+  // are synchronous, so the rows stay locked only for the computation itself.
   const engineGate = await loadFactGate();
-  const facts = await getFacts(db, userId);
-  const ctx = { jdText: tailoring.jdText ?? "", engineGate };
 
-  const result = applyAction(
-    facts,
-    tailoring.suggestions,
-    sid,
-    { action: optionalString(body.action), text: body.text, value: body.value },
-    ctx,
-  );
-  // Facts first: if the second write fails, the suggestions are re-checked
-  // against the saved facts on the next read anyway.
-  if (result.factsChanged) await saveFacts(db, userId, result.facts);
-  const suggestions = freshChecks(result.facts, result.suggestions, ctx);
-  await updateTailoringSuggestions(db, userId, id, suggestions);
-  return json({ tailoring: tailoringView(tailoring, suggestions) });
+  // The tailoring and the facts are read, changed and written under row locks
+  // in one transaction, so two actions at once cannot lose either change.
+  // A refused action (409, 400) throws inside and rolls everything back.
+  const changed = await changeTailoring(await getDb(), userId, id, ({ tailoring, facts }) => {
+    const ctx = { jdText: tailoring.jdText ?? "", engineGate };
+    const result = applyAction(facts, tailoring.suggestions, sid, input, ctx);
+    return {
+      facts: result.factsChanged ? result.facts : undefined,
+      suggestions: freshChecks(result.facts, result.suggestions, ctx),
+    };
+  });
+  if (!changed) throw notFound();
+  return json({ tailoring: tailoringView(changed.tailoring, changed.suggestions) });
 });

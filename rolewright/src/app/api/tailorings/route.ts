@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index.mjs";
-import { createJob, createTailoring, getFacts, listTailorings } from "@/lib/db/repo.mjs";
+import { createJobWithTailoring, getFacts, listTailorings } from "@/lib/db/repo.mjs";
 import { factBaseText, tailorableLines } from "@/lib/facts.mjs";
 import { suggestRewrites } from "@/lib/llm/index.mjs";
 import { readJsonObject } from "@/lib/server/body";
@@ -51,7 +51,13 @@ export const POST = route("tailorings.create", async (req, { state }) => {
     cannotConfirm: facts.cannotConfirm,
     engineGate,
   });
-  const { id: jobId } = await createJob(db, userId, { title, company, jdText });
-  const { id } = await createTailoring(db, userId, { jobId, suggestions, provider: llm.provider, model: llm.model ?? null });
+  const { id } = await createJobWithTailoring(db, userId, {
+    title,
+    company,
+    jdText,
+    suggestions,
+    provider: llm.provider,
+    model: llm.model ?? null,
+  });
   return json({ id });
 });

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { formatDate } from "@/lib/client/format";
 import { clearLlmKey, maskKey, setLlmKey, useLlmKey } from "@/lib/client/llm-key";
-import { PROVIDER_OPTIONS, providerLabel } from "@/lib/client/providers";
+import { providerLabel, useProviders } from "@/lib/client/providers";
 import type { ModelOption, ProviderId, VerifyResponse } from "@/lib/client/types";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/icons";
 import { Button, Card, Field, Input, Notice, Select, Spinner } from "@/components/ui/primitives";
@@ -21,6 +21,7 @@ interface Verified {
 
 export function KeyView() {
   const { llm, ready } = useLlmKey();
+  const { providers } = useProviders();
   const [provider, setProvider] = useState<ProviderId>("gemini");
   const [keyInput, setKeyInput] = useState("");
   const [show, setShow] = useState(false);
@@ -30,7 +31,19 @@ export function KeyView() {
   const [status, setStatus] = useState<{ tone: "ok" | "danger" | "info"; text: string } | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
-  const selected = PROVIDER_OPTIONS.find((p) => p.id === provider) ?? PROVIDER_OPTIONS[0];
+  // Saving or removing the key removes the button that was pressed. Send focus
+  // somewhere sensible instead of letting it fall to the top of the page.
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusTarget) return;
+    const el = document.getElementById(focusTarget);
+    if (el) {
+      el.focus();
+      setFocusTarget(null);
+    }
+  });
+
+  const selected = providers.find((p) => p.id === provider) ?? providers[0];
   // A check only counts for the exact provider and key it was run on.
   const canSave = Boolean(verified && verified.provider === provider && verified.key === keyInput.trim());
 
@@ -81,6 +94,7 @@ export function KeyView() {
       setVerified(null);
       setShow(false);
       setStatus({ tone: "ok", text: t.saved });
+      setFocusTarget("saved-key-title");
     } else {
       setStatus({ tone: "danger", text: t.saveFailed });
     }
@@ -96,6 +110,7 @@ export function KeyView() {
     clearLlmKey();
     reset();
     setStatus({ tone: "info", text: t.removedNote });
+    setFocusTarget("provider");
   };
 
   return (
@@ -107,12 +122,12 @@ export function KeyView() {
 
       {ready && llm ? (
         <Card className="space-y-4" aria-labelledby="saved-key-title">
-          <h2 id="saved-key-title" className="font-heading text-2xl font-semibold">
+          <h2 id="saved-key-title" tabIndex={-1} className="font-heading text-2xl font-semibold">
             {t.savedTitle}
           </h2>
           <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
             <dt className="font-semibold">{t.savedProvider}</dt>
-            <dd>{providerLabel(llm.provider)}</dd>
+            <dd>{providerLabel(llm.provider, providers)}</dd>
             <dt className="font-semibold">{t.savedModel}</dt>
             <dd>{llm.model}</dd>
             <dt className="font-semibold">{t.savedKey}</dt>
@@ -120,11 +135,11 @@ export function KeyView() {
           </dl>
           <p className="text-sm text-muted">{t.savedChecked(formatDate(llm.verifiedAt, true))}</p>
           <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={onCheckSaved} disabled={checking}>
+            <Button variant="secondary" onClick={onCheckSaved} loading={checking}>
               {checking ? <Spinner /> : null}
               {t.checkAgain}
             </Button>
-            <Button variant="danger" onClick={onRemove} disabled={checking}>
+            <Button variant="danger" onClick={onRemove} loading={checking}>
               {t.removeKey}
             </Button>
           </div>
@@ -146,7 +161,7 @@ export function KeyView() {
                 reset();
               }}
             >
-              {PROVIDER_OPTIONS.map((p) => (
+              {providers.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
@@ -154,18 +169,21 @@ export function KeyView() {
             </Select>
           )}
         </Field>
-        <p>
-          <a
-            href={selected.keyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block min-h-8 py-1 text-brand underline underline-offset-4"
-          >
-            {t.getKey(selected.label)}
-          </a>
-        </p>
+        {selected.keyUrl ? (
+          <p>
+            <a
+              href={selected.keyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block min-h-8 py-1 text-brand underline underline-offset-4"
+            >
+              {t.getKey(selected.label)}
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </p>
+        ) : null}
 
-        <Field id="llm-key" label={t.keyLabel} hint={t.keyHelp} error={fieldError}>
+        <Field id="llm-key" label={t.keyLabel} hint={selected.keyHint ? `${t.keyHelp} ${selected.keyHint}.` : t.keyHelp} error={fieldError}>
           {(f) => (
             <div className="flex gap-2">
               <Input
@@ -191,7 +209,7 @@ export function KeyView() {
           )}
         </Field>
 
-        <Button onClick={onCheck} disabled={checking}>
+        <Button id="check-key" onClick={onCheck} loading={checking}>
           {checking ? <Spinner /> : null}
           {t.check}
         </Button>
@@ -214,7 +232,7 @@ export function KeyView() {
                 </Select>
               )}
             </Field>
-            <Button onClick={onSave} disabled={!model}>
+            <Button id="save-key" onClick={onSave} disabled={!model}>
               {t.saveButton}
             </Button>
           </div>
