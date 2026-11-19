@@ -482,6 +482,9 @@ try {
       await visitor.page.getByRole("button", { name: "Development sign-in" }).click();
       await visitor.page.getByText("We could not sign you in").waitFor();
       await checkpoint(visitor.page, "sign-in-failed");
+    } catch (err) {
+      await saveArtifacts("a-inner");
+      throw err;
     } finally {
       await visitor.ctx.close();
       currentPage = page;
@@ -659,8 +662,12 @@ try {
     await card.getByRole("button", { name: "Yes, it is true. Add it" }).click();
     await poll(async () => {
       // One count over a filtered locator: the issues list can disappear between a count and an innerText.
-      return (await card.getByTestId("issues").filter({ hasText: "5 crore" }).count()) === 0;
-    }, "the card no longer lists 5 crore as an issue");
+      return (
+        (await card.count()) === 1 &&
+        (await card.getByTestId("issues").filter({ hasText: "5 crore" }).count()) === 0 &&
+        (await card.locator('[id^="accept-btn-"]:not([disabled])').count()) === 1
+      );
+    }, "the card is present, no longer lists 5 crore as an issue, and can be accepted");
     await checkpoint(page, "review-attested");
 
     await nav(page, "Resume and facts").click();
@@ -861,9 +868,16 @@ try {
       assert.equal(info.id, `confirm-yes-0-${ids.crore}`, "focus moves to the confirmation button");
       await p.keyboard.press("Enter");
       await poll(async () => {
-        return (await cardLoc(p, ids.crore).getByTestId("issues").filter({ hasText: "5 crore" }).count()) === 0;
-      }, "5 crore attested by keyboard");
-      await inCard(ids.crore, "after attesting");
+        // All counts, so a vanished element cannot stall the poll and a vanished card cannot pass it.
+        const card = cardLoc(p, ids.crore);
+        return (
+          (await card.count()) === 1 &&
+          (await card.getByTestId("issues").filter({ hasText: "5 crore" }).count()) === 0 &&
+          (await card.locator(`[id="accept-btn-${ids.crore}"]:not([disabled])`).count()) === 1
+        );
+      }, "5 crore attested by keyboard: card present, issue gone, Accept enabled");
+      info = await inCard(ids.crore, "after attesting");
+      assert.equal(info.id, `accept-btn-${ids.crore}`, "focus moves to Accept once the card is unblocked");
 
       // export, by keyboard
       await tabTo(p, "#export-pdf", 200);
@@ -878,6 +892,9 @@ try {
       await go(p, "/app/privacy");
       await assertSkipLinkFirst(p, "privacy");
       await assertTargets(p, "privacy");
+    } catch (err) {
+      await saveArtifacts("5-keyboard-only-inner");
+      throw err;
     } finally {
       await ctx.close();
       currentPage = page;
@@ -893,6 +910,9 @@ try {
         assert.ok(m.scroll <= m.client, `${label}: no horizontal scroll (${m.scroll} > ${m.client})`);
         await shot(anon.page, `${label}`, { dark: false });
       }
+    } catch (err) {
+      await saveArtifacts("6-inner");
+      throw err;
     } finally {
       await anon.ctx.close();
     }
@@ -967,6 +987,9 @@ try {
       await switchUserWithoutReload(third.page, "dev.e2e@example.com", signOut);
       await assertNoKeyInUse(third.page, "after sign-out and a different sign-in");
       await assertNoStoredKey(third.page, "after switching user");
+    } catch (err) {
+      await saveArtifacts("j-inner");
+      throw err;
     } finally {
       await third.ctx.close();
       currentPage = page;
@@ -989,6 +1012,9 @@ try {
       await go(second.page, "/app/resume");
       await second.page.getByText("No facts yet").waitFor();
       assert.match(await second.page.getByText(/^\d+ of \d+ facts confirmed$/).innerText(), /^0 of 0/);
+    } catch (err) {
+      await saveArtifacts("i-inner");
+      throw err;
     } finally {
       await second.ctx.close();
       currentPage = page;
