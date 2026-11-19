@@ -51,3 +51,6 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-6b review | Size Cloud Run memory and concurrency from the bomb numbers (1 to 2 GB per bomb until the watchdog); workers share vCPUs with the main loop | P1-6 |
 | P0-6b review | `execArgv: []` on the Worker so inherited node flags cannot break worker start | Later |
 | P0-6b review | Pass the file bytes with a transfer list instead of copying three times | P0-6c (note) |
+| P0-6c review | Cloud Run memory at least 2 GiB, explicit concurrency (bounds the PDF wait queue), Node pinned at 22.16+ so the watchdog exists | P1-6 |
+| P0-6c review | Pass the request abort signal into `pdfText` so a disconnected client's queued parse is dropped | Later (needs the resume route) |
+| P0-6c review | Route-level test that a plain Error from `pdfText` becomes 500 (today a source grep) | Later |
