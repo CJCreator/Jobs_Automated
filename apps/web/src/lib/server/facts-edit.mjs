@@ -46,25 +46,25 @@ export function applyFactsEdit(stored, incoming, removals) {
 
 /**
  * An item the AI proposed that the upload does not contain is labelled
- * "model". The page cannot clear that label: an incoming item with the id of a
- * stored "model" item keeps it while its content is unchanged, and becomes
- * "user" once the content is edited.
+ * "model". The page cannot clear that label by changing ids. An incoming item
+ * is "model" when its content equals any stored model item's of that kind. An
+ * incoming "upload" is honoured only for a stored item with the same id, the
+ * same content and source "upload". Anything else is "user".
  */
 function keepModelLabels(stored, facts) {
   const relabel = (kind, items, old) => {
-    const byId = new Map((Array.isArray(old) ? old : []).filter((x) => x?.source === "model").map((x) => [x.id, x]));
+    const olds = (Array.isArray(old) ? old : []).filter((x) => x && typeof x === "object");
+    const modelKeys = new Set(olds.filter((x) => x.source === "model").map((x) => contentKey(kind, x)).filter(Boolean));
     return items.map((item) => {
-      const was = byId.get(item.id);
-      if (!was) return item;
-      return { ...item, source: contentKey(kind, was) === contentKey(kind, item) ? "model" : "user" };
+      const key = contentKey(kind, item);
+      if (key && modelKeys.has(key)) return { ...item, source: "model" };
+      if (item.source === "upload" && olds.some((x) => x.id === item.id && x.source === "upload" && contentKey(kind, x) === key)) return item;
+      return { ...item, source: "user" };
     });
   };
   const oldJobs = Array.isArray(stored?.experience) ? stored.experience : [];
   const oldBullets = oldJobs.flatMap((j) => (Array.isArray(j?.bullets) ? j.bullets : []));
-  const summary =
-    stored?.summary?.source === "model"
-      ? { ...facts.summary, source: contentKey("summary", stored.summary) === contentKey("summary", facts.summary) ? "model" : "user" }
-      : facts.summary;
+  const [summary] = relabel("summary", [facts.summary], stored?.summary ? [{ ...stored.summary, id: undefined }] : []);
   return {
     ...facts,
     summary,

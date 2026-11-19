@@ -36,8 +36,11 @@ const confirmedAll = (v) => {
   return v;
 };
 
-test("squash keeps only lower-case letters and digits", () => {
+test("squash keeps letters, digits, + and #, and a dot or comma only between digits", () => {
   assert.equal(squash("Power-BI,  Year 2019!"), "powerbiyear2019");
+  assert.equal(squash("C++ and C#"), "c++andc#");
+  assert.equal(squash("1,200 and 1.2x"), "1200and1.2x");
+  assert.equal(squash("Node.js"), "nodejs");
 });
 
 test("a bullet copied exactly is found", () => {
@@ -134,4 +137,84 @@ test("reconcile: extras and cannotConfirm come from the stored facts", () => {
   assert.deepEqual(out.cannotConfirm, ["12"]);
   assert.equal(out.extras[0].text, "Won an award");
   assert.equal(out.extras[0].confirmed, true);
+});
+
+test("a field is found only as whole tokens: Java is not in JavaScript, Excel is not in Excellent", () => {
+  const up = "Skills: JavaScript, Excellent writing, Google Cloud, MySQL, Leadership of 120 people, 1.2x growth";
+  assert.equal(foundInUpload(up, "skill", { name: "Java" }), false);
+  assert.equal(foundInUpload(up, "skill", { name: "Excel" }), false);
+  assert.equal(foundInUpload(up, "skill", { name: "Go" }), false);
+  assert.equal(foundInUpload(up, "skill", { name: "SQL" }), false);
+  assert.equal(foundInUpload(up, "skill", { name: "Lead" }), false);
+  assert.equal(foundInUpload(up, "bullet", { text: "Leadership of 12" }), false, "12 is not 120");
+  assert.equal(foundInUpload(up, "bullet", { text: "12x growth" }), false, "12x is not 1.2x");
+  assert.equal(foundInUpload(up, "skill", { name: "JavaScript" }), true);
+  assert.equal(foundInUpload(up, "skill", { name: "MySQL" }), true);
+});
+
+test("C is not found in C++, and C++, Node.js, Power BI, React, an email and 1,200 still are", () => {
+  const up = "C++, C#, Node.js and React; Power BI\nContact: asha.rao@example.com\nRevenue of 1,200 units and a fin-\nance team";
+  assert.equal(foundInUpload(up, "skill", { name: "C" }), false);
+  assert.equal(foundInUpload("Languages: C, Go", "skill", { name: "C" }), true);
+  for (const name of ["C++", "C#", "Node.js", "React", "Power BI"]) assert.equal(foundInUpload(up, "skill", { name }), true, name);
+  assert.equal(foundInUpload(up, "contact", { name: "", email: "asha.rao@example.com" }), true);
+  assert.equal(foundInUpload(up, "bullet", { text: "Revenue of 1200 units" }), true);
+  assert.equal(foundInUpload(up, "bullet", { text: "a finance team" }), true);
+});
+
+const stub = (mutate) => {
+  const base = normalizeFacts({
+    contact: { name: "Asha Rao", email: "asha.rao@example.com", phone: "111", location: "Pune", links: [] },
+    summary: "Finance analyst.",
+    experience: [{ company: "Infosys", title: "Analyst", location: "Pune", start: "2019", end: "2023", bullets: ["Grew revenue 1.2x"] }],
+    skills: ["C"],
+  });
+  mutate?.(base);
+  return confirmedAll(base);
+};
+const REUP = "Asha Rao asha.rao@example.com\nFinance analyst.\nInfosys Analyst 2019 2023\n- Grew revenue 12x\nSkills: C++";
+
+test("reconcile: a bullet whose figure changed from 1.2x to 12x is unconfirmed with a new id", () => {
+  const stored = stub();
+  const out = reconcileUpload(stored, normalizeFacts({
+    experience: [{ company: "Infosys", title: "Analyst", location: "Pune", start: "2019", end: "2023", bullets: ["Grew revenue 12x"] }],
+  }), REUP);
+  const b = out.experience[0].bullets[0];
+  assert.equal(b.confirmed, false);
+  assert.notEqual(b.id, stored.experience[0].bullets[0].id);
+  assert.equal(b.text, "Grew revenue 12x");
+  assert.equal(out.experience[0].confirmed, true, "the unchanged job keeps its confirmation");
+});
+
+test("reconcile: skill C becoming C++ is unconfirmed", () => {
+  const out = reconcileUpload(stub(), normalizeFacts({ skills: ["C++"] }), REUP);
+  assert.equal(out.skills[0].name, "C++");
+  assert.equal(out.skills[0].confirmed, false);
+});
+
+test("reconcile: a matched job keeps the stored location, and a matched bullet its stored text", () => {
+  const stored = stub();
+  const out = reconcileUpload(stored, normalizeFacts({
+    experience: [{ company: "Infosys", title: "Analyst", location: "London", start: "2019", end: "2023", bullets: ["Grew revenue 1.2x"] }],
+  }), "Infosys Analyst 2019 2023 Grew revenue 1.2x");
+  assert.equal(out.experience[0].location, "Pune");
+  assert.equal(out.experience[0].id, stored.experience[0].id);
+  assert.equal(out.experience[0].bullets[0].confirmed, true);
+});
+
+test("reconcile: a changed phone, location or link drops the contact's confirmation; an equal contact keeps it", () => {
+  const up = "Asha Rao asha.rao@example.com";
+  const prop = (patch) => normalizeFacts({ contact: { name: "Asha Rao", email: "asha.rao@example.com", phone: "111", location: "Pune", links: [], ...patch } });
+  assert.equal(reconcileUpload(stub(), prop({ phone: "999" }), up).contact.confirmed, false);
+  assert.equal(reconcileUpload(stub(), prop({ location: "London" }), up).contact.confirmed, false);
+  assert.equal(reconcileUpload(stub(), prop({ links: ["https://x.example"] }), up).contact.confirmed, false);
+  const same = reconcileUpload(stub(), prop({}), up).contact;
+  assert.equal(same.confirmed, true);
+  assert.equal(same.phone, "111");
+});
+
+test("reconcile: a matched summary keeps the stored text", () => {
+  const out = reconcileUpload(stub(), normalizeFacts({ summary: "Finance analyst!" }), "Finance analyst!");
+  assert.equal(out.summary.confirmed, true);
+  assert.equal(out.summary.text, "Finance analyst.");
 });

@@ -11,8 +11,37 @@
 import { cleanText } from "./claims.mjs";
 import { normalizeFacts } from "./facts.mjs";
 
-/** Lower-case letters and digits only, so line breaks, hyphen breaks and spacing do not matter. */
-export const squash = (s) => cleanText(String(s ?? "")).toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+const KEPT = /[\p{L}\p{N}+#]/u;
+const isDigit = (c) => c !== undefined && /\p{N}/u.test(c);
+
+/**
+ * Squash a string and note where the removed characters were.
+ * Kept: lower-case letters, digits, + and #, and a "." between two digits.
+ * A "," between digits is dropped first, so 1,200 and 1200 are the same.
+ * `bound[i]` is true when a removed character (or the start) came before kept
+ * character i; `bound[s.length]` is true.
+ */
+function squashMap(text) {
+  const t = cleanText(String(text ?? "")).toLowerCase().replace(/(?<=\p{N}),(?=\p{N})/gu, "");
+  const chars = [...t];
+  let s = "";
+  const bound = [];
+  let gap = true;
+  chars.forEach((c, i) => {
+    if (KEPT.test(c) || (c === "." && isDigit(chars[i - 1]) && isDigit(chars[i + 1]))) {
+      for (let k = 0; k < c.length; k++) bound.push(gap); // one entry per UTF-16 unit of s
+      s += c;
+      gap = false;
+    } else {
+      gap = true;
+    }
+  });
+  bound.push(true);
+  return { s, bound };
+}
+
+/** A string reduced to what the comparison looks at; see squashMap. */
+export const squash = (s) => squashMap(s).s;
 
 /** The fields of an item that are compared with the upload, by kind. */
 const FIELDS = {
@@ -33,14 +62,20 @@ export function itemFields(kind, item) {
 export const contentKey = (kind, item) => itemFields(kind, item).join("|");
 
 /**
- * Is every non-empty field of this item present in the uploaded text?
+ * Is every non-empty field of this item present in the uploaded text, starting
+ * and ending where a character was removed (so Java is not in JavaScript)?
  * @param {string} uploadText
  * @param {"contact"|"summary"|"job"|"bullet"|"education"|"skill"} kind
  * @param {any} item
  */
 export function foundInUpload(uploadText, kind, item) {
-  const hay = squash(uploadText);
-  return itemFields(kind, item).every((f) => hay.includes(f));
+  const { s, bound } = squashMap(uploadText);
+  return itemFields(kind, item).every((f) => {
+    for (let i = s.indexOf(f); i !== -1; i = s.indexOf(f, i + 1)) {
+      if (bound[i] && bound[i + f.length]) return true;
+    }
+    return false;
+  });
 }
 
 /**
@@ -65,51 +100,53 @@ export function reconcileUpload(existing, proposed, uploadText) {
   const old = existing && typeof existing === "object" ? existing : {};
   const found = (kind, item) => foundInUpload(uploadText, kind, item);
 
-  // Keep an old item's identity only when the new item is found in the upload
-  // and the user had confirmed identical content. A "model" item never is.
+  // On a match the STORED item is kept whole: the key ignores punctuation and
+  // fields it does not compare, and the user confirmed the stored wording, not
+  // the proposed one. A "model" item (not found) is never matched.
   const settle = (kind, item, pool) => {
-    const ok = found(kind, item);
-    const match = ok ? takeMatch(pool, kind, item) : undefined;
-    return { ...item, source: ok ? "upload" : "model", ...(match ? { id: match.id, confirmed: true } : { confirmed: false }), _match: match };
+    if (!found(kind, item)) return { item: { ...item, source: "model", confirmed: false } };
+    const match = takeMatch(pool, kind, item);
+    return match
+      ? { item: { ...match, source: "upload", confirmed: true }, match }
+      : { item: { ...item, source: "upload", confirmed: false } };
   };
 
   const oldJobs = [...(Array.isArray(old.experience) ? old.experience : [])];
   const experience = proposed.experience.map((job) => {
-    const j = settle("job", job, oldJobs);
-    const pool = [...(j._match?.bullets ?? [])];
-    const bullets = job.bullets.map((b) => {
-      const { _match, ...rest } = settle("bullet", b, pool);
-      void _match;
-      return rest;
-    });
-    const { _match, ...rest } = j;
-    void _match;
-    return { ...rest, bullets };
+    const { item, match } = settle("job", job, oldJobs);
+    const pool = [...(match?.bullets ?? [])];
+    return { ...item, bullets: job.bullets.map((b) => settle("bullet", b, pool).item) };
   });
 
-  const strip = (x) => { const { _match, ...rest } = x; void _match; return rest; };
   const oldEdu = [...(Array.isArray(old.education) ? old.education : [])];
   const oldSkills = [...(Array.isArray(old.skills) ? old.skills : [])];
-  const education = proposed.education.map((e) => strip(settle("education", e, oldEdu)));
-  const skills = proposed.skills.map((s) => strip(settle("skill", s, oldSkills)));
+  const education = proposed.education.map((e) => settle("education", e, oldEdu).item);
+  const skills = proposed.skills.map((k) => settle("skill", k, oldSkills).item);
 
-  const summary = proposed.summary.text
-    ? (() => {
-        const oldSummary = old.summary?.confirmed === true ? [old.summary] : [];
-        const ok = found("summary", proposed.summary);
-        const keep = ok && takeMatch(oldSummary, "summary", proposed.summary);
-        return { ...proposed.summary, source: ok ? "upload" : "model", confirmed: Boolean(keep) };
-      })()
-    : { ...proposed.summary, confirmed: false };
+  let summary = { ...proposed.summary, confirmed: false };
+  if (proposed.summary.text) {
+    const ok = found("summary", proposed.summary);
+    const keep = ok && takeMatch(old.summary?.confirmed === true ? [old.summary] : [], "summary", proposed.summary);
+    summary = keep
+      ? { ...old.summary, source: "upload", confirmed: true }
+      : { ...proposed.summary, source: ok ? "upload" : "model", confirmed: false };
+  }
 
+  // The contact has more fields than are compared with the upload, so the
+  // confirmation stays only when every field is as the user confirmed it.
+  const same = (a, b) => (a ?? "").trim() === (b ?? "").trim();
+  const oc = old.contact ?? {};
+  const pc = proposed.contact;
+  const sameLinks = (oc.links ?? []).length === pc.links.length && pc.links.every((l, i) => same(l, oc.links[i]));
   const keepContact =
-    old.contact?.confirmed === true &&
-    contentKey("contact", old.contact) === contentKey("contact", proposed.contact) &&
-    found("contact", proposed.contact);
+    oc.confirmed === true &&
+    ["name", "email", "phone", "location"].every((f) => same(oc[f], pc[f])) &&
+    sameLinks &&
+    found("contact", pc);
 
   return normalizeFacts(
     {
-      contact: { ...proposed.contact, confirmed: keepContact },
+      contact: keepContact ? { ...oc, confirmed: true } : { ...pc, confirmed: false },
       summary,
       experience,
       education,
