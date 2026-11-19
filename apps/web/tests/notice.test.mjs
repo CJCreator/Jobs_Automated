@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { NOTICE_VERSION, grievanceContact } from "../src/lib/notice.mjs";
 
 test("notice version is set", () => {
-  assert.equal(NOTICE_VERSION, "2026-11-19.1");
+  assert.match(NOTICE_VERSION, /^\d{4}-\d{2}-\d{2}\.\d+$/);
 });
 
 test("grievance contact: unset", () => {

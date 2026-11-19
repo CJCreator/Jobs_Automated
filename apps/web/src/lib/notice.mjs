@@ -1,5 +1,5 @@
 // Privacy notice version and the grievance contact (ADR 0004).
-export const NOTICE_VERSION = "2026-11-19.1";
+export const NOTICE_VERSION = "2026-11-19.2";
 
 const EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
