@@ -71,3 +71,5 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-3b review | Privacy notice names only the AI provider as a recipient; add "Who else handles your data": Resend (email sign-in), Google (sign-in), Google Cloud (hosting) | Before sign-ups open: P0-11 or a copy task at the phase gate (needs a NOTICE_VERSION bump) |
 | P0-3b review | `/app/privacy` tab title still "Privacy" while the h1 says "Privacy notice" | Next task touching that page |
 | P0-3b review | Merge P0-2 before P0-3b: the notice states a consent record is stored | Merge order |
+| P0-9a re-review | Step 2b timeout path: set `child = null` after `killTree(proc)` so `stopServer()` does not wait 15 s | Next prod-smoke edit |
+| P0-9a re-review | Comment that `ROLEWRIGHT_GRIEVANCE_*` in the parent env without the flag fails 11b | Next prod-smoke edit |
