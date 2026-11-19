@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db/index.mjs";
 import { changeFacts, getFacts } from "@/lib/db/repo.mjs";
-import { confirmationCounts } from "@/lib/facts.mjs";
+import { MAX_FACT_BASE_CHARS, confirmationCounts, factBaseTooLarge } from "@/lib/facts.mjs";
 import { readJsonObject } from "@/lib/server/body";
 import { applyFactsEdit, parseRemovals } from "@/lib/server/facts-edit.mjs";
 import { HttpError, json, route } from "@/lib/server/http";
@@ -30,6 +30,18 @@ export const PUT = route("facts.put", async (req, { state }) => {
     throw new HttpError(400, "invalid_removals", "The list of claims to remove could not be read.");
   }
   const incoming = body.facts;
-  const facts = await changeFacts(await getDb(), userId, (stored) => applyFactsEdit(stored, incoming, removals));
+  // Refused inside the transaction, so nothing is written. The gate runs against these facts on every
+  // read and export, so their confirmed text has a size cap.
+  const facts = await changeFacts(await getDb(), userId, (stored) => {
+    const next = applyFactsEdit(stored, incoming, removals);
+    if (factBaseTooLarge(next)) {
+      throw new HttpError(
+        400,
+        "facts_too_large",
+        `Your confirmed facts are too long to check (the limit is ${MAX_FACT_BASE_CHARS.toLocaleString("en-IN")} characters of confirmed text). Remove or unconfirm some items, then save again.`,
+      );
+    }
+    return next;
+  });
   return json({ facts, counts: confirmationCounts(facts) });
 });

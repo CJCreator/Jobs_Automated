@@ -116,6 +116,18 @@ export function confirmationCounts(facts) {
   return { confirmed, total };
 }
 
+// The most evidence text the fact gate is ever run against. The gate's cost
+// grows in step with the size of this text (measured at about 2.4 microseconds
+// per character in the worst shape, ~100 ms at 40k), and it runs on the server's
+// one thread, so the size is capped. An honest resume is far under it: the
+// honest fixture is about 400 characters and a dense four-page CV about 12k.
+export const MAX_FACT_BASE_CHARS = 40_000;
+
+/** True when the confirmed facts are too large to run the fact gate against. */
+export function factBaseTooLarge(facts) {
+  return factBaseText(facts).length > MAX_FACT_BASE_CHARS;
+}
+
 const dates = (e) => [e.start, e.end].filter(Boolean).join(" – ");
 
 /**

@@ -6,7 +6,7 @@
 // Pure functions, no I/O. The engine gate is passed in so tests can stub it.
 
 import { checkText } from "./claims.mjs";
-import { buildResume, factBaseText } from "./facts.mjs";
+import { MAX_FACT_BASE_CHARS, buildResume, factBaseText } from "./facts.mjs";
 
 const randomUUID = () => globalThis.crypto.randomUUID();
 
@@ -15,6 +15,16 @@ const MAX_RATIONALE = 300;
 const MAX_VALUE = 200;
 const MAX_EXTRAS = 60;
 const MAX_CANNOT_CONFIRM = 200;
+
+// How many suggestions one tailoring keeps. The AI is asked to rewrite the lines of one resume
+// for one job; 30 is more than a person reviews in one sitting, and each is gate-checked on every
+// read, so the count multiplies the cost of every GET, review action and export.
+export const MAX_SUGGESTIONS = 30;
+
+// The most gate time one request may spend, checked between checks. When it runs out the request
+// fails closed (503) rather than answering with a partial check. Together with the fact-base cap
+// the worst case is this budget plus one gate call (about 100 ms at the cap).
+export const GATE_BUDGET_MS = 1000;
 
 /** A refused action, carrying the HTTP status a route should answer with. */
 export class TailoringError extends Error {
@@ -28,6 +38,27 @@ export class TailoringError extends Error {
     this.name = "TailoringError";
     this.status = status;
     this.code = code;
+  }
+}
+
+const FACTS_TOO_LARGE_MESSAGE =
+  "Your confirmed facts are too long to check, so nothing can be reviewed or exported. Remove or unconfirm some items on your facts page, then try again.";
+const FACTS_TOO_LARGE = { kind: "facts_too_large", value: "", message: FACTS_TOO_LARGE_MESSAGE };
+const tooLargeError = () => new TailoringError(409, "facts_too_large", FACTS_TOO_LARGE_MESSAGE);
+
+/**
+ * A time budget for one request's gate work. `clock` is injectable for tests.
+ * @param {number} [ms]
+ * @param {() => number} [clock]
+ */
+export function gateBudget(ms = GATE_BUDGET_MS, clock = () => performance.now()) {
+  const start = clock();
+  return { exhausted: () => clock() - start >= ms };
+}
+
+function assertBudget(ctx) {
+  if (ctx?.budget?.exhausted()) {
+    throw new TailoringError(503, "check_too_slow", "Checking your changes is taking too long right now, so nothing was changed. Try again in a moment.");
   }
 }
 
@@ -47,8 +78,10 @@ const asList = (v) => (Array.isArray(v) ? v.filter((s) => s && typeof s === "obj
  */
 
 /** The check context for a set of facts. Always rebuilt from the facts themselves. */
-function contextFor(facts, { jdText = "", engineGate } = {}) {
-  return { sourceText: factBaseText(facts), cannotConfirm: facts.cannotConfirm ?? [], jdText, engineGate };
+function contextFor(facts, { jdText = "", engineGate, budget = gateBudget() } = {}) {
+  const sourceText = factBaseText(facts);
+  // Over the cap the engine is not run and the text is never truncated: every check fails closed.
+  return { sourceText, cannotConfirm: facts.cannotConfirm ?? [], jdText, engineGate, budget, tooLarge: sourceText.length > MAX_FACT_BASE_CHARS };
 }
 
 /**
@@ -56,7 +89,11 @@ function contextFor(facts, { jdText = "", engineGate } = {}) {
  * @param {any} suggestion
  * @param {CheckContext} ctx
  */
-export function checkSuggestion(suggestion, { sourceText, jdText = "", cannotConfirm = [], engineGate }) {
+export function checkSuggestion(suggestion, { sourceText, jdText = "", cannotConfirm = [], engineGate, budget, tooLarge = false }) {
+  if (tooLarge) {
+    return { ...suggestion, check: { verdict: "block", issues: [FACTS_TOO_LARGE], advisory: [], engineRan: false } };
+  }
+  assertBudget({ budget });
   const check = checkText({
     text: typeof suggestion.finalText === "string" ? suggestion.finalText : "",
     sourceText,
@@ -75,11 +112,13 @@ export function checkSuggestion(suggestion, { sourceText, jdText = "", cannotCon
  * @param {CheckContext} ctx
  */
 export function buildSuggestions(rawRewrites, lines, ctx) {
+  if (typeof ctx?.sourceText === "string" && ctx.sourceText.length > MAX_FACT_BASE_CHARS) throw tooLargeError();
   const byRef = new Map((lines ?? []).map((l) => [l.ref, l]));
   const seen = new Set();
   const out = [];
   for (const raw of Array.isArray(rawRewrites) ? rawRewrites : []) {
     const line = byRef.get(raw?.ref);
+    if (out.length >= MAX_SUGGESTIONS) break;
     if (!line || seen.has(line.ref) || typeof raw.after !== "string") continue;
     const after = raw.after.trim().slice(0, MAX_TEXT);
     if (!after) continue;
@@ -136,7 +175,11 @@ export function applyAction(facts, suggestions, sid, { action, text, value } = {
   const index = list.findIndex((s) => s.id === sid);
   if (typeof sid !== "string" || index === -1) throw new TailoringError(404, "not_found", "That suggestion was not found.");
   const target = list[index];
+  // One budget for the whole action, shared by every check it makes.
+  ctx = { ...ctx, budget: ctx.budget ?? gateBudget() };
   const ctxNow = contextFor(facts, ctx);
+  // Rejecting needs no check, so it still works on a fact base that is too large to check.
+  if (ctxNow.tooLarge && action !== "reject") throw tooLargeError();
   const replace = (next) => list.map((s, i) => (i === index ? next : s));
 
   switch (action) {
@@ -179,6 +222,7 @@ export function applyAction(facts, suggestions, sid, { action, text, value } = {
         ? extras.map((x) => (x === existing ? { ...x, confirmed: true, source: "user", statedAt } : x))
         : [...extras, { id: randomUUID(), text: issue.value, confirmed: true, source: "user", statedAt }];
       const nextFacts = { ...facts, extras: nextExtras };
+      if (factBaseText(nextFacts).length > MAX_FACT_BASE_CHARS) throw tooLargeError();
       return { facts: nextFacts, suggestions: recheckAll(list, contextFor(nextFacts, ctx)), factsChanged: true };
     }
 
@@ -225,6 +269,7 @@ export function freshChecks(facts, suggestions, ctx = {}) {
 export function exportBlockers(facts, suggestions, ctx = {}) {
   if (typeof ctx.engineGate !== "function") return [{ sid: null, ref: null, text: "", issues: [ENGINE_MISSING] }];
   const c = contextFor(facts, ctx);
+  if (c.tooLarge) return [{ sid: null, ref: null, text: "", issues: [FACTS_TOO_LARGE] }];
   const list = asList(suggestions);
   // buildResume keeps the last accepted suggestion per line, so map back the same way.
   const acceptedByRef = new Map();
@@ -232,6 +277,7 @@ export function exportBlockers(facts, suggestions, ctx = {}) {
   const { changed } = buildResume(facts, list);
   const blockers = [];
   for (const { ref, before, after } of changed) {
+    assertBudget(c);
     const check = checkText({ text: after, sourceText: c.sourceText, before, jdText: c.jdText, cannotConfirm: c.cannotConfirm, engineGate: c.engineGate });
     if (check.verdict === "block" || !check.engineRan) {
       blockers.push({ sid: acceptedByRef.get(ref)?.id ?? null, ref, text: after, issues: check.issues.length ? check.issues : [ENGINE_MISSING] });
