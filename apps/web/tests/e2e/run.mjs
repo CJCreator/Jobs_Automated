@@ -39,6 +39,7 @@ const { resumeHtml } = await load("src/lib/resume-html.mjs");
 const { renderPdf, closeBrowser } = await load("src/lib/server/pdf.mjs");
 const { pdfText } = await load("src/lib/server/pdf-text.mjs");
 const { MOCK_RESUME, MOCK_KEY } = await load("src/lib/llm/mock.mjs");
+const { NOTICE_VERSION } = await load("src/lib/notice.mjs");
 
 const PORT = Number(process.env.E2E_PORT) || 3122;
 const base = `http://localhost:${PORT}`;
@@ -95,17 +96,20 @@ function startServer() {
     delete env[k];
   }
   const nextBin = path.join(appDir, "node_modules", "next", "dist", "bin", "next");
-  const proc = spawn(process.execPath, [nextBin, "dev", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const proc = spawn(process.execPath, [nextBin, "dev", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
   proc.stdout.on("data", (d) => (serverOutput += d.toString()));
   proc.stderr.on("data", (d) => (serverOutput += d.toString()));
   return proc;
 }
 
 function killServerSync() {
-  if (!child || child.exitCode !== null) return;
+  if (!child) return;
+  // On win32 an exited parent has no tree left to kill; elsewhere the server runs in its own process group,
+  // which can outlive the parent (next-server is a child of the next CLI), so the group is killed regardless.
+  if (process.platform === "win32" && child.exitCode !== null) return;
   try {
     if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    else child.kill("SIGKILL");
+    else process.kill(-child.pid, "SIGKILL");
   } catch {
     // Already gone.
   }
@@ -150,7 +154,7 @@ process.once("exit", () => {
   killServerSync();
   restoreGenerated();
 });
-for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => process.exit(130));
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, () => process.exit(130));
 
 // ---------------------------------------------------------------------------
 // Steps, findings and screenshots
@@ -563,7 +567,7 @@ try {
     await page.evaluate(() => window.localStorage.setItem("rolewright.llm", JSON.stringify({ provider: "mock", key: "x", model: "m" })));
     await go(page, "/app");
     await page.getByText("Nothing tailored yet").waitFor();
-    assert.equal(await page.evaluate(() => window.localStorage.getItem("rolewright.llm")), null, "the legacy item was removed by loading /app");
+    await poll(async () => (await page.evaluate(() => window.localStorage.getItem("rolewright.llm"))) === null, "the legacy item was removed by loading /app");
     await enterKey(page);
   });
 
@@ -733,6 +737,17 @@ try {
     await card.locator('[id^="accept-btn-"]').click();
     await poll(async () => (await card.innerText()).includes("Accepted"), "the 5 crore card is accepted (it was attested in step g)");
 
+    // The Tableau card has two failing values. Attest both and accept it, so one refused line carries two words.
+    const tcard = cardLoc(page, state.cards.tableau);
+    for (let i = 0; i < 2; i++) {
+      await tcard.locator('[id^="attest-"]').first().click();
+      await tcard.getByRole("button", { name: "Yes, it is true. Add it" }).click();
+      await poll(async () => (await tcard.locator('[id^="attest-"]').count()) === 1 - i, `attested ${i + 1} of 2 values on the Tableau card`);
+    }
+    await poll(async () => (await tcard.locator('[id^="accept-btn-"]:not([disabled])').count()) === 1, "the Tableau card can be accepted");
+    await tcard.locator('[id^="accept-btn-"]').click();
+    await poll(async () => (await tcard.innerText()).includes("Accepted"), "the Tableau card is accepted");
+
     // In a second tab of the same account, take the attested fact away again. This tab still shows the old state.
     const other = await main.ctx.newPage();
     watch(other);
@@ -741,9 +756,14 @@ try {
       const extras = other.locator('section[aria-labelledby="sec-extras-title"]');
       await extras.locator("textarea").first().waitFor();
       const values = await extras.locator("textarea").evaluateAll((els) => els.map((e) => e.value));
-      const at = values.findIndex((v) => v.includes("5 crore"));
-      assert.ok(at >= 0, `the attested fact is listed: ${JSON.stringify(values)}`);
-      await extras.getByRole("button", { name: /Remove this fact/ }).nth(at).click();
+      assert.ok(values.some((v) => v.includes("5 crore")), `the attested fact is listed: ${JSON.stringify(values)}`);
+      // Remove the attested facts behind both refused lines (5 crore; Tableau and Google).
+      for (let guard = 0; guard < 10; guard++) {
+        const now = await extras.locator("textarea").evaluateAll((els) => els.map((e) => e.value));
+        const at = now.findIndex((v) => /5 crore|Tableau|Google/.test(v));
+        if (at < 0) break;
+        await extras.getByRole("button", { name: /Remove this fact/ }).nth(at).click();
+      }
       await other.locator("#save-facts").click();
       await other.getByText("Facts saved.").waitFor();
     } finally {
@@ -756,15 +776,18 @@ try {
     const notice = page.getByRole("alert").filter({ hasText: "The export was stopped" });
     await notice.waitFor();
     const lines = notice.getByTestId("export-blocked-line");
-    assert.equal(await lines.count(), 1, "one failing line is listed");
-    const text = await lines.first().innerText();
+    assert.equal(await lines.count(), 2, "two failing lines are listed (one per suggestion, words grouped)");
+    const text = await lines.filter({ hasText: "portfolios" }).first().innerText();
+    assert.match(text, /^Suggestion \d+: /, `the line is numbered:\n${text}`);
     assert.ok(text.includes("portfolios"), `the failing line's own text is shown:\n${text}`);
-    assert.ok(/Not in your facts:\s*₹?5 crore/.test(text), `the failing words are shown:\n${text}`);
+    assert.ok(/Not in your facts:\s*₹?5 crore\s*(\n|$)/.test(text), `the failing words are shown:\n${text}`);
+    const tableauText = await lines.filter({ hasText: "Tableau" }).first().innerText();
+    assert.match(tableauText, /Not in your facts:\s*(Tableau, Google|Google, Tableau)\s*(\n|$)/, `both words sit on one line:\n${tableauText}`);
     await checkpoint(page, "review-export-refused");
 
     // Move focus away, then follow the link.
     await page.locator("#export-pdf").focus();
-    await lines.first().getByRole("button", { name: "Go to this suggestion" }).click();
+    await lines.filter({ hasText: "portfolios" }).first().getByRole("button", { name: "Go to this suggestion" }).click();
     await poll(async () => (await page.evaluate(() => document.activeElement?.id)) === `sug-${crore}`, "focus is on the failing suggestion's card");
   });
 
@@ -779,14 +802,16 @@ try {
       await go(p, "/sign-in");
       await p.getByRole("link", { name: /privacy notice/i }).first().click();
       await p.waitForURL("**/privacy");
+      assert.equal(new URL(p.url()).pathname, "/privacy", "the sign-in page links to /privacy");
 
       await settle(p);
-      await p.getByRole("heading", { level: 1 }).first().waitFor();
-      assert.match(await p.locator("main").innerText(), /privacy/i, "the notice is shown");
+      assert.equal((await p.getByRole("heading", { level: 1 }).first().innerText()).trim(), "Privacy notice", "the notice's own heading is shown");
+      assert.ok((await p.getByTestId("notice-version").innerText()).includes(NOTICE_VERSION), "the notice shows its current version");
       const findings = [];
       await runAxe(p, appDir, "privacy (signed out)", findings);
       assert.equal(findings.length, 0, `axe on /privacy:\n${describeAxe(findings)}`);
       await assertTargets(p, "/privacy");
+      // assertSkipLinkFirst needs a fresh load; this page was reached by a client-side link.
       await go(p, "/privacy");
       await assertSkipLinkFirst(p, "/privacy");
       await shot(p, "privacy-public");
