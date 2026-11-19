@@ -85,36 +85,40 @@ No public sign-ups until every Phase 0 task is merged and the phase is approved.
 
 **Step 0: the advisor revises this plan.** The task graph and the rows below are the orchestrator's draft. Before any worker starts, the advisor reads the draft against the code and the reviews, then corrects the tasks, files and waves and writes the briefs. The owner sees the revised graph at the start of Phase 0.
 
-### Task graph
+### Task graph (advisor revision, step 0 done)
+
+The advisor's corrections, waves and full briefs are in [`phase-0-briefs.md`](phase-0-briefs.md); they supersede the draft rows that were here. Summary:
 
 ```
-Wave A (max 4)       P0-1  P0-5  P0-6  P0-7
-Wave B (parallel)    P0-3  P0-10 (after P0-1)  P0-9a
-Wave C (parallel)    P0-2 (after P0-3)    P0-4 (after P0-3)
-Wave D (parallel)    P0-8 (after P0-2, P0-4)    P0-9b (after P0-2)
-Exit                 advisor phase review -> owner gate
+Wave A  P0-1a  P0-5   P0-6   P0-7
+Wave B  P0-1b (after P0-1a)   P0-3a   P0-4   P0-10
+Wave C  P0-2 (after P0-3a, P0-10)   P0-3b (after P0-3a, P0-4, P0-5, P0-10)   P0-9a (after P0-3a, P0-4, P0-7)
+Wave D  P0-8 (after P0-2, P0-4)   P0-11 (after all)
 ```
 
-### Tasks
+| ID | Worker | Task |
+|---|---|---|
+| P0-1a | Sonnet | App fact gate: claim words, block and explain |
+| P0-1b | Sonnet | Engine gate: trailing employer, magnitude counts, built-in sourced-word check |
+| P0-2 | Sonnet | Consent record |
+| P0-3a | Sonnet | Public privacy route, grievance config, `NOTICE_VERSION` |
+| P0-3b | Haiku | Copy pass: the only editor of existing `en.ts` keys |
+| P0-4 | Sonnet | Purge endpoint with Google OIDC; token deletion |
+| P0-5 | Sonnet | Session-only key (cleared on sign-out too) |
+| P0-6 | Sonnet | PDF expansion cap |
+| P0-7 | Sonnet | Deployed-environment safety switches |
+| P0-8 | Sonnet | Isolation and row locks on real Postgres; new `app-ci.yml` |
+| P0-9a | Haiku | HSTS, prod-smoke browser launcher |
+| P0-10 | Sonnet | Extracted facts checked against the upload; re-upload keeps confirmations |
+| P0-11 | Sonnet | Browser test sweep and baseline |
 
-| ID | Task | Worker | Touches | Done when | From |
-|---|---|---|---|---|---|
-| P0-1 | **Fact gate: block and explain.** Close the reproduced bypasses ("Global", "Certified", "Expert", invented employers such as "at Acme Corp", unit-bearing figures such as "14M evaluations per month"). Credentials, seniority and scope words, capitalised names, tools and numbers in a changed line must appear in confirmed facts. Return each failing line with the offending words; the UI lists them and links to edit the line or confirm a fact. Run the forbidden-phrase checks even without `config/cv-facts.json`. | Sonnet | `apps/web/src/lib/claims.mjs`, `packages/engine/verify-cv-facts.mjs`, the export route, the tailoring review view, tests | One regression test per reproduced bypass, written first and seen failing; honest rewordings in the fixture set still pass; export refuses and the reason is shown | Launch review P0-1, claims audit, ADR 0005 |
-| P0-3 | **Notice before collection.** Sonnet moves the route and its links (it touches the auth layout and `src/proxy.ts`); Haiku then writes the notice copy. Move the privacy page out of the signed-in layout; link it from the landing and sign-in pages. Name the AI provider transfer for both the resume and the job description. Add the grievance contact from config (`ROLEWRIGHT_GRIEVANCE_NAME`, `ROLEWRIGHT_GRIEVANCE_EMAIL`), with a visible "not yet set" marker in non-production. Version the notice text (`NOTICE_VERSION`). | Sonnet (route), Haiku (copy) | `src/app/app/privacy`, a new public privacy route, `src/app/app/layout.tsx`, `src/app/page.tsx`, `src/proxy.ts`, `src/i18n/en.ts` (privacy keys), env docs | The page renders signed out; links are present; the grievance value comes from config | Launch review P0-4, P0-5, P2-18 |
-| P0-5 | **Session-only key.** Replace `localStorage` in `src/lib/client/llm-key.ts` with an in-memory store that clears on reload. | Sonnet | `src/lib/client/llm-key.ts`, its callers, `tests/integration` | `test:flow` asserts nothing is in `localStorage`, `sessionStorage` or IndexedDB after key entry; existing key-hygiene checks still pass | ADR 0003, launch review P2-14 |
-| P0-6 | **PDF expansion cap.** Stop parsing once extracted text exceeds a cap (default 200,000 characters) or a page count, before the whole file is decoded; return a clear 413 error. | Sonnet | `src/lib/server/pdf-text.mjs`, the upload route, tests | The reproduced 175 KB file is rejected in under 1 s with bounded memory; normal resumes are unaffected | Launch review P1-6 |
-| P0-7 | **Production safety switches.** Refuse to start in a deployed environment without `DATABASE_URL` and `AUTH_SECRET`; no silent fallback to the embedded database. Dev sign-in only with an explicit flag and never in a deployed environment, whatever `NODE_ENV` says. "Deployed" is decided from the platform, not from the request's Host header (a client sets that header): Cloud Run sets `K_SERVICE`, so dev sign-in is refused whenever it is present, and when `ROLEWRIGHT_DEPLOYED=1` is set. | Sonnet | `src/lib/server/env-guard.mjs`, `src/lib/db/index.mjs`, tests | Unit tests cover every combination; `test:prod` still passes | Launch review P1-7, P1-12 |
-| P0-2 | **Consent record.** A `consents` table (user id, notice version, accepted-at, purpose). The upload route refuses without a consent for the current notice version; a new notice version asks again. | Sonnet | `src/lib/db/schema.mjs`, `repo.mjs`, the resume route, `resume-view.tsx`, tests | Upload without consent returns 403; the record exists after consent; RLS test for the new table | Launch review P0-3, ADR 0004 |
-| P0-4 | **Retention purge for real.** A `POST /api/internal/purge` endpoint that accepts only a Google-signed OIDC token from the configured scheduler service account and runs the 12-month purge. Align the privacy text with what runs. Also delete verification tokens on account deletion. | Sonnet | new internal route, `scripts/purge-inactive.mjs` (shared logic), `src/i18n/en.ts` retention line, tests | Unauthenticated and wrong-audience calls get 401; a seeded idle account is purged; tokens are gone after deletion | Launch review P0-2, P2-17 |
-| P0-9a | **HSTS.** Strict-Transport-Security header in production. | Haiku | `next.config.mjs`, `tests/integration/prod-smoke.mjs` | Header present in `test:prod` | Launch review P2-15 |
-| P0-9b | **Re-upload keeps confirmations.** Re-uploading a resume keeps already-confirmed facts confirmed when the new text still contains them. Runs after P0-2 because both edit the resume upload route. | Sonnet | `src/app/api/resume/route.ts`, `src/lib/facts.mjs`, tests | Re-upload test passes | Launch review P2-16 |
-| P0-10 | **Extracted facts are checked against the upload.** Each model-extracted fact is compared with the uploaded text; a fact not found there is marked "not in your resume" and cannot be confirmed in bulk. "Confirm all" confirms only facts found in the source and says how many it skipped. | Sonnet | `src/lib/facts.mjs`, `src/components/fact-editor.tsx`, `src/app/api/facts/route.ts`, `src/i18n/en.ts` (append), tests | A fact absent from the upload is flagged and skipped by "Confirm all"; one test per case | Launch review P1-8, ADR 0005 |
-| P0-8 | **Prove isolation on real Postgres.** A CI job with a Postgres service runs the schema, the app connects as a non-owner role, and the skipped negative control in `tests/db.test.mjs` runs: user A cannot read, update or delete user B's rows in every table, and row locks hold under concurrent updates. | Sonnet | `tests/db.test.mjs`, `.github/workflows/web-ci.yml` (or a new app workflow), schema grants | The negative control runs and passes in CI, not skipped | Launch review P1-13 |
+The `en.ts` rule changes: code tasks only append keys; P0-3b is the single editor of existing keys.
 
 ### Phase 0 exit (what the owner sees at the gate)
 
 - Every task merged, each with its advisor review recorded below.
-- `apps/web`: typecheck, `npm test`, `test:flow`, `test:prod`, `build` all pass.
+- `apps/web`: typecheck, `npm test`, `test:flow`, `test:prod` (13 of 13), `test:e2e`, `build` all pass, browsers via `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+- Retention: the purge endpoint exists, but nothing calls it until Cloud Scheduler runs in Phase 1. Public sign-ups stay closed until then, or the notice drops the daily-job claim.
 - Engine: no failure added relative to `docs/reviews/test-baseline.md`.
 - The advisor's phase review: a fresh read of the launch-review P0 and P1 items, each marked fixed, still open (with a reason) or moved.
 - Still open by design: the grievance contact value and the legal review of the notice.
