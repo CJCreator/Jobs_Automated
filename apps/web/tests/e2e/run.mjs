@@ -40,7 +40,7 @@ const { renderPdf, closeBrowser } = await load("src/lib/server/pdf.mjs");
 const { pdfText } = await load("src/lib/server/pdf-text.mjs");
 const { MOCK_RESUME, MOCK_KEY } = await load("src/lib/llm/mock.mjs");
 
-const PORT = 3122;
+const PORT = Number(process.env.E2E_PORT) || 3122;
 const base = `http://localhost:${PORT}`;
 const WRONG_KEY = "mock-wrong-key-123";
 const JD = [
@@ -127,6 +127,8 @@ async function waitForServer() {
 }
 
 async function launchBrowser() {
+  const envExe = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  if (envExe) return chromium.launch({ executablePath: envExe });
   try {
     return await chromium.launch();
   } catch (err) {
@@ -312,6 +314,92 @@ async function signInByUi(page, email) {
 
 const nav = (page, name) => page.getByRole("navigation", { name: "Main" }).getByRole("link", { name, exact: true });
 
+/** Everything the page could keep in browser storage, as text. */
+async function storageDump(page) {
+  return page.evaluate(async () => {
+    const read = (store) => {
+      const out = {};
+      try {
+        for (let i = 0; i < store.length; i++) {
+          const k = store.key(i);
+          out[k] = store.getItem(k);
+        }
+      } catch {
+        // Blocked storage holds nothing.
+      }
+      return out;
+    };
+    let idb = [];
+    try {
+      idb = indexedDB.databases ? (await indexedDB.databases()).map((d) => d.name) : [];
+    } catch {
+      // No databases we can list.
+    }
+    return { local: read(window.localStorage), session: read(window.sessionStorage), idb, cookie: document.cookie };
+  });
+}
+
+async function assertNoStoredKey(page, what) {
+  const dump = JSON.stringify(await storageDump(page));
+  assert.ok(!dump.includes(MOCK_KEY), `${what}: the key is not in localStorage, sessionStorage, IndexedDB names or document.cookie: ${dump.slice(0, 300)}`);
+  assert.ok(!dump.includes("rolewright.llm"), `${what}: nothing named rolewright.llm is stored: ${dump.slice(0, 300)}`);
+}
+
+/**
+ * The key lives only in page memory, so any full page load forgets it. Put it
+ * back through the key screen (checks it, picks the model, saves). Leaves the
+ * page on /app/key with the saved-key card showing.
+ */
+async function enterKey(page) {
+  if (!new URL(page.url()).pathname.startsWith("/app/key")) {
+    await nav(page, "AI key").click();
+    await page.waitForURL("**/app/key");
+    await settle(page);
+  }
+  if ((await page.locator("#saved-key-title").count()) > 0) return;
+  await page.waitForSelector('#provider option[value="mock"]', { state: "attached" });
+  await page.locator("#provider").selectOption("mock");
+  await page.locator("#llm-key").fill(MOCK_KEY);
+  await page.getByRole("button", { name: "Check key", exact: true }).click();
+  await page.getByText(/This key works/).waitFor();
+  await page.locator("#model").selectOption("mock-1");
+  await page.getByRole("button", { name: "Save in this browser" }).click();
+  await page.locator("#saved-key-title").waitFor();
+}
+
+/** Sign out with the header button and sign in as someone else, with client-side navigation only (no page load). */
+async function switchUserWithoutReload(page, email, signOutButton) {
+  await page.evaluate(() => {
+    window.__noReload = true;
+  });
+  await signOutButton();
+  await page.waitForURL(`${base}/`, { timeout: 60_000 });
+  await page.getByRole("link", { name: "Sign in" }).first().click();
+  await page.waitForURL("**/sign-in");
+  await page.locator("#dev-email").fill(email);
+  await page.getByRole("button", { name: "Development sign-in" }).click();
+  await page.waitForURL("**/app", { timeout: 90_000 });
+  await settle(page);
+  assert.equal(await page.evaluate(() => window.__noReload === true), true, "the tab was not reloaded, so memory was not cleared by a page load");
+}
+
+async function assertNoKeyInUse(page, what) {
+  await nav(page, "AI key").click();
+  await page.waitForURL("**/app/key");
+  await settle(page);
+  await page.locator("#llm-key").waitFor();
+  assert.equal(await page.locator("#saved-key-title").count(), 0, `${what}: no saved key card`);
+}
+
+/** Follow a header link with the keyboard only (no page load, so the in-memory key survives). */
+async function kbNav(page, href) {
+  await page.evaluate(() => document.querySelector(".skip-link")?.focus());
+  await tabTo(page, `a[href="${href}"]`);
+  await page.keyboard.press("Enter");
+  await page.waitForURL(`**${href}`);
+  await settle(page);
+}
+
 async function pdfFixture() {
   const fixture = {
     contact: { ...MOCK_RESUME.contact },
@@ -431,12 +519,19 @@ try {
       assert.ok(!shown.includes(MOCK_KEY), "the key is not shown in full");
     };
     await afterSave();
+    await assertNoStoredKey(page, "after saving the key");
     await checkpoint(page, "key-after");
 
+    // An old build kept the key in localStorage: loading the page removes it.
+    await page.evaluate((k) => window.localStorage.setItem("rolewright.llm", JSON.stringify({ provider: "mock", key: k, model: "mock-1", verifiedAt: "2020-01-01T00:00:00.000Z" })), MOCK_KEY);
     await page.reload();
     await settle(page);
-    await page.locator("#saved-key-title").waitFor();
+    await page.locator("#llm-key").waitFor();
+    assert.equal(await page.locator("#saved-key-title").count(), 0, "after a reload the saved-key card is gone");
+    await assertNoStoredKey(page, "after reload (legacy item removed)");
+    await enterKey(page);
     await afterSave();
+    await assertNoStoredKey(page, "after entering the key again");
   });
 
   await step("c. resume: consent, upload, fact review starts at 0 confirmed, confirm all, save, reload keeps it", async () => {
@@ -469,6 +564,8 @@ try {
     await page.reload();
     await settle(page);
     await poll(async () => (await bar.innerText().catch(() => "")) === `${state.total} of ${state.total} facts confirmed`, "confirmed count persisted after reload");
+    // The reload forgot the key; the next steps use it.
+    await enterKey(page);
   });
 
   await step("d. tailor: title, company and a long job description lead to four suggestions", async () => {
@@ -656,9 +753,9 @@ try {
       assert.equal(info.id, "saved-key-title", "focus moves to the saved key summary");
       await assertTargets(p, "key saved");
 
-      // c. resume
-      await go(p, "/app/resume");
-      await assertSkipLinkFirst(p, "resume");
+      // c. resume. The key lives in page memory, so reach this screen by keyboard
+      // navigation inside the app instead of a page load, which would forget it.
+      await kbNav(p, "/app/resume");
       await tabTo(p, "#resume-file");
       await p.locator("#resume-file").setInputFiles({ name: "asha-rao-resume.pdf", mimeType: "application/pdf", buffer: state.pdf });
       await p.keyboard.press("Tab");
@@ -689,8 +786,7 @@ try {
       assert.equal(info.id, "save-facts", "focus stays on Save");
 
       // d. tailor
-      await go(p, "/app/tailor");
-      await assertSkipLinkFirst(p, "tailor");
+      await kbNav(p, "/app/tailor");
       await assertTargets(p, "tailor");
       await tabTo(p, "#job-title");
       await p.keyboard.type("Finance Analyst");
@@ -808,6 +904,7 @@ try {
     ];
     for (const [url, label] of screens) {
       await go(page, url);
+      if (label === "key-saved") await enterKey(page);
       if (label === "review") await findCards(page);
       if (label === "resume-review") await page.getByText(/facts confirmed/).first().waitFor();
       if (label === "home-data") await page.getByText("Finance Analyst").first().waitFor();
@@ -849,6 +946,21 @@ try {
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
+  await step("j. sign-out clears the key: another user signing in in the same tab, without a reload, has no key", async () => {
+    const third = await newContext();
+    try {
+      await signInByUi(third.page, "chitra.e2e@example.com");
+      await enterKey(third.page);
+      await assertNoStoredKey(third.page, "key in use");
+      await switchUserWithoutReload(third.page, "dev.e2e@example.com", () => third.page.getByRole("button", { name: "Sign out" }).click());
+      await assertNoKeyInUse(third.page, "after sign-out and a different sign-in");
+      await assertNoStoredKey(third.page, "after switching user");
+    } finally {
+      await third.ctx.close();
+      currentPage = page;
+    }
+  });
+
   await step("i. a second user sees none of the first user's data", async () => {
     // Run while the first user's data still exists, so the check means something.
     const second = await newContext();
@@ -873,6 +985,8 @@ try {
 
   await step("h. privacy: Delete stays off until DELETE is typed; deleting signs out and /app asks for sign-in", async () => {
     await page.setViewportSize({ width: 1280, height: 800 });
+    await go(page, "/app");
+    await enterKey(page);
     await nav(page, "Privacy").click();
     await page.waitForURL("**/app/privacy");
     await settle(page);
@@ -883,7 +997,23 @@ try {
     assert.equal(await del.isDisabled(), true, "lowercase does not unlock it");
     await page.locator("#delete-confirm").fill("DELETE");
     assert.equal(await del.isDisabled(), false, "enabled once DELETE is typed");
+    // Deleting the account must also forget the key held in this tab. Delete,
+    // then sign in as someone else in the same tab (no reload) and look for it.
+    await page.evaluate(() => {
+      window.__noReload = true;
+    });
     await del.click();
+    await page.waitForURL(`${base}/`, { timeout: 60_000 });
+    await page.getByRole("link", { name: "Sign in" }).first().click();
+    await page.waitForURL("**/sign-in");
+    await page.locator("#dev-email").fill("esha.e2e@example.com");
+    await page.getByRole("button", { name: "Development sign-in" }).click();
+    await page.waitForURL("**/app", { timeout: 90_000 });
+    await settle(page);
+    assert.equal(await page.evaluate(() => window.__noReload === true), true, "no page load happened");
+    await assertNoKeyInUse(page, "after deleting the account");
+    await go(page, "/app");
+    await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(`${base}/`, { timeout: 60_000 });
     await go(page, "/app");
     assert.match(new URL(page.url()).pathname, /^\/sign-in/, "/app redirects to sign-in once signed out");
