@@ -7,6 +7,7 @@ import { useLlmKey } from "@/lib/client/llm-key";
 import { providerLabel, useProviders } from "@/lib/client/providers";
 import type { Facts, FactsResponse, FactsSave } from "@/lib/client/types";
 import { confirmationCounts } from "@/lib/facts.mjs";
+import { NOTICE_VERSION } from "@/lib/notice.mjs";
 import { FactEditor } from "@/components/fact-editor";
 import { AlertIcon, CheckIcon } from "@/components/ui/icons";
 import { Button, buttonClass, Card, Checkbox, ErrorBlock, Field, LoadingBlock, Notice, Spinner } from "@/components/ui/primitives";
@@ -93,7 +94,7 @@ export function ResumeView() {
       ok = false;
     } else setFileError(null);
     if (!consent) {
-      setConsentError(t.consentError);
+      setConsentError(en.consent.error);
       ok = false;
     } else setConsentError(null);
     if (!ok || !file) return;
@@ -102,6 +103,8 @@ export function ResumeView() {
     setUploadError(null);
     setUploadDone(false);
     try {
+      // The server records the agreement and refuses the upload without it.
+      await api<{ accepted: boolean }>("/api/consent", { method: "POST", json: { noticeVersion: NOTICE_VERSION } });
       const form = new FormData();
       form.append("file", file);
       const res = await api<FactsResponse>("/api/resume", { method: "POST", form });
@@ -199,7 +202,14 @@ export function ResumeView() {
                 setConsent(e.target.checked);
                 if (e.target.checked) setConsentError(null);
               }}
-              label={t.consent(llm ? providerLabel(llm.provider, providers) : t.providerFallback)}
+              label={
+                <>
+                  {en.consent.lead(llm ? providerLabel(llm.provider, providers) : t.providerFallback)}{" "}
+                  <Link href="/privacy" target="_blank" className="inline-block min-h-6 font-semibold text-brand underline underline-offset-4">
+                    {en.consent.linkText}
+                  </Link>
+                </>
+              }
             />
             {consentError ? (
               <p id="resume-consent-error" className="text-sm font-medium text-danger">

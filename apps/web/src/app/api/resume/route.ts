@@ -3,6 +3,7 @@ import { changeFacts, saveResume } from "@/lib/db/repo.mjs";
 import { reconcileUpload } from "@/lib/fact-source.mjs";
 import { confirmationCounts, normalizeFacts } from "@/lib/facts.mjs";
 import { extractFacts } from "@/lib/llm/index.mjs";
+import { requireConsent } from "@/lib/server/consent";
 import { readBodyBytes } from "@/lib/server/body";
 import { HttpError, json, route } from "@/lib/server/http";
 import { readLlmHeaders } from "@/lib/server/llm-key";
@@ -50,6 +51,8 @@ export const POST = route("resume.upload", async (req, { state }) => {
   if (file.type && !PDF_TYPES.has(file.type.toLowerCase())) throw notPdf();
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!startsWithPdfMagic(bytes)) throw notPdf();
+
+  await requireConsent(userId);
 
   // Never written to disk: the bytes live only in this request.
   const { text } = await pdfText(bytes);

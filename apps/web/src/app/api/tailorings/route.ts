@@ -3,6 +3,7 @@ import { createJobWithTailoring, getFacts, listTailorings } from "@/lib/db/repo.
 import { factBaseText, tailorableLines } from "@/lib/facts.mjs";
 import { suggestRewrites } from "@/lib/llm/index.mjs";
 import { readJsonObject } from "@/lib/server/body";
+import { requireConsent } from "@/lib/server/consent";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { HttpError, json, route } from "@/lib/server/http";
 import { readLlmHeaders } from "@/lib/server/llm-key";
@@ -33,6 +34,7 @@ export const POST = route("tailorings.create", async (req, { state }) => {
   if (jdText.length < MIN_JD || jdText.length > MAX_JD) {
     throw new HttpError(400, "invalid_jd", "Paste the full job description: between 200 and 20,000 characters.");
   }
+  await requireConsent(userId);
   takeRateLimit("ai", userId);
 
   // Fail closed: without the engine's fact gate nothing is checked, so nothing is made.

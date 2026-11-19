@@ -24,6 +24,7 @@ const { pdfText } = await load("src/lib/server/pdf-text.mjs");
 const { MOCK_RESUME, MOCK_KEY } = await load("src/lib/llm/mock.mjs");
 const { emptyFacts } = await load("src/lib/facts.mjs");
 const { createDb } = await load("src/lib/db/index.mjs");
+const { NOTICE_VERSION } = await load("src/lib/notice.mjs");
 
 const SENTINEL = "sentinel-KEY-9f3b2c7d1e";
 const JD = [
@@ -325,6 +326,18 @@ try {
     state.fixturePdf = await renderPdf(resumeHtml(fixture));
     assert.ok((await pdfText(state.fixturePdf)).text.length >= 200, "the fixture has enough text");
 
+    // No consent yet: the upload is refused before any AI call.
+    assertError(await request(state.A, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() }), 403, "consent_required");
+    assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: false });
+    assertError(await request(state.A, "POST", "/api/consent", { json: { noticeVersion: "1999-01-01.0" } }), 400, "stale_notice");
+    assertError(await request(state.A, "POST", "/api/consent", { json: {} }), 400, "stale_notice");
+    assertError(await request(null, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } }), 401, "unauthorized");
+    const agreed = await request(state.A, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } });
+    assert.equal(agreed.status, 200);
+    assert.deepEqual(agreed.data, { accepted: true });
+    assert.equal((await request(state.A, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } })).status, 200, "agreeing twice is fine");
+    assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: true });
+
     const up = await request(state.A, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() });
     assert.equal(up.status, 200, JSON.stringify(up.data).slice(0, 300));
     assert.ok(everyItemUnconfirmed(up.data.facts), "every proposed item is unconfirmed");
@@ -350,6 +363,7 @@ try {
   await step("4b. an item the upload lacks is labelled model; a re-upload keeps confirmations and ids", async () => {
     const allItems = (f) => [f.summary, ...f.experience, ...f.experience.flatMap((e) => e.bullets), ...f.education, ...f.skills];
     const jar = await signIn("cora.flow@example.com");
+    assert.equal((await request(jar, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } })).status, 200);
     const first = await request(jar, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() });
     assert.equal(first.status, 200, JSON.stringify(first.data).slice(0, 300));
     assert.ok(allItems(first.data.facts).every((i) => i.source !== "model"), "the first upload has no model items");
@@ -564,6 +578,16 @@ try {
     const badProvider = await request(state.B, "POST", "/api/keys/verify", { headers: { ...ai(SENTINEL), "x-llm-provider": "nope" } });
     assert.equal(badProvider.data.ok, false);
     // The mock provider's completions ignore the key, so these write rows while carrying it.
+    // B has not consented yet: neither route runs, and the key never leaks in the refusal.
+    const noConsentUp = await request(state.B, "POST", "/api/resume", { form: pdfForm(state.fixturePdf, "bala.pdf"), headers: ai(SENTINEL) });
+    assertError(noConsentUp, 403, "consent_required");
+    assert.ok(!JSON.stringify(noConsentUp.data).includes(SENTINEL));
+    assertError(
+      await request(state.B, "POST", "/api/tailorings", { json: { title: "Analyst", company: "Acme", jdText: JD }, headers: ai(SENTINEL) }),
+      403,
+      "consent_required",
+    );
+    assert.equal((await request(state.B, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } })).status, 200);
     const up = await request(state.B, "POST", "/api/resume", { form: pdfForm(state.fixturePdf, "bala.pdf"), headers: ai(SENTINEL) });
     assert.equal(up.status, 200);
     const put = await request(state.B, "PUT", "/api/facts", { json: { facts: confirmAll(up.data.facts) } });
@@ -601,7 +625,7 @@ try {
     assert.ok(!serverOutput.includes(MOCK_KEY), "the valid key is not in the server output either");
     const db = await createDb({ dataDir: dbDir });
     try {
-      for (const table of ["users", "accounts", "verification_tokens", "resumes", "fact_bases", "jobs", "tailorings"]) {
+      for (const table of ["users", "accounts", "verification_tokens", "resumes", "fact_bases", "jobs", "tailorings", "consents"]) {
         const { rows } = await db.system.query(`SELECT row_to_json(t)::text AS j FROM ${table} t`);
         for (const { j } of rows) {
           assert.ok(!j.includes(SENTINEL), `the key is not stored in ${table}`);
@@ -610,6 +634,8 @@ try {
       }
       const { rows: bRows } = await db.system.query("SELECT count(*)::int AS n FROM tailorings WHERE user_id = $1", [state.bId]);
       assert.equal(bRows[0].n, 1, "B's rows (written with the key) were scanned");
+      const { rows: consents } = await db.system.query("SELECT notice_version, purpose FROM consents WHERE user_id = $1", [state.bId]);
+      assert.deepEqual(consents, [{ notice_version: NOTICE_VERSION, purpose: "ai_processing" }], "B's consent is stored once, with the notice version");
     } finally {
       await db.close();
     }
@@ -620,7 +646,7 @@ try {
     try {
       const { rows: u } = await db.system.query("SELECT count(*)::int AS n FROM users WHERE id = $1", [state.aId]);
       assert.equal(u[0].n, 0);
-      for (const table of ["resumes", "fact_bases", "jobs", "tailorings"]) {
+      for (const table of ["resumes", "fact_bases", "jobs", "tailorings", "consents"]) {
         const { rows } = await db.system.query(`SELECT count(*)::int AS n FROM ${table} WHERE user_id = $1`, [state.aId]);
         assert.equal(rows[0].n, 0, `no rows left in ${table}`);
       }

@@ -776,6 +776,10 @@ try {
       assert.equal(info.id, "resume-consent");
       await p.keyboard.press("Space");
       assert.equal(await p.locator("#resume-consent").isChecked(), true, "Space ticks the consent box");
+      // P0-2: the consent label now links to the privacy notice, which is the next tab stop.
+      await p.keyboard.press("Tab");
+      info = await assertFocusVisible(p, "privacy notice link in the consent label");
+      assert.equal(await p.evaluate(() => document.activeElement?.getAttribute("href")), "/privacy");
       await p.keyboard.press("Tab");
       info = await assertFocusVisible(p, "upload button");
       assert.equal(info.id, "upload-resume");

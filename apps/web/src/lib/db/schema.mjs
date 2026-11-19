@@ -88,6 +88,17 @@ CREATE TABLE IF NOT EXISTS tailorings (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Who agreed to which notice version, for what, and when (ADR 0004). Append-only
+-- for the app: it can read and add rows, never change or delete them.
+CREATE TABLE IF NOT EXISTS consents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  notice_version text NOT NULL,
+  purpose text NOT NULL,
+  accepted_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, notice_version, purpose)
+);
+
 CREATE INDEX IF NOT EXISTS resumes_user_id_idx ON resumes (user_id);
 CREATE INDEX IF NOT EXISTS jobs_user_id_idx ON jobs (user_id);
 CREATE INDEX IF NOT EXISTS tailorings_user_id_idx ON tailorings (user_id);
@@ -102,6 +113,8 @@ ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs FORCE ROW LEVEL SECURITY;
 ALTER TABLE tailorings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tailorings FORCE ROW LEVEL SECURITY;
+ALTER TABLE consents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consents FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS resumes_isolation ON resumes;
 CREATE POLICY resumes_isolation ON resumes
@@ -123,6 +136,12 @@ CREATE POLICY tailorings_isolation ON tailorings
   USING (user_id = current_setting('app.user_id')::uuid)
   WITH CHECK (user_id = current_setting('app.user_id')::uuid);
 
+DROP POLICY IF EXISTS consents_isolation ON consents;
+CREATE POLICY consents_isolation ON consents
+  USING (user_id = current_setting('app.user_id')::uuid)
+  WITH CHECK (user_id = current_setting('app.user_id')::uuid);
+
 -- Privileges: user-data tables only. Nothing on users, accounts or verification_tokens.
 GRANT SELECT, INSERT, UPDATE, DELETE ON resumes, fact_bases, jobs, tailorings TO rolewright_app;
+GRANT SELECT, INSERT ON consents TO rolewright_app;
 `;
