@@ -658,9 +658,8 @@ try {
     assert.ok(/You are stating that '₹?5 crore' is true about you/.test(confirmText), `inline statement shown:\n${confirmText}`);
     await card.getByRole("button", { name: "Yes, it is true. Add it" }).click();
     await poll(async () => {
-      const issues = card.getByTestId("issues");
-      if ((await issues.count()) === 0) return true;
-      return !(await issues.innerText()).includes("5 crore");
+      // One count over a filtered locator: the issues list can disappear between a count and an innerText.
+      return (await card.getByTestId("issues").filter({ hasText: "5 crore" }).count()) === 0;
     }, "the card no longer lists 5 crore as an issue");
     await checkpoint(page, "review-attested");
 
@@ -862,8 +861,7 @@ try {
       assert.equal(info.id, `confirm-yes-0-${ids.crore}`, "focus moves to the confirmation button");
       await p.keyboard.press("Enter");
       await poll(async () => {
-        const issues = cardLoc(p, ids.crore).getByTestId("issues");
-        return (await issues.count()) === 0 || !(await issues.innerText()).includes("5 crore");
+        return (await cardLoc(p, ids.crore).getByTestId("issues").filter({ hasText: "5 crore" }).count()) === 0;
       }, "5 crore attested by keyboard");
       await inCard(ids.crore, "after attesting");
 
