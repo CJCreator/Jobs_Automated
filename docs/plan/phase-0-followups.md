@@ -23,7 +23,7 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1a review | Browser test for the grouped export-blocked notice | P0-11 |
 | P0-1a re-review | "ph d" (space, no dots) passes; "Ph. D." blocks only via the name check | Later gate task |
 | P0-1a re-review | "Vice President" vs facts "VP" false-blocks on the name check (one attest click) | Later gate task |
-| P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | CPU half closed by P0-6b; memory half P0-6c (blocks the phase gate) |
+| P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | Closed: CPU bound by P0-6b, memory bound by P0-6c (watchdog refuses at about 270-310 MB external in about 1 s) |
 | P0-6 review | Set Cloud Run memory, request timeout and concurrency explicitly; worker typed-array memory is bounded only by the instance limit | P1-6 |
 | P0-6 review | Upload rate limit is per process, so it weakens with more instances | P1-3 |
 | P0-4 review | Purge and `deleteUserData` cascade as the non-superuser role under FORCE RLS | P0-8 |
@@ -54,3 +54,13 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-6c review | Cloud Run memory at least 2 GiB, explicit concurrency (bounds the PDF wait queue), Node pinned at 22.16+ so the watchdog exists | P1-6 |
 | P0-6c review | Pass the request abort signal into `pdfText` so a disconnected client's queued parse is dropped | Later (needs the resume route) |
 | P0-6c review | Route-level test that a plain Error from `pdfText` becomes 500 (today a source grep) | Later |
+| P0-6c re-review | 503 `pdf_busy` has no `Retry-After` header (wrapper has no header field on status errors) | Later |
+| P0-1b review | Cover letters: pass target role and company to the gate so body sentences about the job applied for are not read as the candidate's claims | Phase 2 cover letters (ADR 0015) |
+| P0-1b review | Indian magnitudes: lakh, crore, Mn not treated as magnitudes; "5 lakh customers" compared as "5 customers" | Later gate task (before cover letters) |
+| P0-1b review | "10k" vs "10,000" not equal | Later gate task |
+| P0-1b review | Employer suffixes and cities ("Infosys Ltd", "Infosys Bengaluru") block as unknown employers | Later gate task |
+| P0-1b review | Title-cased phrases after "at" read as employers ("at Month End") | Later gate task |
+| P0-1b review | Old quadratic regex: 50k chars of "1," take about 19 s; confirm the app caps engine input size | P0-11 check |
+| P0-1b review | Precompile per-family regex in `builtinClaimWordFacts` | Later |
+| P0-1b review | "Post Graduate Diploma" vs "Postgraduate Diploma"; review "Executive summary", "Enterprise reporting", "award-winning" false blocks | Later gate task (both twin lists) |
+| P0-1b review | Should an unsourced title in the engine's structured title slot block instead of warn? | Owner decision (ADR 0005) |
