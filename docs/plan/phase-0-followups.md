@@ -21,3 +21,5 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1a review | Homoglyphs ("expеrt" with Cyrillic е) pass both layers; add a mixed-script token check | Later gate task |
 | P0-1a review | Name check blocks family-supported tokens ("Sr. Manager" vs facts "Senior Manager") | Later gate task |
 | P0-1a review | Browser test for the grouped export-blocked notice | P0-11 |
+| P0-1a re-review | "ph d" (space, no dots) passes; "Ph. D." blocks only via the name check | Later gate task |
+| P0-1a re-review | "Vice President" vs facts "VP" false-blocks on the name check (one attest click) | Later gate task |
