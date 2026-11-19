@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { useLlmKey } from "@/lib/client/llm-key";
+import { providerLabel, useProviders } from "@/lib/client/providers";
 import type { FactsResponse } from "@/lib/client/types";
 import { useApi } from "@/lib/client/use-api";
 import { tailorableLines } from "@/lib/facts.mjs";
-import { Button, Card, ErrorBlock, Field, Input, LoadingBlock, Notice, Spinner, Textarea } from "@/components/ui/primitives";
+import { NOTICE_VERSION } from "@/lib/notice.mjs";
+import { Button, Card, Checkbox, ErrorBlock, Field, Input, LoadingBlock, Notice, Spinner, Textarea } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
 
 const t = en.app.tailor;
@@ -18,20 +20,24 @@ const MAX = 20000;
 export function TailorForm() {
   const router = useRouter();
   const { llm, ready } = useLlmKey();
+  const { providers } = useProviders();
   const facts = useApi<FactsResponse>("/api/facts");
+  const consent = useApi<{ noticeVersion: string; accepted: boolean }>("/api/consent");
+  const [agreed, setAgreed] = useState(false);
 
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
   const [jd, setJd] = useState("");
-  const [errors, setErrors] = useState<{ title?: string; company?: string; jd?: string }>({});
+  const [errors, setErrors] = useState<{ title?: string; company?: string; jd?: string; consent?: string }>({});
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  if (facts.loading || !ready) return <LoadingBlock label={en.common.loading} lines={5} />;
+  if (facts.loading || consent.loading || !ready) return <LoadingBlock label={en.common.loading} lines={5} />;
   if (facts.error || !facts.data) {
     return <ErrorBlock message={facts.error?.message ?? en.common.loadError} retryLabel={en.common.retry} onRetry={facts.reload} />;
   }
 
+  const needConsent = !consent.data?.accepted;
   const hasLines = tailorableLines(facts.data.facts).length > 0;
   const missingKey = !llm;
 
@@ -69,22 +75,31 @@ export function TailorForm() {
     if (!company.trim()) next.company = t.errCompany;
     if (length < MIN) next.jd = t.errJdShort(MIN);
     else if (length > MAX) next.jd = t.errJdLong(MAX);
+    if (needConsent && !agreed) next.consent = en.consent.error;
     setErrors(next);
     if (Object.keys(next).length) {
-      const first = next.title ? "job-title" : next.company ? "job-company" : "job-jd";
+      const first = next.title ? "job-title" : next.company ? "job-company" : next.jd ? "job-jd" : "tailor-consent";
       document.getElementById(first)?.focus();
       return;
     }
     setBusy(true);
     setServerError(null);
+    let consentSaved = !needConsent;
     try {
+      if (needConsent) {
+        await api<{ accepted: boolean }>("/api/consent", { method: "POST", json: { noticeVersion: NOTICE_VERSION } });
+        consentSaved = true;
+        consent.setData({ noticeVersion: NOTICE_VERSION, accepted: true });
+      }
       const res = await api<{ id: string }>("/api/tailorings", {
         method: "POST",
         json: { title: title.trim(), company: company.trim(), jdText: jd.trim() },
       });
       router.push(`/app/tailor/${res.id}`);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : en.common.loadError);
+      // A tab left open across a notice change: ask again.
+      if (err instanceof ApiError && err.code === "consent_required") consent.setData({ noticeVersion: NOTICE_VERSION, accepted: false });
+      setServerError(err instanceof ApiError ? err.message : consentSaved ? en.common.loadError : en.consent.saveFailed);
       setBusy(false);
     }
   };
@@ -140,6 +155,33 @@ export function TailorForm() {
             </>
           )}
         </Field>
+        {needConsent ? (
+          <div className="space-y-1.5">
+            <Checkbox
+              id="tailor-consent"
+              checked={agreed}
+              required
+              describedBy={errors.consent ? "tailor-consent-error" : undefined}
+              onChange={(e) => {
+                setAgreed(e.target.checked);
+                if (e.target.checked) setErrors((x) => ({ ...x, consent: undefined }));
+              }}
+              label={
+                <>
+                  {en.consent.lead(llm ? providerLabel(llm.provider, providers) : en.app.resume.providerFallback)}{" "}
+                  <Link href="/privacy" target="_blank" className="inline-block min-h-6 font-semibold text-brand underline underline-offset-4">
+                    {en.consent.linkText}
+                  </Link>
+                </>
+              }
+            />
+            {errors.consent ? (
+              <p id="tailor-consent-error" className="text-sm font-medium text-danger">
+                {errors.consent}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <Button id="tailor-submit" type="submit" loading={busy}>
           {busy ? <Spinner /> : null}
           {t.submit}

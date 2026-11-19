@@ -3,6 +3,7 @@ import { createJobWithTailoring, getFacts, listTailorings } from "@/lib/db/repo.
 import { factBaseText, tailorableLines } from "@/lib/facts.mjs";
 import { suggestRewrites } from "@/lib/llm/index.mjs";
 import { readJsonObject } from "@/lib/server/body";
+import { requireConsent } from "@/lib/server/consent";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { HttpError, json, route } from "@/lib/server/http";
 import { readLlmHeaders } from "@/lib/server/llm-key";
@@ -25,6 +26,7 @@ export const GET = route("tailorings.list", async (_req, { state }) => {
 export const POST = route("tailorings.create", async (req, { state }) => {
   const userId = await requireUser(state);
   const llm = readLlmHeaders(req);
+  await requireConsent(userId);
   const body = await readJsonObject(req);
   const title = field(body.title, 200);
   const company = field(body.company, 200);

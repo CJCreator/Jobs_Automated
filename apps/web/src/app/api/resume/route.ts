@@ -3,6 +3,7 @@ import { changeFacts, saveResume } from "@/lib/db/repo.mjs";
 import { reconcileUpload } from "@/lib/fact-source.mjs";
 import { confirmationCounts, normalizeFacts } from "@/lib/facts.mjs";
 import { extractFacts } from "@/lib/llm/index.mjs";
+import { requireConsent } from "@/lib/server/consent";
 import { readBodyBytes } from "@/lib/server/body";
 import { HttpError, json, route } from "@/lib/server/http";
 import { readLlmHeaders } from "@/lib/server/llm-key";
@@ -29,8 +30,10 @@ const cleanFilename = (name: string) => name.replace(/[\u0000-\u001f\u007f]/g, "
 
 export const POST = route("resume.upload", async (req, { state }) => {
   const userId = await requireUser(state);
-  takeRateLimit("upload", userId);
   const llm = readLlmHeaders(req);
+  // Before the body is read and before a rate-limit token is spent: no collection without consent.
+  await requireConsent(userId);
+  takeRateLimit("upload", userId);
 
   const type = req.headers.get("content-type") ?? "";
   if (!type.toLowerCase().startsWith("multipart/form-data")) {

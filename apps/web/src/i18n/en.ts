@@ -363,6 +363,14 @@ export const en = {
     privacyLink: "Privacy notice",
     signInPrivacyLink: "Read the privacy notice before you sign in",
   },
+  // P0-2
+  consent: {
+    lead: (provider: string) =>
+      `I understand my resume text and the job description will be sent to ${provider}, the AI provider I chose, which may process them outside India.`,
+    linkText: "Read the privacy notice",
+    error: "Tick the box to continue.",
+    saveFailed: "Your agreement could not be saved. Try again.",
+  },
 } as const;
 
 export type Strings = typeof en;
