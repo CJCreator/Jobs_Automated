@@ -22,7 +22,7 @@ $env:ROLEWRIGHT_DEV_LOGIN="1"; $env:ROLEWRIGHT_ALLOW_MOCK_LLM="1"; npm run dev
 
 Open http://localhost:3100. With no `DATABASE_URL`, data is kept in an embedded database at `apps/web/.data/pglite`. To use the fake provider, choose provider `mock` with the key `mock-valid-key`. It deliberately invents figures, tools and employers so you can see the fact check stop them.
 
-Both flags are refused when `NODE_ENV` is `production`, and so is a missing `AUTH_SECRET`: the sign-in module throws an error naming every problem when it first loads, and every API route repeats the check. The server process still starts, but every page and route that needs a session answers 500 and the server log names the problem. The check is skipped while `next build` runs (Next sets `NEXT_PHASE=phase-production-build`), so building needs neither the secret nor any flag. The rule lives in `src/lib/server/env-guard.mjs`.
+Both flags are refused on a **deployed host** and when `NODE_ENV` is `production`, and so is a missing `AUTH_SECRET`. A host counts as deployed when `ROLEWRIGHT_DEPLOYED=1` or when `K_SERVICE` is set to any non-empty value (Cloud Run and Knative set it), whatever `NODE_ENV` says; it is read from the process environment, never from a request. On a deployed host a missing `DATABASE_URL` is also refused, and the embedded database is never opened. The server checks this when it starts (`src/instrumentation.ts`): the error is logged naming every problem and every request answers 500. The first-use checks in the sign-in module and the API routes remain as a second layer. With `NODE_ENV=production` on a machine that is not deployed (the production smoke test), the embedded database is allowed but logs one warning naming its directory. The check is skipped while `next build` runs (Next sets `NEXT_PHASE=phase-production-build`), so building needs neither the secret nor any flag. The rule lives in `src/lib/server/env-guard.mjs`.
 
 ## Commands
 
@@ -41,14 +41,16 @@ Read from the process environment only.
 
 | Name | Meaning |
 |---|---|
-| `AUTH_SECRET` | Signs and encrypts session cookies. Required in production: without it every route that needs a session answers 500 (see above). In development a fixed, development-only value is used when unset. Generate one with `openssl rand -base64 32`. |
+| `AUTH_SECRET` | Signs and encrypts session cookies. Required in production and on a deployed host: without it every route that needs a session answers 500 (see above). In development a fixed, development-only value is used when unset. Generate one with `openssl rand -base64 32`. |
 | `AUTH_URL` | The public URL of the app, e.g. `https://rolewright.example`. Needed in production behind a proxy so sign-in links and callbacks use the right host (or set `AUTH_TRUST_HOST=true`). |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google sign-in. Offered only when both are set. Callback URL to register with Google: `<AUTH_URL>/api/auth/callback/google`. |
 | `AUTH_RESEND_KEY`, `EMAIL_FROM` | Sign-in by email link, sent through Resend. Offered only when both are set. `EMAIL_FROM` must be on a domain verified in Resend. |
-| `DATABASE_URL` | Postgres connection string. When unset, the embedded database is used. |
+| `DATABASE_URL` | Postgres connection string. When unset, the embedded database is used, except on a deployed host, where the server refuses to start (see above). |
+| `ROLEWRIGHT_DEPLOYED=1` | Marks this process as a deployed host. Only the exact value `1` counts. Turns on the same refusals as `NODE_ENV=production`, plus the `DATABASE_URL` requirement. |
+| `K_SERVICE` | Set by Cloud Run and Knative. Any non-empty value marks a deployed host, the same as `ROLEWRIGHT_DEPLOYED=1`. |
 | `ROLEWRIGHT_DATA_DIR` | Directory for the embedded database instead of `.data/pglite` (the flow test uses a temp directory). Ignored when `DATABASE_URL` is set. |
-| `ROLEWRIGHT_DEV_LOGIN=1` | Development sign-in by email with no verification. Refused when `NODE_ENV=production` (see above). |
-| `ROLEWRIGHT_ALLOW_MOCK_LLM=1` | Enables the fake AI provider `mock`. Refused when `NODE_ENV=production` (see above). |
+| `ROLEWRIGHT_DEV_LOGIN=1` | Development sign-in by email with no verification. Refused on a deployed host or when `NODE_ENV=production` (see above). |
+| `ROLEWRIGHT_ALLOW_MOCK_LLM=1` | Enables the fake AI provider `mock`. Refused on a deployed host or when `NODE_ENV=production` (see above). |
 | `CAREER_OPS_CODE_ROOT` | Path to the engine package. Default: `../../packages/engine` relative to the app's working directory. |
 | `CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR` | The engine's data folder. Leave unset: the server points the engine at a fresh, empty temp folder before loading it, so it never reads files from the checkout. All user data is in the database. |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | Optional. A Chromium binary to use for PDF export instead of Playwright's own download. |
@@ -137,4 +139,4 @@ Taken by the browser test (`E2E_SCREENS_DIR=<folder> npm run test:e2e`).
 - **Real AI providers.** The flow test uses the mock provider only. Uploading and tailoring with Gemini, OpenAI, Anthropic, OpenRouter or Groq keys has not been tried end to end.
 - **Postgres.** Everything ran on the embedded database. `tests/db.test.mjs` can run against a real server (`ROLEWRIGHT_TEST_DATABASE_URL`, `ROLEWRIGHT_TEST_ADMIN_URL`) and includes the checks that only mean something there: 20 interleaved `withUser` calls for two users on one pool, pooled connections coming back without the role or user id, two concurrent review actions both landing under the row locks, and a negative control showing an update is lost without them. That run has not happened yet (no Postgres server was available), so the `pg` driver path, the role set-up above, the row locks under real concurrency, and behaviour with several server processes are all unverified. On the embedded database every transaction runs alone, so the lock tests pass there without proving anything about Postgres.
 - **Scanned PDFs, password-protected PDFs and very long resumes** are refused or capped by code paths that no test has exercised with a real file of that kind.
-- **The production guards fail on first use, not at start-up.** Run against `next start`: with `ROLEWRIGHT_DEV_LOGIN=1`, with `ROLEWRIGHT_ALLOW_MOCK_LLM=1`, or without `AUTH_SECRET`, `/api/auth/csrf`, `/api/facts` and `/api/providers` all answered 500 and the log named the setting. The process itself keeps running and reports "Ready", so a health check that only pings a static page would not notice.
+- **The production guards fail every request, not the process.** `src/instrumentation.ts` checks the environment at start-up, but Next 16 logs the failure ("Failed to prepare server") and keeps the process up and listening: run against `next start` with `K_SERVICE=x`, `AUTH_SECRET` set and no `DATABASE_URL`, `/sign-in` and `/api/auth/csrf` both answered 500. Under `next dev` the error is logged the same way and `/sign-in` returns no page, so no development form is shown. A health check that only pings a static page would not notice, so point it at a route that needs the app.

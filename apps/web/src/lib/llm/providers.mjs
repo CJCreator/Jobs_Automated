@@ -6,6 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { LlmError, errorForStatus, scrub } from "./errors.mjs";
 import { mockComplete, mockVerifyKey } from "./mock.mjs";
+import { strictEnv } from "../server/env-guard.mjs";
 
 export const PROVIDERS = [
   { id: "gemini", label: "Google Gemini", keyUrl: "https://aistudio.google.com/apikey", keyHint: "Starts with AIza" },
@@ -30,7 +31,7 @@ const RECOMMEND = { gemini: /flash/i, openai: /mini/i, groq: /llama.*70b|versati
 const NON_CHAT = /embed|whisper|tts|dall-e|moderation|audio|image|realtime|transcribe|search|similarity/i;
 
 export function isProviderAllowed(id) {
-  if (id === "mock") return process.env.ROLEWRIGHT_ALLOW_MOCK_LLM === "1" && process.env.NODE_ENV !== "production";
+  if (id === "mock") return process.env.ROLEWRIGHT_ALLOW_MOCK_LLM === "1" && !strictEnv(process.env);
   return PROVIDERS.some((p) => p.id === id);
 }
 

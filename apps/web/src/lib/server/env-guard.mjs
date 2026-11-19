@@ -22,13 +22,41 @@ export class UnsafeEnvironmentError extends Error {
 }
 
 /**
+ * True on a hosted deployment, whatever NODE_ENV says. Read from the process
+ * environment only, never from a request. Only the exact value "1" turns
+ * ROLEWRIGHT_DEPLOYED on; any non-empty K_SERVICE (set by Cloud Run and
+ * Knative hosts) counts.
+ * @param {Record<string, string | undefined>} env
+ */
+export function isDeployed(env) {
+  return env.ROLEWRIGHT_DEPLOYED === "1" || (env.K_SERVICE ?? "") !== "";
+}
+
+/**
+ * True when the development conveniences must be off: a deployed host, or
+ * NODE_ENV=production.
+ * @param {Record<string, string | undefined>} env
+ */
+export function strictEnv(env) {
+  return isDeployed(env) || env.NODE_ENV === "production";
+}
+
+/**
+ * Whether the development sign-in is on: asked for, and the environment is not strict.
+ * @param {Record<string, string | undefined>} env
+ */
+export function devLoginEnabled(env) {
+  return env.ROLEWRIGHT_DEV_LOGIN === "1" && !strictEnv(env);
+}
+
+/**
  * The problems with this environment, in plain words. Empty means safe.
  * @param {Record<string, string | undefined>} env
  * @returns {string[]}
  */
 export function unsafeEnvProblems(env) {
   if (env.NEXT_PHASE === BUILD_PHASE) return [];
-  if (env.NODE_ENV !== "production") return [];
+  if (!strictEnv(env)) return [];
   const problems = [];
   if (env.ROLEWRIGHT_DEV_LOGIN === "1") {
     problems.push(
@@ -40,6 +68,11 @@ export function unsafeEnvProblems(env) {
   }
   if (!(env.AUTH_SECRET ?? "").trim()) {
     problems.push("AUTH_SECRET is not set, so sessions cannot be signed. Generate one with `openssl rand -base64 32`.");
+  }
+  if (isDeployed(env) && !(env.DATABASE_URL ?? "").trim()) {
+    problems.push(
+      "DATABASE_URL is not set, so the app would fall back to the embedded database, which is for development only. Set it to your Postgres connection string.",
+    );
   }
   return problems;
 }
@@ -53,7 +86,7 @@ export function assertSafeEnv(env) {
   const problems = unsafeEnvProblems(env);
   if (problems.length) {
     throw new UnsafeEnvironmentError(
-      `Rolewright will not run in production with these settings: ${problems.join(" ")} Fix them and restart.`,
+      `Rolewright will not run in production or on a deployed host with these settings: ${problems.join(" ")} Fix them and restart.`,
     );
   }
 }
