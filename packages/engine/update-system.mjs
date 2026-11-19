@@ -5897,6 +5897,20 @@ if (process.argv[1] && !isCli) {
 if (isCli) {
   const cmd = process.argv[2] || 'check';
 
+  // Rolewright is a renamed fork. Installing an upstream career-ops release
+  // would overwrite its system files, so upstream updates are off while the
+  // marker file sits next to this script. CAREER_OPS_ALLOW_UPSTREAM_UPDATES=1
+  // turns them back on deliberately (see docs/adr in the repository root).
+  if (existsSync(join(ROOT, '.no-upstream-updates'))
+      && process.env.CAREER_OPS_ALLOW_UPSTREAM_UPDATES !== '1') {
+    if (cmd === 'check' || cmd === 'status') {
+      console.log(JSON.stringify({ status: 'disabled', reason: 'upstream updates are disabled in this fork', local: localVersion() }));
+      process.exit(0);
+    }
+    console.error('Upstream career-ops updates are disabled in this fork (.no-upstream-updates). Nothing was changed.');
+    process.exit(1);
+  }
+
   try {
     // A Claude Code plugin install is a copy Claude Code owns and replaces on
     // every plugin update, with no .git of its own, so this updater has

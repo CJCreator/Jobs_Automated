@@ -78,8 +78,7 @@
     "archive": "node archive-posting.mjs",
     "prepare:application": "node prepare-application.mjs",
     "application:init": "node application-artifacts.mjs --init",
-    "postinstall": "node -e \"process.exit(['','0','false'].includes((process.env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD||'').toLowerCase())?1:0)\" || npx playwright install chromium || npx playwright install chromium || node -e \"console.warn('\\ncareer-ops: could not install Playwright Chromium. Everything else is installed; PDF generation and browser checks need it. Run: npx playwright install chromium')\"",
-    "manifesto": "node manifesto.mjs"
+    "postinstall": "node -e \"process.exit(['','0','false'].includes((process.env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD||'').toLowerCase())?1:0)\" || npx playwright install chromium || npx playwright install chromium || node -e \"console.warn('\\ncareer-ops: could not install Playwright Chromium. Everything else is installed; PDF generation and browser checks need it. Run: npx playwright install chromium')\""
   },
   "keywords": [
     "ai",

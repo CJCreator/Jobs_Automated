@@ -11,6 +11,10 @@ on:
   pull_request:
     paths: [.github/workflows/copilot-setup-steps.yml]
 
+defaults:
+  run:
+    working-directory: packages/engine
+
 jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
