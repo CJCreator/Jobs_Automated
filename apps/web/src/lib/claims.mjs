@@ -9,14 +9,21 @@
 //   1. every number, with its unit, must appear in the user's confirmed facts;
 //   2. every name-shaped word (capitalised, acronym, mixed letters and digits)
 //      must appear in the user's confirmed facts;
-//   3. anything the user marked "I can't confirm" is blocked for good.
+//   3. every credential, seniority, scope and expertise word ("certified",
+//      "principal", "global", "expert", ...) must appear in the user's confirmed
+//      facts, in any letter case, anywhere in the line;
+//   4. anything the user marked "I can't confirm" is blocked for good.
 //
 // It errs towards flagging. A false flag costs the user one click to attest a
 // true fact; a false pass puts an invented claim in front of an employer.
 //
-// Known gaps (by design, because closing them would flag honest rewording):
-// lower-case tool names ("python"), and vague multipliers ("doubled", "half
-// the time"). The engine gate catches some of these; the user's review is the
+// Covered: invented figures; capitalised or mixed names; and the claim words in
+// CLAIM_FAMILIES, whole-word and case-insensitive ("global", "Global",
+// "GLOBAL"), where a word is supported by any form of its family in the facts.
+// Not covered (by design, because closing them would flag honest rewording):
+// lower-case tool names ("python"), claim words outside the lists ("lead",
+// "specialist", "experienced"), and vague multipliers ("doubled", "half the
+// time"). The engine gate catches some of these; the user's review is the
 // backstop for the rest.
 //
 // Pure functions, no I/O, so `node --test` can import this file directly.
@@ -206,12 +213,12 @@ boost cultivate foster generate leverage utilise utilize apply use perform produ
 recruit onboard reconcile forecast budget audit close submit file post settle approve
 validate verify document standardise standardize simplify consolidate integrate align
 bridge unify transform modernise modernize overhaul revamp redesign rework refine
-responsible key senior junior lead principal team member part core main primary first
+responsible key lead team member part core main primary first
 second third last new next former current prior early late
 experienced skilled proven strong excellent successful dedicated results hands seasoned
 motivated driven focused oriented passionate detail analytical technical strategic creative
 operational financial commercial professional hardworking diligent accomplished versatile
-curious collaborative ambitious reliable meticulous adaptable bilingual certified
+curious collaborative ambitious reliable meticulous adaptable bilingual
 currently previously recently also additionally independently successfully consistently
 actively directly closely jointly together
 career summary profile objective overview experience education skills projects
@@ -226,7 +233,7 @@ growth impact insight insights outcome outcomes performance product products pro
 program programme programs programmes goal goals metrics metric dashboard dashboards
 month year quarter weekly monthly annual annually daily budget budgets process processes
 team analyst analysts specialist specialists lead leader mentor mentoring
-expert experts hybrid remote global regional local national international
+hybrid remote local
 proficiency mastery turnaround whole day days spreadsheet spreadsheets faster quicker better
 leaner smarter speedier simpler stronger deeper broader wider larger bigger greater
 fluency command grasp familiarity exposure background track record
@@ -365,6 +372,100 @@ function containsPhrase(haystack, phrase) {
   return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, "iu").test(cleanText(haystack));
 }
 
+// Claim words: a credential, a seniority, a scope or an expertise the facts must
+// back. Each row is one family; any form of a family in the facts supports every
+// form of it. Words that honest rewordings rely on ("lead", "specialist",
+// "qualified", "graduate", "expertise", "mastery", "proficiency", "experienced",
+// "seasoned", "end-to-end", "cross-functional", "whole", "hands-on", "ownership",
+// "oversight", "governance", "stewardship") are deliberately not here.
+const CLAIM_FAMILIES = {
+  credential: [
+    ["certified", "certification", "certifications", "certificate", "certificates"],
+    ["chartered"],
+    ["licensed", "licenced"],
+    ["accredited", "accreditation"],
+    ["award", "awards", "awarded"],
+    ["patent", "patents", "patented"],
+    ["medalist", "medallist"],
+    ["topper"],
+    ["scholarship", "scholarships"],
+    ["fellowship", "fellowships"],
+    ["mba"],
+    ["phd", "doctorate"],
+    ["diploma"],
+    ["postgraduate"],
+  ],
+  seniority: [
+    ["senior", "sr"],
+    ["principal"],
+    ["director", "directors"],
+    ["head of"],
+    ["chief"],
+    ["ceo"], ["cfo"], ["cto"], ["coo"], ["cio"], ["cmo"],
+    ["vp", "vice president"],
+    ["president"],
+    ["manager", "managers"],
+    ["executive", "executives"],
+    ["founder", "cofounder", "co-founder"],
+  ],
+  scope: [
+    ["global", "globally"],
+    ["worldwide"],
+    ["international", "internationally"],
+    ["multinational"],
+    ["national", "nationally", "nationwide"],
+    ["regional", "regionally"],
+    ["enterprise"],
+    ["entire"],
+    ["sole", "solely"],
+    ["single-handedly"],
+  ],
+  expertise: [
+    ["expert", "experts"],
+    ["guru"],
+    ["veteran"],
+    ["world-class"],
+    ["thought leader"],
+    ["best-in-class"],
+    ["industry-leading"],
+    ["top-performing"],
+  ],
+};
+
+const CLAIM_FORMS = [];
+for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
+  for (const family of families) for (const form of family) CLAIM_FORMS.push({ kind, form, family });
+}
+// Longest first so "vice president" is read before "president".
+CLAIM_FORMS.sort((a, b) => b.form.length - a.form.length);
+const CLAIM_BY_FORM = new Map(CLAIM_FORMS.map((f) => [f.form, f]));
+const CLAIM_RE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.map((f) => escapeRegExp(f.form).replace(/ /g, "\\s+")).join("|")})(?![\\p{L}\\p{N}])`,
+  "giu",
+);
+
+/**
+ * Credential, seniority, scope and expertise words in `text` that the facts
+ * never state, in any letter case and anywhere in the line.
+ *
+ * @param {string} text
+ * @param {string} sourceText the user's confirmed facts, serialised
+ * @returns {{ kind: string, value: string }[]} value is the word as written
+ */
+export function unsupportedClaimWords(text, sourceText) {
+  const facts = factTokenSet(sourceText);
+  const out = [];
+  for (const match of cleanText(text).matchAll(CLAIM_RE)) {
+    const written = match[0].replace(/\s+/g, " ");
+    const entry = CLAIM_BY_FORM.get(written.toLowerCase());
+    if (!entry) continue;
+    const supported = entry.family.some((form) =>
+      /[\s-]/.test(form) ? containsPhrase(sourceText, form) : facts.has(form));
+    if (!supported) out.push({ kind: entry.kind, value: written });
+  }
+  return out;
+}
+
 /**
  * Check one piece of tailored text against the user's confirmed facts.
  *
@@ -401,6 +502,10 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
     if (!allowedNumbers.has(claim.key)) {
       add("number", claim.raw, `The figure "${claim.raw}" is not in your confirmed facts.`);
     }
+  }
+
+  for (const { kind, value } of unsupportedClaimWords(target, sourceText)) {
+    add(kind, value, `"${value}" is not in your confirmed facts.`);
   }
 
   const facts = factTokenSet(sourceText);

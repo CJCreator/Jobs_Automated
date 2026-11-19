@@ -324,3 +324,36 @@ test("freshChecks shows checks against the current facts without touching decisi
   assert.equal(out[0].decision, "accepted");
   assert.equal(out[0].check.verdict, "block");
 });
+
+// P0-1a
+test("attesting a claim word on a blocked suggestion adds the fact and unblocks it", () => {
+  const facts = ashaFacts();
+  const { gate } = stubGate();
+  const list = [suggestion(REF.close, "Expert in SQL and Power BI for month-end close", "pending")];
+  const ctx = { jdText: JD, engineGate: gate, now: NOW };
+  const before = checkSuggestion(list[0], { ...ctxFor(facts), engineGate: gate });
+  assert.equal(before.check.verdict, "block");
+  assert.ok(before.check.issues.some((i) => i.kind === "expertise" && i.value === "Expert"), JSON.stringify(before.check.issues));
+  expectError(() => applyAction(facts, list, list[0].id, { action: "accept" }, ctx), 409, "blocked");
+
+  const out = applyAction(facts, list, list[0].id, { action: "attest", value: "Expert" }, ctx);
+  assert.equal(out.factsChanged, true);
+  assert.equal(out.facts.extras.length, 1);
+  assert.equal(out.facts.extras[0].text, "Expert");
+  assert.equal(out.facts.extras[0].confirmed, true);
+  assert.notEqual(out.suggestions[0].check.verdict, "block", JSON.stringify(out.suggestions[0].check.issues));
+  const accepted = applyAction(out.facts, out.suggestions, list[0].id, { action: "accept" }, ctx);
+  assert.equal(accepted.suggestions[0].decision, "accepted");
+});
+
+test("exportBlockers returns the exact exported line as text", () => {
+  const facts = ashaFacts();
+  const { gate } = stubGate();
+  const list = [suggestion(REF.team, "  Owned the entire finance function  ", "accepted")];
+  const blockers = exportBlockers(facts, list, { engineGate: gate });
+  assert.equal(blockers.length, 1);
+  assert.equal(blockers[0].text, "Owned the entire finance function");
+  assert.ok(blockers[0].issues.some((i) => i.value === "entire"));
+  // With no engine gate there is no line to show, but the field is still a string.
+  assert.equal(exportBlockers(facts, list, {})[0].text, "");
+});

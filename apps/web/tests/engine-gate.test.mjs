@@ -87,7 +87,7 @@ test("combined: a slash-separated tool list is not read as one invented tool", (
   assert.notEqual(r.verdict, "block", JSON.stringify(r.issues));
 });
 
-test("known gap: a scope claim with no figure or tool passes both layers", { todo: "needs a stronger scope check" }, () => {
+test("combined: a scope claim with no figure or tool is blocked by the claim-word check", () => {
   assert.equal(gated("Owned the entire finance function").verdict, "block");
 });
 

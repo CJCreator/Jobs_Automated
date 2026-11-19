@@ -220,10 +220,10 @@ export function freshChecks(facts, suggestions, ctx = {}) {
  * @param {any} facts
  * @param {any[]} suggestions
  * @param {ActionContext} ctx
- * @returns {{ sid: string|null, ref: string|null, issues: { kind: string, value: string, message: string }[] }[]}
+ * @returns {{ sid: string|null, ref: string|null, text: string, issues: { kind: string, value: string, message: string }[] }[]}
  */
 export function exportBlockers(facts, suggestions, ctx = {}) {
-  if (typeof ctx.engineGate !== "function") return [{ sid: null, ref: null, issues: [ENGINE_MISSING] }];
+  if (typeof ctx.engineGate !== "function") return [{ sid: null, ref: null, text: "", issues: [ENGINE_MISSING] }];
   const c = contextFor(facts, ctx);
   const list = asList(suggestions);
   // buildResume keeps the last accepted suggestion per line, so map back the same way.
@@ -234,7 +234,7 @@ export function exportBlockers(facts, suggestions, ctx = {}) {
   for (const { ref, before, after } of changed) {
     const check = checkText({ text: after, sourceText: c.sourceText, before, jdText: c.jdText, cannotConfirm: c.cannotConfirm, engineGate: c.engineGate });
     if (check.verdict === "block" || !check.engineRan) {
-      blockers.push({ sid: acceptedByRef.get(ref)?.id ?? null, ref, issues: check.issues.length ? check.issues : [ENGINE_MISSING] });
+      blockers.push({ sid: acceptedByRef.get(ref)?.id ?? null, ref, text: after, issues: check.issues.length ? check.issues : [ENGINE_MISSING] });
     }
   }
   return blockers;

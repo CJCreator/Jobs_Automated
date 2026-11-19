@@ -22,8 +22,8 @@ export function tailoringView(t: StoredTailoring, suggestions: unknown[]) {
 }
 
 /** One flat issue list (the client's CheckIssue shape) that still says which suggestion each came from. */
-export function flattenBlockers(blockers: { sid: string | null; ref: string | null; issues: { kind: string; value: string; message: string }[] }[]) {
-  return blockers.flatMap((b) => b.issues.map((issue) => ({ ...issue, sid: b.sid, ref: b.ref })));
+export function flattenBlockers(blockers: { sid: string | null; ref: string | null; text?: string; issues: { kind: string; value: string; message: string }[] }[]) {
+  return blockers.flatMap((b) => b.issues.map((issue) => ({ ...issue, sid: b.sid, ref: b.ref, line: b.text ?? "" })));
 }
 
 export const notFound = () => new HttpError(404, "not_found", "That tailoring was not found.");
