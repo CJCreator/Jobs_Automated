@@ -78,3 +78,32 @@ test("the default is 12 months and a purge with nobody idle returns 0", async ()
   assert.equal(await repo.purgeInactiveUsers(db), 0);
   assert.equal(await exists(user.id), true);
 });
+
+const tokenCount = async (email) => (await db.system.query("SELECT count(*)::int AS n FROM verification_tokens WHERE identifier = $1", [email])).rows[0].n;
+const future = new Date(Date.now() + 3600 * 1000);
+
+test("purging a user removes their email-link tokens, keeps other users' tokens, and removes expired tokens", async () => {
+  await db.system.query("DELETE FROM users");
+  await db.system.query("DELETE FROM verification_tokens");
+  await userSeen("tok-old@example.com", new Date("2000-01-01T00:00:00.000Z"));
+  await userSeen("tok-keep@example.com", new Date());
+  await repo.createVerificationToken(db, { identifier: "tok-old@example.com", token: "t1", expires: future });
+  await repo.createVerificationToken(db, { identifier: "tok-keep@example.com", token: "t2", expires: future });
+  await repo.createVerificationToken(db, { identifier: "stranger@example.com", token: "t3", expires: new Date(Date.now() - 1000) });
+  assert.equal(await repo.purgeInactiveUsers(db, { months: 12 }), 1);
+  assert.equal(await tokenCount("tok-old@example.com"), 0);
+  assert.equal(await tokenCount("tok-keep@example.com"), 1);
+  assert.equal(await tokenCount("stranger@example.com"), 0, "expired token removed");
+});
+
+test("deleteUserData removes the user's tokens and leaves another user's", async () => {
+  await db.system.query("DELETE FROM users");
+  await db.system.query("DELETE FROM verification_tokens");
+  const a = await userSeen("tok-a@example.com", new Date());
+  await userSeen("tok-b@example.com", new Date());
+  await repo.createVerificationToken(db, { identifier: "tok-a@example.com", token: "a1", expires: future });
+  await repo.createVerificationToken(db, { identifier: "tok-b@example.com", token: "b1", expires: future });
+  assert.equal(await repo.deleteUserData(db, a.id), true);
+  assert.equal(await tokenCount("tok-a@example.com"), 0);
+  assert.equal(await tokenCount("tok-b@example.com"), 1);
+});

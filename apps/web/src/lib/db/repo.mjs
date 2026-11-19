@@ -351,7 +351,9 @@ function monthsBefore(now, months) {
  * deleted. Deletes every user whose last sign-in is strictly older than
  * `months` calendar months before `now` (exactly on the line is kept); every
  * table's user_id foreign key cascades, so all their data goes too.
- * Nothing in the app calls this: scripts/purge-inactive.mjs must be scheduled.
+ * Also removes their email-link tokens (keyed by email, so no cascade) and
+ * every expired token. POST /api/internal/purge calls this on a schedule;
+ * scripts/purge-inactive.mjs is the fallback.
  *
  * @returns {Promise<number>} how many users were deleted
  */
@@ -360,15 +362,25 @@ export async function purgeInactiveUsers(db, { months = 12, now = new Date() } =
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new RangeError("now must be a valid date.");
   const cutoff = monthsBefore(now, months).toISOString();
   const { rows } = await db.system.query(
-    "DELETE FROM users WHERE COALESCE(last_seen_at, created_at) < $1::timestamptz RETURNING id",
+    `WITH gone AS (
+       DELETE FROM users WHERE COALESCE(last_seen_at, created_at) < $1::timestamptz RETURNING id, email
+     ), tokens AS (
+       DELETE FROM verification_tokens WHERE identifier IN (SELECT email FROM gone) OR expires < now()
+     )
+     SELECT id FROM gone`,
     [cutoff],
   );
   return rows.length;
 }
 
-/** Deletes the user row; every table's user_id foreign key cascades. */
+/** Deletes the user row (every table's user_id foreign key cascades) and their email-link tokens. */
 export async function deleteUserData(db, userId) {
   if (!isUuid(userId)) return false;
-  const { rows } = await db.system.query("DELETE FROM users WHERE id = $1 RETURNING id", [userId]);
+  const { rows } = await db.system.query(
+    `WITH gone AS (DELETE FROM users WHERE id = $1 RETURNING id, email),
+     tokens AS (DELETE FROM verification_tokens WHERE identifier IN (SELECT email FROM gone))
+     SELECT id FROM gone`,
+    [userId],
+  );
   return rows.length > 0;
 }

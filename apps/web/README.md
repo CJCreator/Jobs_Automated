@@ -31,7 +31,7 @@ Both flags are refused on a **deployed host** and when `NODE_ENV` is `production
 | `npm test` | Unit tests (`tests/**/*.test.mjs`), no server needed. |
 | `npm run test:flow` | The whole flow over real HTTP: starts `next dev` on a free port (3111 if free) with the dev flags and a temporary database, signs in two users, uploads a PDF, tailors, reviews, exports, checks isolation, cross-site refusal and key hygiene, deletes an account. Prints PASS or FAIL per step. Set `FLOW_SHOW_SERVER_OUTPUT=1` to print what the server logged. It uses its own build folder (`.next-flow`) so it does not disturb a `next dev` already running. `tsconfig.json` already lists the type folders `next dev` adds for `.next`, `.next-flow` and `.next-e2e`, so a run leaves it unchanged; `next-env.d.ts` is rewritten for the last folder used and is not tracked. |
 | `npm run test:prod` | Production-mode smoke test: `next build` into `.next-prod`, `next start` on port 3124 with `NODE_ENV=production` and no development flags, a session cookie minted with Auth.js's own `encode`, and a seeded database. Checks the database and row-level security, the engine fact gate (a stale stored pass is recomputed to a block), PDF export, isolation between users, cross-site refusal, the security headers with a per-request script nonce, the absence of the mock AI provider, and that the pages hydrate in Chromium with no Content Security Policy violation. |
-| `npm run purge:inactive` | Deletes accounts idle for 12 months, with all their data, and prints the number deleted. Must be scheduled (see below). |
+| `npm run purge:inactive` | Deletes accounts idle for 12 months, with all their data, and prints the number deleted. The fallback to the purge endpoint (see below). |
 | `npm run typecheck` | TypeScript check of `src/`. |
 | `npm run build` | Production build. |
 
@@ -53,6 +53,8 @@ Read from the process environment only.
 | `ROLEWRIGHT_ALLOW_MOCK_LLM=1` | Enables the fake AI provider `mock`. Refused on a deployed host or when `NODE_ENV=production` (see above). |
 | `CAREER_OPS_CODE_ROOT` | Path to the engine package. Default: `../../packages/engine` relative to the app's working directory. |
 | `CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR` | The engine's data folder. Leave unset: the server points the engine at a fresh, empty temp folder before loading it, so it never reads files from the checkout. All user data is in the database. |
+| `ROLEWRIGHT_PURGE_AUDIENCE` | The audience Cloud Scheduler puts in its OIDC token: the service URL, e.g. `https://rolewright.example`. With this or the next variable unset, `POST /api/internal/purge` answers 401 to everyone. |
+| `ROLEWRIGHT_PURGE_SERVICE_ACCOUNT` | Email of the service account Cloud Scheduler signs as. Only a token for exactly this email, with `email_verified` true, is accepted. |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | Optional. A Chromium binary to use for PDF export instead of Playwright's own download. |
 | `BUILD_DIST` | Optional. A build folder other than `.next` (read by `next.config.mjs`). The flow test sets `.next-flow` so it can run beside another `next dev`. |
 | `FLOW_SHOW_SERVER_OUTPUT=1` | Optional, for `npm run test:flow` only: print everything the server logged. |
@@ -119,7 +121,23 @@ This set-up has not yet been run against a real Postgres server (see below); `te
 
 ### Deleting inactive accounts (schedule this)
 
-The privacy screen tells people that an account with no sign-in for 12 months is deleted. The app does not do this by itself: run `npm run purge:inactive` (it calls `purgeInactiveUsers` in `src/lib/db/repo.mjs`) **once a day** from a scheduler such as cron, a Kubernetes CronJob or your host's job runner, with the same `DATABASE_URL` as the app. It deletes every user whose last sign-in (`last_seen_at`) is more than 12 calendar months before now, and everything they own (resumes, facts, jobs, tailorings, linked accounts) goes with them. It prints only the number deleted and never emails anyone. If it is not scheduled, the promise on the privacy screen is not kept.
+The privacy screen tells people that an account with no sign-in for 12 months is deleted. The app does not schedule this itself: a daily job must call `POST /api/internal/purge`. The endpoint runs `purgeInactiveUsers` (in `src/lib/db/repo.mjs`) and answers `{ "purged": <count> }`. It deletes every user whose last sign-in (`last_seen_at`) is more than 12 calendar months before now, everything they own (resumes, facts, jobs, tailorings, linked accounts), their email-link sign-in tokens, and any expired token. Deleting an account from the app removes its tokens too. It never emails anyone and logs no token or email address.
+
+The endpoint takes no session. It accepts only a Google-signed OpenID Connect token for one service account, and answers every other request with the same 401. Set both variables on the app, or it refuses everything:
+
+- `ROLEWRIGHT_PURGE_AUDIENCE`: the service URL.
+- `ROLEWRIGHT_PURGE_SERVICE_ACCOUNT`: the scheduler's service account email.
+
+Cloud Scheduler job settings:
+
+- Target: HTTP, method `POST`, URL `<service URL>/api/internal/purge`.
+- Frequency: once a day, for example `17 3 * * *`.
+- Auth header: OIDC token, with the service account above and **audience = the service URL** (the same value as `ROLEWRIGHT_PURGE_AUDIENCE`).
+- That account needs permission to invoke the service if Cloud Run requires authentication.
+
+The token's signature is checked against Google's published keys (`https://www.googleapis.com/oauth2/v3/certs`), so the server needs outbound access to `www.googleapis.com`.
+
+Fallback: `npm run purge:inactive` does the same purge directly against `DATABASE_URL` (or the embedded database) and prints the number deleted. Run it from cron or a job runner if you cannot use the endpoint. If neither is scheduled, the promise on the privacy screen is not kept.
 
 ## Screenshots
 
