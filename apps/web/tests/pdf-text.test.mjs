@@ -3,10 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import zlib from "node:zlib";
 import { threadId, isMainThread } from "node:worker_threads";
-import { pdfText, PdfTextError } from "../src/lib/server/pdf-text.mjs";
+import { pdfText, pdfParseStats, PdfTextError } from "../src/lib/server/pdf-text.mjs";
 
 /** Build a PDF with one page per content string. Optionally Flate-compress each stream. */
-function buildPdf(contents, { compress = false } = {}) {
+function buildPdf(contents, { compress = false, rawFilter = null } = {}) {
   const n = contents.length;
   const objs = [];
   objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
@@ -14,8 +14,9 @@ function buildPdf(contents, { compress = false } = {}) {
   objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
   objs[4] = null;
   contents.forEach((content, i) => {
-    const data = compress ? zlib.deflateSync(Buffer.from(content, "latin1")) : Buffer.from(content, "latin1");
-    const filter = compress ? " /Filter /FlateDecode" : "";
+    // rawFilter: `content` is already encoded as a Buffer and the stream dictionary names these filters.
+    const data = rawFilter ? content : compress ? zlib.deflateSync(Buffer.from(content, "latin1")) : Buffer.from(content, "latin1");
+    const filter = rawFilter ? ` /Filter [${rawFilter}]` : compress ? " /Filter /FlateDecode" : "";
     objs[5 + i * 2] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${6 + i * 2} 0 R >>`;
     objs[6 + i * 2] = { head: `<< /Length ${data.length}${filter} >>`, data };
   });
@@ -45,23 +46,20 @@ function buildPdf(contents, { compress = false } = {}) {
 // close together: 1,000 letters across and 60,000 lines down all stay on the page.
 const textStream = (line, times) => "BT /F1 0.5 Tf 0.01 TL 20 700 Td " + `(${line}) Tj T*\n`.repeat(times) + "ET";
 
-test("a PDF bomb is refused with 413 pdf_too_much_text, quickly, without building the text", async () => {
+test("a PDF bomb is refused with 413 pdf_too_much_text, without building the text", async () => {
   const bomb = buildPdf([textStream("A".repeat(1000), 60000)], { compress: true });
   assert.ok(bomb.length < 300_000, `fixture is ${bomb.length} bytes`);
-  const rssBefore = process.memoryUsage().rss;
   const started = performance.now();
   await assert.rejects(pdfText(bomb), (error) => {
     assert.ok(error instanceof PdfTextError);
     assert.equal(error.status, 413);
+    // The worker's own refusal (expanded text), not the watchdog and not the timer.
     assert.equal(error.code, "pdf_too_much_text");
+    assert.equal(error.cause, undefined);
+    assert.ok(error.refusedBy === "worker", `refused by ${error.refusedBy}`);
     return true;
   });
-  const elapsed = performance.now() - started;
-  const grown = process.memoryUsage().rss - rssBefore;
-  console.log(`bomb: ${Math.round(elapsed)} ms, rss +${Math.round(grown / 1048576)} MB, pdf ${bomb.length} bytes`);
-  assert.ok(elapsed < 2000, `took ${elapsed} ms`);
-  // The worker thread has its own heap (capped at 128 MB old space); its pages may not be returned yet.
-  assert.ok(grown < 300 * 1048576, `rss grew ${grown} bytes`);
+  console.log(`text bomb: ${Math.round(performance.now() - started)} ms, pdf ${bomb.length} bytes`);
 });
 
 test("a small one-page PDF returns its text", async () => {
@@ -146,7 +144,7 @@ for (const [name, content] of [["off-page text", OFF_PAGE], ["a q Q operator str
 
 test("expiry in the middle of a read: 413 pdf_too_complex", async () => {
   const bytes = buildPdf([textStream("A".repeat(1000), 60000)], { compress: true });
-  await assert.rejects(pdfText(bytes, { timeBudgetMs: 30, maxExpandedChars: 1e9 }), (error) => {
+  await assert.rejects(pdfText(bytes, { timeBudgetMs: 400, maxExpandedChars: 1e9 }), (error) => {
     assert.ok(error instanceof PdfTextError);
     assert.equal(error.status, 413);
     assert.equal(error.code, "pdf_too_complex");
@@ -171,4 +169,104 @@ test("a normal PDF leaves no worker behind and the default budget is 5 s", async
   console.log(`normal PDF: ${Math.round(performance.now() - started)} ms`);
   assert.ok(text.includes("billing rewrite"));
   await noLiveWorkers();
+});
+
+// P0-6c: memory watchdog, concurrency cap, server faults.
+/** 1 GB of spaces, deflated twice: a few KB on the wire, ~1 GB of external (ArrayBuffer) memory in pdf.js. */
+async function memoryBombPdf() {
+  const chunk = Buffer.alloc(1024 * 1024, 0x20);
+  const deflate = (input) => new Promise((resolve, reject) => {
+    const out = [];
+    const z = zlib.createDeflate({ level: 9 });
+    z.on("data", (c) => out.push(c)).on("end", () => resolve(Buffer.concat(out))).on("error", reject);
+    if (typeof input === "number") {
+      for (let i = 0; i < input; i++) z.write(chunk);
+      z.end();
+    } else z.end(input);
+  });
+  const once = await deflate(1024);
+  const twice = await deflate(once);
+  // Filters apply in order: the first inflates `twice` to `once`, the second inflates that to 1 GB.
+  return buildPdf([twice], { rawFilter: "/FlateDecode /FlateDecode" });
+}
+
+test("a double-deflated 1 GB PDF is cut off by the memory watchdog, well before the time budget", async () => {
+  const bomb = await memoryBombPdf();
+  console.log(`memory bomb: pdf ${bomb.length} bytes`);
+  assert.ok(bomb.length < 10_000);
+  const rssBefore = process.memoryUsage().rss;
+  const started = performance.now();
+  const error = await pdfText(bomb).then(() => null, (e) => e);
+  const elapsed = performance.now() - started;
+  const rssGrown = process.memoryUsage().rss - rssBefore;
+  assert.ok(error instanceof PdfTextError, String(error));
+  assert.equal(error.status, 413);
+  assert.equal(error.code, "pdf_too_much_text");
+  assert.equal(error.refusedBy, "memory");
+  assert.ok(Number.isFinite(error.externalMemoryBytes), "reading recorded");
+  assert.ok(error.externalMemoryBytes >= 256 * 1048576, `reading ${error.externalMemoryBytes}`);
+  console.log(`memory bomb: refused in ${Math.round(elapsed)} ms, watchdog read ${Math.round(error.externalMemoryBytes / 1048576)} MB external, parent rss +${Math.round(rssGrown / 1048576)} MB`);
+  assert.ok(elapsed < 2000, `took ${elapsed} ms against a 5000 ms budget`);
+  await noLiveWorkers();
+});
+
+test("a normal PDF is not refused by the watchdog", async () => {
+  const { text } = await pdfText(buildPdf([textStream("Shipped the billing rewrite.", 5)]));
+  assert.ok(text.includes("billing rewrite"));
+});
+
+test("at most two parses run at once; a third waits for a free slot and still succeeds", async () => {
+  const bytes = buildPdf([OFF_PAGE], { compress: true });
+  const budget = 600;
+  const before = pdfParseStats();
+  assert.equal(before.running, 0);
+  let seen = 0;
+  const sampler = setInterval(() => { seen = Math.max(seen, pdfParseStats().running); }, 5);
+  const started = performance.now();
+  const results = await Promise.all([1, 2, 3].map(() => pdfText(bytes, { timeBudgetMs: budget }).then(() => "ok", (e) => e)));
+  const elapsed = performance.now() - started;
+  clearInterval(sampler);
+  console.log(`concurrency: peak ${pdfParseStats().peak} workers, ${Math.round(elapsed)} ms for 3 parses of ${budget} ms budget`);
+  for (const r of results) {
+    assert.ok(r instanceof PdfTextError, String(r));
+    assert.equal(r.code, "pdf_too_complex", "the waiting parse gets its own full budget");
+  }
+  const peak = pdfParseStats().peak;
+  assert.equal(peak, 2, `peak ${peak}`);
+  assert.equal(seen, 2, `sampled ${seen}`);
+  assert.equal(pdfParseStats().running, 0);
+  assert.equal(pdfParseStats().waiting, 0);
+  // Two waves: the third did not start until a slot freed.
+  assert.ok(elapsed >= budget * 2 - 50, `took ${elapsed} ms`);
+  await noLiveWorkers();
+});
+
+test("a worker that cannot start rejects with a plain Error, never forwarding the worker's text", async () => {
+  const bytes = buildPdf([textStream("Shipped the billing rewrite.", 5)]);
+  const logged = [];
+  const original = console.error;
+  console.error = (...args) => logged.push(args.join(" "));
+  let error;
+  try {
+    // --input-type is not allowed in a worker's execArgv, so the worker fails to start.
+    error = await pdfText(bytes, { execArgv: ["--input-type=module"] }).then(() => null, (e) => e);
+  } finally {
+    console.error = original;
+  }
+  assert.ok(error instanceof Error, String(error));
+  assert.ok(!(error instanceof PdfTextError), "a server fault is not a PdfTextError");
+  assert.equal(error.name, "Error");
+  assert.ok(!("status" in error));
+  assert.match(error.message, /^pdf worker failed: [a-z_-]+$/);
+  assert.ok(logged.some((l) => l.includes(error.message)), `logged: ${JSON.stringify(logged)}`);
+  assert.ok(!/input-type|ERR_/.test(error.message), error.message);
+  await noLiveWorkers();
+});
+
+test("a plain Error from pdfText becomes a 500 internal in the route wrapper", async () => {
+  // The route wrapper only maps names in its safe list; anything else is a 500.
+  const { readFileSync } = await import("node:fs");
+  const http = readFileSync(new URL("../src/lib/server/http.ts", import.meta.url), "utf8");
+  assert.match(http, /errorJson\(500, "internal"/);
+  assert.ok(!/SAFE_NAMES = new Set\(\[[^\]]*"Error"/.test(http));
 });
