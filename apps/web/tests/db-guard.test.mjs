@@ -20,6 +20,8 @@ test("production that is not deployed warns once about the embedded database, na
   assertDbEnv({ NODE_ENV: "production" }, DIR, (m) => warnings.push(m));
   assert.equal(warnings.length, 1);
   assert.ok(warnings[0].includes(DIR));
+  assertDbEnv({ NODE_ENV: "production" }, DIR, (m) => warnings.push(m));
+  assert.equal(warnings.length, 1);
 });
 
 test("development and test with no DATABASE_URL neither throw nor warn", () => {
