@@ -23,6 +23,8 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 | `npm run test:flow` | 15 of 15 | 15 of 15 |
 | `npm run test:prod` | 12 of 13 | 12 of 13 |
 
+After Phase 0 waves A to C (merged `ec9f577`): `npm test` 359 pass, 0 fail, 1 skipped; `test:flow` 16 of 16; `test:e2e` 17 of 17; `test:prod` 15 of 15 on the P0-9a branch (13 original steps plus 2b and 11b). Browser runs need `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+
 `test:prod` step 13 (hydration without CSP violations in Chromium) fails in this environment because it launches Playwright's default Chromium build, which is not installed. It ignores `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. That is an environment issue, not a product failure, but the test should honour the variable.
 
 ## Known pre-existing engine failures (not caused by the restructure)
