@@ -188,3 +188,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 
 | Task | Branch | Advisor verdict | Rounds | Merge |
 |---|---|---|---|---|
+| P0-7 | `task/P0-7` | approve | 1 | `eb82196` |

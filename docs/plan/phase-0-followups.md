@@ -14,3 +14,10 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-5 review | Key input may be offered to password managers | Next task touching `key-view.tsx`: `autoComplete="new-password"`, `data-1p-ignore`, `data-lpignore` |
 | P0-5 review | ADR 0003 asked `test:flow` for the browser-storage check; it lives in `test:e2e` step b | Phase gate runs `test:e2e` (already in the exit list) |
 | P0-5 review | Dead `saveFailed` branch in `key-view.tsx:98-100` | Next task touching `key-view.tsx` |
+| P0-7 review | `apps/web/README.md:142` names `/privacy` and `/robots.txt` as static pages; say "every page and route answers 500" | P0-3b |
+| P0-1a review | Claim word supported by any token in the facts ("Reported to the Finance Manager" supports "assistant manager"); require same role or title line | Later gate task (after P0-1b) |
+| P0-1a review | Missing variants: principals, gurus, veterans, diplomas, toppers, seniors, heads of, "Head, Finance", seniormost, expertly | Later gate task |
+| P0-1a review | Missing Indian-market titles and scope: mgr, gm, avp, svp, c-suite, pan-India, in charge of, headed, leader of | Later gate task |
+| P0-1a review | Homoglyphs ("expеrt" with Cyrillic е) pass both layers; add a mixed-script token check | Later gate task |
+| P0-1a review | Name check blocks family-supported tokens ("Sr. Manager" vs facts "Senior Manager") | Later gate task |
+| P0-1a review | Browser test for the grouped export-blocked notice | P0-11 |
