@@ -30,10 +30,23 @@ const WATCHDOG_INTERVAL_MS = 100;
 // delay and not a failed upload; its time budget starts only when it gets a slot.
 export const MAX_CONCURRENT_PARSES = 2;
 
+// Past this many waiting parses a new one is refused, so a burst cannot queue without limit.
+export const MAX_WAITING_PARSES = 8;
+const BUSY = "We are reading a lot of resumes right now. Try again in a minute.";
+
 let running = 0;
 let peak = 0;
+let liveWorkers = 0;
+let execArgvForTests;
+let warnedNoWatchdog = false;
+/** Test hook: pass these execArgv to the next workers (undefined to clear). Not a public option. */
+export const __setWorkerExecArgvForTests = (argv) => { execArgvForTests = argv; };
 const waiters = [];
-const acquire = () => new Promise((resolve) => {
+const acquire = () => new Promise((resolve, reject) => {
+  if (running >= MAX_CONCURRENT_PARSES && waiters.length >= MAX_WAITING_PARSES) {
+    reject(new PdfTextError(503, "pdf_busy", BUSY));
+    return;
+  }
   if (running < MAX_CONCURRENT_PARSES) {
     running++;
     peak = Math.max(peak, running);
@@ -45,8 +58,8 @@ const release = () => {
   if (next) next(); // the slot passes straight to the next waiter
   else running--;
 };
-/** Parses running, waiting, and the most that have run at once (for tests and logs). */
-export const pdfParseStats = () => ({ running, waiting: waiters.length, peak });
+/** Parses running, waiting, the most that have run at once, and live worker threads (for tests and logs). */
+export const pdfParseStats = () => ({ running, waiting: waiters.length, peak, workers: liveWorkers });
 
 const TOO_MUCH_TEXT = "That PDF holds far more text than a resume. Upload only your resume pages.";
 const TOO_COMPLEX = "That PDF took too long to read. Upload only your resume pages, or export it again.";
@@ -59,7 +72,7 @@ function serverFault(cause) {
 
 /**
  * @param {Uint8Array} bytes
- * @param {{ maxPages?: number, maxChars?: number, maxExpandedChars?: number, timeBudgetMs?: number, execArgv?: string[] }} [opts]
+ * @param {{ maxPages?: number, maxChars?: number, maxExpandedChars?: number, timeBudgetMs?: number }} [opts]
  * @returns {Promise<{ text: string, pages: number, truncated: boolean }>}
  */
 export async function pdfText(
@@ -69,18 +82,17 @@ export async function pdfText(
     maxChars = MAX_PDF_CHARS,
     maxExpandedChars = MAX_PDF_EXPANDED_CHARS,
     timeBudgetMs = PDF_TIME_BUDGET_MS,
-    execArgv,
   } = {},
 ) {
   await acquire();
   try {
-    return await parse(bytes, { maxPages, maxChars, maxExpandedChars, timeBudgetMs, execArgv });
+    return await parse(bytes, { maxPages, maxChars, maxExpandedChars, timeBudgetMs });
   } finally {
     release();
   }
 }
 
-function parse(bytes, { maxPages, maxChars, maxExpandedChars, timeBudgetMs, execArgv }) {
+function parse(bytes, { maxPages, maxChars, maxExpandedChars, timeBudgetMs }) {
   return new Promise((resolve, reject) => {
     let timer;
     let watchdog;
@@ -110,14 +122,20 @@ function parse(bytes, { maxPages, maxChars, maxExpandedChars, timeBudgetMs, exec
         workerData: { bytes: copy, maxPages, maxChars, maxExpandedChars, timeBudgetMs },
         transferList: [copy.buffer],
         resourceLimits: { maxOldGenerationSizeMb: 256 },
-        ...(execArgv ? { execArgv } : {}),
+        ...(execArgvForTests ? { execArgv: execArgvForTests } : {}),
       });
     } catch {
       reject(serverFault("start"));
       return;
     }
+    liveWorkers++;
+    worker.once("exit", () => { liveWorkers--; });
     // Created only once the worker exists, so a setup failure never leaves a live timer.
     timer = setTimeout(() => finish(reject, new PdfTextError(413, "pdf_too_complex", TOO_COMPLEX)), Math.max(0, timeBudgetMs));
+    if (typeof worker.getHeapStatistics !== "function" && !warnedNoWatchdog) {
+      warnedNoWatchdog = true;
+      console.error("pdf memory watchdog unavailable: this Node version has no worker.getHeapStatistics()");
+    }
     if (typeof worker.getHeapStatistics === "function") {
       let sampling = false;
       watchdog = setInterval(async () => {

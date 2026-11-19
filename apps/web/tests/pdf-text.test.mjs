@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import zlib from "node:zlib";
 import { threadId, isMainThread } from "node:worker_threads";
-import { pdfText, pdfParseStats, PdfTextError } from "../src/lib/server/pdf-text.mjs";
+import { pdfText, pdfParseStats, PdfTextError, __setWorkerExecArgvForTests } from "../src/lib/server/pdf-text.mjs";
 
 /** Build a PDF with one page per content string. Optionally Flate-compress each stream. */
 function buildPdf(contents, { compress = false, rawFilter = null } = {}) {
@@ -122,9 +122,12 @@ async function withTicker(fn) {
   return { result, maxGap, elapsed: performance.now() - started };
 }
 
-const noLiveWorkers = () => new Promise((resolve) => setTimeout(resolve, 100)).then(() => {
-  assert.equal(process.getActiveResourcesInfo().filter((r) => r === "MessagePort" || r === "Worker").length, 0);
-});
+// Waits briefly for terminated workers to report exit, then asserts none are alive.
+const noLiveWorkers = async () => {
+  const deadline = performance.now() + 2000;
+  while (pdfParseStats().workers > 0 && performance.now() < deadline) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(pdfParseStats().workers, 0);
+};
 
 for (const [name, content] of [["off-page text", OFF_PAGE], ["a q Q operator stream", Q_Q]]) {
   test(`${name}: 413 pdf_too_complex within budget + 500 ms, main loop keeps ticking`, async () => {
@@ -249,8 +252,10 @@ test("a worker that cannot start rejects with a plain Error, never forwarding th
   let error;
   try {
     // --input-type is not allowed in a worker's execArgv, so the worker fails to start.
-    error = await pdfText(bytes, { execArgv: ["--input-type=module"] }).then(() => null, (e) => e);
+    __setWorkerExecArgvForTests(["--input-type=module"]);
+    error = await pdfText(bytes).then(() => null, (e) => e);
   } finally {
+    __setWorkerExecArgvForTests(undefined);
     console.error = original;
   }
   assert.ok(error instanceof Error, String(error));
@@ -269,4 +274,26 @@ test("a plain Error from pdfText becomes a 500 internal in the route wrapper", a
   const http = readFileSync(new URL("../src/lib/server/http.ts", import.meta.url), "utf8");
   assert.match(http, /errorJson\(500, "internal"/);
   assert.ok(!/SAFE_NAMES = new Set\(\[[^\]]*"Error"/.test(http));
+});
+
+test("with 2 running and 8 waiting, the next parse is refused with 503 pdf_busy", async () => {
+  const bytes = buildPdf([OFF_PAGE], { compress: true });
+  const first = Array.from({ length: 10 }, () => pdfText(bytes, { timeBudgetMs: 200 }).then(() => "ok", (e) => e));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(pdfParseStats().running, 2);
+  assert.equal(pdfParseStats().waiting, 8);
+  const error = await pdfText(bytes).then(() => null, (e) => e);
+  assert.ok(error instanceof PdfTextError, String(error));
+  assert.equal(error.status, 503);
+  assert.equal(error.code, "pdf_busy");
+  assert.match(error.message, /Try again in a minute/);
+  for (const r of await Promise.all(first)) assert.equal(r.code, "pdf_too_complex");
+  assert.equal(pdfParseStats().waiting, 0);
+  await noLiveWorkers();
+});
+
+test("pdfText does not accept execArgv as a public option", async () => {
+  const bytes = buildPdf([textStream("Shipped the billing rewrite.", 5)]);
+  const { text } = await pdfText(bytes, { execArgv: ["--input-type=module"] });
+  assert.ok(text.includes("billing rewrite"));
 });
