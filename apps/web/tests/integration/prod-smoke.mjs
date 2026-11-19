@@ -62,8 +62,11 @@ function serverEnv() {
     AUTH_URL: base,
     ROLEWRIGHT_DATA_DIR: dbDir,
     NEXT_TELEMETRY_DISABLED: "1",
+    // Configured so the purge endpoint reaches its token check (no token is ever sent).
+    ROLEWRIGHT_PURGE_AUDIENCE: base,
+    ROLEWRIGHT_PURGE_SERVICE_ACCOUNT: "purge-smoke@example.iam.gserviceaccount.com",
   };
-  for (const k of ["ROLEWRIGHT_DEV_LOGIN", "ROLEWRIGHT_ALLOW_MOCK_LLM", "DATABASE_URL", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "AUTH_RESEND_KEY", "EMAIL_FROM", "CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR"]) {
+  for (const k of ["K_SERVICE", "ROLEWRIGHT_DEPLOYED", "ROLEWRIGHT_DEV_LOGIN", "ROLEWRIGHT_ALLOW_MOCK_LLM", "DATABASE_URL", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "AUTH_RESEND_KEY", "EMAIL_FROM", "CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR"]) {
     delete env[k];
   }
   return env;
@@ -252,9 +255,8 @@ try {
   await step("2b. a deployed host (K_SERVICE set) with no DATABASE_URL refuses to start: non-zero exit, nothing listening", async () => {
     assert.ok(await portIsFree(PORT), `port ${PORT} is free`);
     const env = { ...serverEnv(), K_SERVICE: "x" };
-    delete env.DATABASE_URL;
     let out = "";
-    const proc = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const proc = (child = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true }));
     proc.stdout.on("data", (d) => (out += d.toString()));
     proc.stderr.on("data", (d) => (out += d.toString()));
     const code = await new Promise((resolve) => {
@@ -262,14 +264,15 @@ try {
         killTree(proc);
         resolve("timeout");
       }, 90_000);
-      proc.once("exit", (c) => {
+      proc.once("close", (c) => {
         clearTimeout(timer);
         resolve(c);
       });
     });
     assert.notEqual(code, "timeout", `the server kept running instead of exiting.\n${out.slice(-1500)}`);
     assert.ok(typeof code === "number" && code !== 0, `exit code is non-zero, got ${code}.\n${out.slice(-1500)}`);
-    assert.match(out, /DATABASE_URL/, "the refusal names DATABASE_URL");
+    assert.match(out, /DATABASE_URL is not set/, "the refusal says DATABASE_URL is not set");
+    child = null;
     assert.ok(await portIsFree(PORT), `nothing is listening on ${PORT}`);
   });
 
@@ -384,10 +387,14 @@ try {
     const csp = res.headers.get("content-security-policy") ?? "";
     assert.match(csp, /script-src[^;]*'nonce-[A-Za-z0-9+/=_-]{16,}'/, `/privacy CSP carries a nonce: ${csp}`);
     assert.equal(res.headers.get("strict-transport-security"), "max-age=63072000; includeSubDomains");
+    const privacyNonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+    assert.ok(res.data.includes(`nonce="${privacyNonce}"`), "the /privacy HTML carries the nonce from its CSP");
     if (process.env.ROLEWRIGHT_EXPECT_GRIEVANCE === "1") {
       assert.ok(!res.data.includes('data-testid="grievance-unset"'), "the grievance contact is configured (ROLEWRIGHT_EXPECT_GRIEVANCE=1)");
+      const email = process.env.ROLEWRIGHT_GRIEVANCE_EMAIL ?? "";
+      assert.ok(email && res.data.includes(`mailto:${email}`), "/privacy shows the grievance email");
     } else {
-      assert.ok(res.data.includes("grievance-unset"), "with no grievance contact configured, /privacy says so");
+      assert.ok(res.data.includes('data-testid="grievance-unset"'), "with no grievance contact configured, /privacy says so");
     }
     for (const route of ["/", "/sign-in"]) {
       const page = await request(null, "GET", route);
@@ -396,6 +403,7 @@ try {
     }
     const purge = await request(null, "POST", "/api/internal/purge");
     assert.equal(purge.status, 401, JSON.stringify(purge.data));
+    assert.equal(purge.data?.error?.code, "unauthorized");
   });
 
   await step("12. the mock AI provider does not exist in production", async () => {
@@ -418,7 +426,7 @@ try {
     page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
 
     // Signed out: the sign-in page and the landing page load and run their scripts.
-    for (const route of ["/sign-in", "/"]) {
+    for (const route of ["/sign-in", "/", "/privacy"]) {
       await page.goto(route, { waitUntil: "networkidle" });
       assert.ok(await page.evaluate(() => Boolean(document.querySelector("main"))), `${route} rendered`);
     }

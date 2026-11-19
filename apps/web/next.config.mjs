@@ -30,7 +30,7 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          // Production only: a browser that sees this on localhost would refuse plain http there for two years.
+          // Production builds only. Browsers ignore this header over plain http, so local runs are unaffected.
           ...(process.env.NODE_ENV === "production"
             ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]
             : []),
