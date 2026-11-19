@@ -349,7 +349,7 @@ try {
   passes('a slash between single letters is not a name',
     '- Ran experiments using HubSpot.', '- Ran experiments using HubSpot and A/B splits on landing pages.');
   passes('a dotted abbreviation in a clause is not a name',
-    '- Ran outreach using HubSpot.', '- Ran outreach using HubSpot to weekly regional sales U.S. lists.');
+    '- Ran outreach using HubSpot.', '- Ran outreach using HubSpot to weekly inbound sales U.S. lists.');
   blocksOn('a dotted name joined to another by a slash is read as two names',
     '- Built APIs using Node.js and AWS Lambda.', '- Built the API using Node.js/Express on AWS Lambda.', ['express']);
   blocksOn('a name that opens with a dot is a name inside a clause',

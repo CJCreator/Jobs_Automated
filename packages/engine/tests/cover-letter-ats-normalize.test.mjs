@@ -141,7 +141,7 @@ test('an amount with the currency after it prints when cv.md or a plan answer st
   const planned = letter({ opening: plan }, { inputs: [plan] });
   assert.equal(planned.run.status, 0, describeSpawn(planned.run));
   // Read now that it prints as a code, so an amount no source states is refused.
-  const madeUp = letter({ opening: stated });
+  const madeUp = letter({ opening: stated }, { cv: 'Worked at Globex.\n' });
   assert.equal(madeUp.run.status, 1, describeSpawn(madeUp.run));
   assert.match(madeUp.run.stderr, /metric-like claims absent from sources: €50000/);
 });

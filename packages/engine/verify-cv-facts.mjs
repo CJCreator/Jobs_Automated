@@ -1019,10 +1019,13 @@ const AT_JOB_LEAD_RE = new RegExp([
 // then "at <Name>". The verb has to open the clause (a bullet, a sentence, "I ...",
 // "and ...") so "the work done at Stripe" and "what you built at Stripe" stay unread,
 // and a clause that talks to the company ("your") claims nothing.
-// Verbs of looking and arriving take "at" without naming a job: "We looked at Kafka".
-const NOT_TRAILING_WORK_VERBS = `${NOT_WORK_VERBS}|looked|glanced|stared|gazed|arrived|aimed|stopped|marvell?ed|wondered|laughed|smiled|hinted|pointed|balked|clamou?red`;
+// Verbs of looking, arriving, applying and feeling take "at" without naming a job:
+// "We looked at Kafka", "I applied for the role at Stripe". Tested in lower case,
+// because a capitalised verb opens a bullet.
+const NOT_TRAILING_WORK_VERBS = new Set(`${NOT_WORK_VERBS}|looked|glanced|stared|gazed|arrived|aimed|stopped|marvelled|marveled|wondered|laughed|smiled|hinted|pointed|balked|clamoured|clamored|learned|discovered|applied|loved|liked|enjoyed|excited|thrilled|delighted|interested|inspired|motivated|impressed|intrigued|fascinated|attracted|experienced|skilled|qualified|seasoned|dedicated|committed|talked|chatted|connected|referred|recommended|encouraged|advertised|posted|listed|opened|respected|researched`.split('|'));
 const TRAILING_IRREGULAR_VERBS = '[Ll]ed|[Bb]uilt|[Rr]an|[Gg]rew|[Ww]rote|[Mm]ade|[Ww]on|[Dd]rove|[Tt]ook|[Cc]ut|[Tt]aught|[Ss]pent|[Oo]versaw|[Bb]egan|[Bb]rought|[Ss]old|[Ss]et|[Gg]ot|[Kk]ept|[Hh]eld|[Gg]ave';
-const TRAILING_EMPLOYER_RE = new RegExp(`(?:^\\s*(?:[\u2022*+-]\\s+)?|[.;!?]\\s+|\\n\\s*(?:[\u2022*+-]\\s+)?|\\b[Ii] |\\b[Ww]e |\\b[Aa]nd |, )(?:(?!(?:${NOT_TRAILING_WORK_VERBS})\\b)[A-Za-z][a-z]{1,20}ed|${TRAILING_IRREGULAR_VERBS})\\b(?:(?!\\bat\\b)[^.;!?\\n]){0,100}?\\bat (?:The )?(${AT_NAME})(?![\\p{L}\\p{N}])${NOT_ADDRESSED}`, 'gu');
+// The words between the verb and "at" stop at a second clause or a job-posting noun.
+const TRAILING_EMPLOYER_RE = new RegExp(`(?:^\\s*(?:[•*+-]\\s+)?|[.;!?]\\s+|\\n[^\\S\\n]*(?:[•*+-][^\\S\\n]+)?|\\b[Ii] |\\b[Ww]e |\\b[Aa]nd |, )([A-Za-z][a-z]{1,20}ed|${TRAILING_IRREGULAR_VERBS})\\b(?:(?!\\b(?:at|I|we|what|which|who|whom|where|how|why|because|would|will|hope|role|position|opening|opportunity|vacancy|posting)\\b)[^.;!?\\n]){0,100}?\\bat (?:The )?(${AT_NAME})(?![\\p{L}\\p{N}])${NOT_ADDRESSED}`, 'gu');
 // Capitalised words that follow "at" in a title-cased bullet without naming anyone.
 const NOT_AN_EMPLOYER = new Set(['scale', 'speed', 'once', 'least', 'most', 'all', 'times', 'best', 'work', 'home', 'cost', 'risk', 'large', 'first', 'last', 'present']);
 
@@ -1040,8 +1043,8 @@ function atEmployerClaims(text) {
     for (const name of match[1].split(' and ')) claims.push({ kind: 'employer', value: normalizeFact(name.replace(POSSESSIVE_SUFFIX_RE, '')) });
   }
   for (const match of clean.matchAll(TRAILING_EMPLOYER_RE)) {
-    const name = match[1];
-    if (NOT_AN_EMPLOYER.has(name.toLowerCase())) continue;
+    const name = match[2];
+    if (NOT_TRAILING_WORK_VERBS.has(match[1].toLowerCase()) || NOT_AN_EMPLOYER.has(name.toLowerCase())) continue;
     claims.push({ kind: 'employer', value: normalizeFact(name.replace(POSSESSIVE_SUFFIX_RE, '')) });
   }
   return claims;
@@ -1122,7 +1125,9 @@ const CLAIM_WORD_RE = new RegExp(
 
 /** Claim words in the target that no form of their family appears next to in the source. */
 function builtinClaimWordFacts(targetText, sourceText) {
-  const target = stripMarkup(targetText).normalize('NFKC').replace(/\p{Cf}/gu, '');
+  // The role the letter is for is the job being applied to, not a claim about the candidate.
+  const withoutRoleTitle = String(targetText ?? '').replace(/<div\b[^>]*\bclass="[^"]*\brole-title\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, ' ');
+  const target = stripMarkup(withoutRoleTitle).normalize('NFKC').replace(/\p{Cf}/gu, '');
   const source = stripMarkup(sourceText).normalize('NFKC').replace(/\p{Cf}/gu, '');
   const inSource = (form) => new RegExp(`(?<![\\p{L}\\p{N}])${claimFormPattern(form)}(?![\\p{L}\\p{N}])`, 'iu').test(source);
   const facts = [];
@@ -2137,13 +2142,16 @@ export function metricClaims(text, { keepPlanHorizons = false } = {}) {
   for (const pattern of SIMPLE_CLAIM_PATTERNS) {
     for (const match of clean.matchAll(pattern)) claims.add(canonicalMetric(match[0]));
   }
+  // Where each COUNT_CLAIM_RE number starts: it already binds that number to its
+  // noun, so "2M active users" is not a second claim "2m active".
+  const counted = new Set([...clean.matchAll(COUNT_CLAIM_RE)].map((m) => m.index + m[0].indexOf(m[1])));
   for (const match of countMatches(clean, { keepPlanHorizons })) {
     const noun = match[2].toLowerCase();
     claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
   }
   for (const match of clean.matchAll(MAGNITUDE_COUNT_RE)) {
     const noun = match[2].toLowerCase();
-    if (MAGNITUDE_NOT_A_NOUN.has(noun)) continue;
+    if (MAGNITUDE_NOT_A_NOUN.has(noun) || counted.has(match.index)) continue;
     claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
   }
   return claims;
@@ -2550,13 +2558,23 @@ export function verifyFactsFromText(targetText, {
   ].filter(({ value }) => !allowedFacts.has(value));
   // Runs with or without a config: the word lists are built in.
   // A word already inside a more specific unsupported fact ("phd computer
-  // science" as a degree, "principal engineer" as a title) is not reported twice.
-  // A structured title field only warns by design (cv-title-check.mjs), so a claim
-  // word inside one is left to that warning instead of becoming a block.
-  const alreadyNamed = [...namedFacts, ...comparedFacts, ...advisoryFacts].map(({ value }) => ` ${value} `);
+  // science" as a degree) is not reported twice.
+  const alreadyNamed = [...namedFacts, ...comparedFacts].map(({ value }) => ` ${value} `);
+  // A structured title field only warns by design (cv-title-check.mjs), so the
+  // claim words inside one are left to that warning: one occurrence is excused per
+  // occurrence in a title slot, and the same word elsewhere in the document still blocks.
+  const excused = new Map();
+  for (const field of fieldClaims.filter(({ blocking, kind }) => !blocking && kind === 'title')) {
+    for (const { value } of builtinClaimWordFacts(field.line, '')) excused.set(value, (excused.get(value) ?? 0) + 1);
+  }
   const claimWordFacts = builtinClaimWordFacts(targetText, sourceText)
     .filter(({ value }) => !allowedFacts.has(value))
-    .filter(({ value }) => !alreadyNamed.some((named) => named.includes(` ${value} `)));
+    .filter(({ value }) => !alreadyNamed.some((named) => named.includes(` ${value} `)))
+    .filter(({ value }) => {
+      const left = excused.get(value) ?? 0;
+      if (left > 0) { excused.set(value, left - 1); return false; }
+      return true;
+    });
   const unsupportedFacts = [...namedFacts, ...comparedFacts, ...claimWordFacts]
     .filter((claim, index, claims) => claims.findIndex(other => other.kind === claim.kind && other.value === claim.value) === index);
   const forbidden = config.forbidden_phrases
