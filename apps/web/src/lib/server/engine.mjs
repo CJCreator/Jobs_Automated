@@ -32,7 +32,7 @@ export function engineCodeRoot() {
   const explicit = (process.env.CAREER_OPS_CODE_ROOT || "").trim();
   return explicit
     ? path.resolve(/* turbopackIgnore: true */ process.cwd(), explicit)
-    : path.resolve(/* turbopackIgnore: true */ process.cwd(), "..");
+    : path.resolve(/* turbopackIgnore: true */ process.cwd(), "../../packages/engine");
 }
 
 /**

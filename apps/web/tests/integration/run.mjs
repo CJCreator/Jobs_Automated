@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "..");
+process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "../../packages/engine");
 
 const load = (rel) => import(pathToFileURL(path.join(appDir, rel)).href);
 const { resumeHtml } = await load("src/lib/resume-html.mjs");

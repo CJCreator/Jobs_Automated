@@ -19,7 +19,7 @@ import { chromium } from "playwright-core";
 import { encode } from "next-auth/jwt";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "..");
+process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "../../packages/engine");
 
 const load = (rel) => import(pathToFileURL(path.join(appDir, rel)).href);
 const { createDb } = await load("src/lib/db/index.mjs");

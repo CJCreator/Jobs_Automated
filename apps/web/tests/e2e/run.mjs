@@ -30,7 +30,7 @@ import {
 } from "./helpers.mjs";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "..");
+process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "../../packages/engine");
 const artifactsDir = path.join(appDir, "tests", "e2e", "artifacts");
 const screensDir = process.env.E2E_SCREENS_DIR || "";
 

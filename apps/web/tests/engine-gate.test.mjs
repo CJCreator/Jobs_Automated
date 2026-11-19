@@ -32,7 +32,7 @@ before(async () => {
   // The engine resolves a data root from the environment at import time. An
   // empty temp directory means it can never read this checkout's own files.
   process.env.CAREER_OPS_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "rw-"));
-  ({ verifyFactsFromText } = await import("../../verify-cv-facts.mjs"));
+  ({ verifyFactsFromText } = await import("../../../packages/engine/verify-cv-facts.mjs"));
 });
 
 const engine = (text) => verifyFactsFromText(text, { sourceText: SOURCE });
