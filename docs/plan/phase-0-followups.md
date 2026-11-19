@@ -89,3 +89,11 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-8 review | Optional: second `changeFacts` lock probe on an existing row | Later |
 | P0-8 review | One unexplained PGlite `npm test` failure (name not recorded); capture on recurrence | Watch in CI |
 | P0-12 review | Notice says "Google Cloud (Mumbai region) hosts Rolewright": confirm Cloud Run and Cloud SQL are in asia-south1 before sign-ups open; if region or host differs, change the line and bump NOTICE_VERSION | P1-7 (gate before sign-ups) |
+| P0-13 review | Per-account gate load: 40 req/min x ~1.1 s is ~44 s/min of blocked thread per account; two accounts saturate a process. Add a per-user gate-time bucket now, or move the gate to a worker thread (like P0-6b) | P1-3; decide before public sign-ups |
+| P0-13 review | POST /api/tailorings sends up to 751 lines to the model then keeps 30 silently; cap lines sent, tell the user, refuse over-cap before the model call | Phase 1 task touching tailorings/route.ts |
+| P0-13 review | Suggestion card shows confirm/cannot-confirm buttons for issues with an empty value (facts_too_large, engine) | Next UI task |
+| P0-13 review | Unit test for the rate limiter (split a pure core out of rate-limit.ts) | P1-3 |
+| P0-11 review | `tests/integration/run.mjs` (and maybe `prod-smoke.mjs`) kill only the parent process, so `next-server` can leak like the e2e harness did; apply the same group-kill fix, prove with two same-port runs | Small harness task, before the phase gate if `test:flow` leaks block runs |
+| P0-11 review | After client-side navigation to `/privacy`, first Tab landed on the Next dev overlay in dev; check where focus lands in the production build (prod-smoke Chromium step) | P1 or next prod-smoke edit |
+| P0-13 re-review | With MAX_SUGGESTIONS 20, a resume with more than 20 confirmed bullets gets only the first 20 rewritten and the user is not told; all lines still go to the model | Owner should know; fix with follow-up B (Phase 1) |
+| P0-13 re-review | Caps proven on the test machine only: add a gate-timing line to the staging smoke (one check at the cap on the deployed instance); revisit caps if it is more than 2x the local figure | P1-7 |
