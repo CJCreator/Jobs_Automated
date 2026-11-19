@@ -671,6 +671,50 @@ Report: as in the common list, plus timings for a normal resume before and after
 ```
 
 ```
+Task: P0-6c PDF worker: memory watchdog, parse concurrency cap, server faults as 500
+Worker: Sonnet
+Goal: An uploaded PDF cannot push the process far past a fixed memory bound, at most two parses run at
+  once per process, and a server-side worker failure is a logged 500, not a user-facing 422.
+ADRs: 0004
+Why (advisor's P0-6b review): resourceLimits bounds only the JS heap. A 2,407-byte PDF (1 GB of spaces,
+  deflated twice) kept the worker heap near 20 MB while external (ArrayBuffer) memory reached 1,029 MB;
+  RSS grew +0.8 to +2.1 GB for the full 5 s budget; four at once reached +1.8 GB. Separately, the pdf.js
+  import now sits inside the worker's catch-all, so a missing module or a worker-start failure (reproduced
+  with --input-type=module in execArgv) returns 422 "could not be read" for every PDF, with no log line.
+Touches (only these):
+  apps/web/src/lib/server/pdf-text.mjs
+  apps/web/src/lib/server/pdf-text-worker.mjs
+  apps/web/tests/pdf-text.test.mjs
+Steps:
+ 1. Tests first, seen failing:
+    - the double-deflated 1 GB-of-spaces PDF (build it in the test) returns 413 pdf_too_much_text, and the
+      parent's external-memory reading at refusal is recorded; assert the refusal comes well before the
+      5 s budget (target under 2 s);
+    - a third concurrent parse waits (or is refused with 503 and Retry-After; pick one and justify) while
+      two are running;
+    - a worker start failure / non-OOM worker error rejects with a plain Error (not PdfTextError), so the
+      route wrapper returns 500 internal and logs a cause label; the worker's own error text is never
+      forwarded (pdf.js errors can quote file content);
+    - fix the "mid-read expiry" test: budget about 400 ms (30 ms expires before pdf.js loads) and confirm
+      pdf_too_complex.
+ 2. Worker: hoist `const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")` to module top
+    level, above the try.
+ 3. Parent: poll worker.getHeapStatistics() about every 100 ms (guard typeof === "function"; engines allow
+    Node 22.13) and terminate with 413 pdf_too_much_text when external_memory passes a cap of about 256 MB
+    (validate against the 30-page test). Expect overshoot between samples.
+ 4. Parent: a process-wide semaphore of 2 concurrent parses.
+ 5. Pass the bytes with transferList instead of copying them three times; drop the worker-side copy.
+ 6. Correct the comment that says the bundler copies the worker file (it bundles it into a
+    [worker thread] chunk). Restore maxOldGenerationSizeMb 256 unless the 30-page test needs less; say why.
+Done when:
+  - new tests pass and were seen failing first
+  - apps/web: npm run typecheck && npm test && npm run build
+  - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=... npm run test:flow
+  - a production-build check (next start) that a valid PDF uploads and the memory bomb returns 413
+Report: as in the common list, plus memory and timing for the bomb and a normal resume.
+```
+
+```
 Task: P0-7 Deployed-environment safety switches
 Worker: Sonnet
 Goal: On a deployed host the app refuses the development sign-in, the mock AI, the fallback secret and the

@@ -107,6 +107,7 @@ Wave D  P0-8 (after P0-2, P0-4)   P0-11 (after all)
 | P0-5 | Sonnet | Session-only key (cleared on sign-out too) |
 | P0-6 | Sonnet | PDF expansion cap (text count) |
 | P0-6b | Sonnet | PDF parsing in a worker thread with a hard deadline (added after the P0-6 review) |
+| P0-6c | Sonnet | PDF worker: memory watchdog, parse concurrency cap, server faults as 500 (added after the P0-6b review) |
 | P0-7 | Sonnet | Deployed-environment safety switches |
 | P0-8 | Sonnet | Isolation and row locks on real Postgres; new `app-ci.yml` |
 | P0-9a | Haiku | HSTS, prod-smoke browser launcher |
@@ -195,3 +196,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 | P0-4 | `task/P0-4` | approve | 1 | `331e9a3` |
 | P0-5 | `task/P0-5` | approve | 1 | `7eef4c7` |
 | P0-10 | `task/P0-10` | approve | 1 | `1ddf1d0` |
+| P0-6b | `task/P0-6b` | approve (memory half open: P0-6c) | 0 | `f5ee350` |

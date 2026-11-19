@@ -23,7 +23,7 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1a review | Browser test for the grouped export-blocked notice | P0-11 |
 | P0-1a re-review | "ph d" (space, no dots) passes; "Ph. D." blocks only via the name check | Later gate task |
 | P0-1a re-review | "Vice President" vs facts "VP" false-blocks on the name check (one attest click) | Later gate task |
-| P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | P0-6b (blocks the phase gate) |
+| P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | CPU half closed by P0-6b; memory half P0-6c (blocks the phase gate) |
 | P0-6 review | Set Cloud Run memory, request timeout and concurrency explicitly; worker typed-array memory is bounded only by the instance limit | P1-6 |
 | P0-6 review | Upload rate limit is per process, so it weakens with more instances | P1-3 |
 | P0-4 review | Purge and `deleteUserData` cascade as the non-superuser role under FORCE RLS | P0-8 |
@@ -48,3 +48,6 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-3a review | Retention sentence is public: scheduler must run before real users see it; lawyer review of the notice (ADR 0004) | Phase gate |
 | P0-3a review | Briefs touching landing, sign-in or `/app` pages must list `npm run test:e2e` | Remaining briefs (P0-2, P0-3b, P0-9a) |
 | P0-3a review | Consent record imports `NOTICE_VERSION` from `notice.mjs` | P0-2 |
+| P0-6b review | Size Cloud Run memory and concurrency from the bomb numbers (1 to 2 GB per bomb until the watchdog); workers share vCPUs with the main loop | P1-6 |
+| P0-6b review | `execArgv: []` on the Worker so inherited node flags cannot break worker start | Later |
+| P0-6b review | Pass the file bytes with a transfer list instead of copying three times | P0-6c (note) |
