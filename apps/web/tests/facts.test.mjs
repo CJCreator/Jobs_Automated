@@ -267,3 +267,12 @@ test("confirmationCounts counts items and what is confirmed", () => {
   assert.equal(unconfirmed.confirmed, 0);
   assert.equal(unconfirmed.total, 12);
 });
+
+test("normalizeFacts keeps the source value model and maps anything unknown to upload", () => {
+  const f = normalizeFacts({
+    skills: [{ name: "A", source: "model" }, { name: "B", source: "nonsense" }, { name: "C", source: "user" }],
+    summary: { text: "x", source: "model" },
+  });
+  assert.deepEqual(f.skills.map((s) => s.source), ["model", "upload", "user"]);
+  assert.equal(f.summary.source, "model");
+});
