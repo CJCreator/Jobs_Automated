@@ -317,7 +317,7 @@ export const en = {
       exportBlockedGeneral: "Other problems:",
     },
     privacy: {
-      title: "Privacy",
+      title: "Privacy notice",
       intro: "Here is what Rolewright keeps, and what it does not.",
       storedTitle: "What we store",
       stored: [

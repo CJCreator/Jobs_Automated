@@ -363,7 +363,7 @@ async function enterKey(page) {
   await page.getByRole("button", { name: "Check key", exact: true }).click();
   await page.getByText(/This key works/).waitFor();
   await page.locator("#model").selectOption("mock-1");
-  await page.getByRole("button", { name: "Save in this browser" }).click();
+  await page.getByRole("button", { name: "Use this key for this visit" }).click();
   await page.locator("#saved-key-title").waitFor();
 }
 
@@ -509,8 +509,8 @@ try {
     await page.getByRole("button", { name: "Check key", exact: true }).click();
     await page.getByText(/This key works/).waitFor();
     await page.locator("#model").selectOption("mock-1");
-    await page.getByRole("button", { name: "Save in this browser" }).click();
-    await page.getByText("Key saved in this browser.").waitFor();
+    await page.getByRole("button", { name: "Use this key for this visit" }).click();
+    await page.getByText("Key ready. It stays in memory until you close or reload this tab.").waitFor();
     await page.locator("#saved-key-title").waitFor();
 
     const afterSave = async () => {
@@ -761,7 +761,7 @@ try {
       await tabTo(p, "#model");
       await tabTo(p, "#save-key");
       await p.keyboard.press("Enter");
-      await p.getByText("Key saved in this browser.").waitFor();
+      await p.getByText("Key ready. It stays in memory until you close or reload this tab.").waitFor();
       info = await assertFocusVisible(p, "after saving the key");
       assert.equal(info.id, "saved-key-title", "focus moves to the saved key summary");
       await assertTargets(p, "key saved");
