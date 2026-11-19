@@ -8,6 +8,7 @@
 // So the stored list is kept, and an entry leaves it only when the request
 // names it in `removeCannotConfirm`.
 
+import { contentKey } from "../fact-source.mjs";
 import { normalizeFacts } from "../facts.mjs";
 
 export const MAX_REMOVALS = 200;
@@ -39,6 +40,41 @@ export function parseRemovals(value) {
  *   match nothing are ignored
  */
 export function applyFactsEdit(stored, incoming, removals) {
+  const out = applyEdit(stored, incoming, removals);
+  return keepModelLabels(stored, out);
+}
+
+/**
+ * An item the AI proposed that the upload does not contain is labelled
+ * "model". The page cannot clear that label: an incoming item with the id of a
+ * stored "model" item keeps it while its content is unchanged, and becomes
+ * "user" once the content is edited.
+ */
+function keepModelLabels(stored, facts) {
+  const relabel = (kind, items, old) => {
+    const byId = new Map((Array.isArray(old) ? old : []).filter((x) => x?.source === "model").map((x) => [x.id, x]));
+    return items.map((item) => {
+      const was = byId.get(item.id);
+      if (!was) return item;
+      return { ...item, source: contentKey(kind, was) === contentKey(kind, item) ? "model" : "user" };
+    });
+  };
+  const oldJobs = Array.isArray(stored?.experience) ? stored.experience : [];
+  const oldBullets = oldJobs.flatMap((j) => (Array.isArray(j?.bullets) ? j.bullets : []));
+  const summary =
+    stored?.summary?.source === "model"
+      ? { ...facts.summary, source: contentKey("summary", stored.summary) === contentKey("summary", facts.summary) ? "model" : "user" }
+      : facts.summary;
+  return {
+    ...facts,
+    summary,
+    experience: relabel("job", facts.experience, oldJobs).map((j) => ({ ...j, bullets: relabel("bullet", j.bullets, oldBullets) })),
+    education: relabel("education", facts.education, stored?.education),
+    skills: relabel("skill", facts.skills, stored?.skills),
+  };
+}
+
+function applyEdit(stored, incoming, removals) {
   const drop = new Set(removals.map(key));
   const kept = (Array.isArray(stored?.cannotConfirm) ? stored.cannotConfirm : []).filter(
     (c) => typeof c === "string" && !drop.has(key(c)),

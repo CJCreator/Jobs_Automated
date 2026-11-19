@@ -55,3 +55,42 @@ test("parseRemovals: absent means none; only a list of short strings is accepted
     assert.equal(parseRemovals(bad), null, `refused: ${JSON.stringify(bad)?.slice(0, 40)}`);
   }
 });
+
+const modelStored = normalizeFacts({
+  summary: { text: "Invented summary.", source: "model" },
+  experience: [{ company: "Infosys", title: "Analyst", source: "upload", bullets: [{ text: "Led 12 people", source: "model" }, { text: "Real bullet", source: "upload" }] }],
+  skills: [{ name: "Tableau", source: "model" }],
+});
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+test("a client cannot relabel an unchanged model item as upload", () => {
+  const body = clone(modelStored);
+  body.skills[0].source = "upload";
+  body.skills[0].confirmed = true;
+  body.experience[0].bullets[0].source = "upload";
+  body.summary.source = "upload";
+  const out = applyFactsEdit(modelStored, body, []);
+  assert.equal(out.skills[0].source, "model");
+  assert.equal(out.skills[0].confirmed, true, "the single confirmation still works");
+  assert.equal(out.experience[0].bullets[0].source, "model");
+  assert.equal(out.experience[0].bullets[1].source, "upload");
+  assert.equal(out.summary.source, "model");
+});
+
+test("edited content on a model item becomes user", () => {
+  const body = clone(modelStored);
+  body.skills[0].name = "Tableau Desktop";
+  body.skills[0].source = "upload";
+  body.experience[0].bullets[0].text = "Led 4 people";
+  body.experience[0].bullets[0].source = "user";
+  const out = applyFactsEdit(modelStored, body, []);
+  assert.equal(out.skills[0].source, "user");
+  assert.equal(out.experience[0].bullets[0].source, "user");
+});
+
+test("an item with a new id is not treated as a stored model item", () => {
+  const body = clone(modelStored);
+  body.skills.push({ id: "brand-new-id", name: "Excel", confirmed: false, source: "upload" });
+  const out = applyFactsEdit(modelStored, body, []);
+  assert.equal(out.skills[1].source, "upload");
+});

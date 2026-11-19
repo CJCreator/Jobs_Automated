@@ -26,7 +26,7 @@ export type VerifyResponse =
   | { ok: true; models: ModelOption[]; recommended: string | null }
   | { ok: false; code: string; message: string };
 
-export type Source = "upload" | "user";
+export type Source = "upload" | "user" | "model";
 
 export interface Contact {
   name: string;

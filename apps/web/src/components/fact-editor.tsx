@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import type { Bullet, Education, Extra, Facts, Job, Skill } from "@/lib/client/types";
+import type { Bullet, Education, Extra, Facts, Job, Skill, Source } from "@/lib/client/types";
 import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/components/ui/cn";
 import { Badge, Button, Card, Checkbox, Field, Input, Textarea } from "@/components/ui/primitives";
@@ -46,14 +46,27 @@ function Section({
 }
 
 /** One editable item. The bar on its start edge, and the checkbox text, show whether it is confirmed. */
-function Item({ confirmed, label = true, children }: { confirmed: boolean; label?: boolean; children: ReactNode }) {
+function Item({
+  confirmed,
+  label = true,
+  source,
+  children,
+}: {
+  confirmed: boolean;
+  label?: boolean;
+  source?: Source;
+  children: ReactNode;
+}) {
+  const notFound = source === "model";
   return (
     <Card className={cn("space-y-4 border-s-4 p-4! sm:p-5!", confirmed ? "border-s-ok" : "border-s-warn")}>
-      {label ? (
-        <div className="flex justify-end">
-          <Badge tone={confirmed ? "ok" : "warn"}>{confirmed ? en.common.confirmed : t.needsCheck}</Badge>
+      {label || notFound ? (
+        <div className="flex flex-wrap justify-end gap-2">
+          {notFound ? <Badge tone="danger">{t.notInResume}</Badge> : null}
+          {label ? <Badge tone={confirmed ? "ok" : "warn"}>{confirmed ? en.common.confirmed : t.needsCheck}</Badge> : null}
         </div>
       ) : null}
+      {notFound ? <p className="text-sm text-muted">{t.notInResumeHint}</p> : null}
       {children}
     </Card>
   );
@@ -148,9 +161,14 @@ export function FactEditor({ facts, onChange, announce }: Props) {
     set({ extras: [...facts.extras, { id, text: "", confirmed: false, source: "user", statedAt: today() }] });
   };
 
-  const confirmAll = (section: string, patch: Partial<Facts>) => {
+  // "Confirm all" never confirms an item the upload does not contain.
+  const bulk = <T extends { confirmed: boolean; source?: Source }>(item: T): T =>
+    item.source === "model" ? item : { ...item, confirmed: true };
+  const skippedIn = (items: { confirmed: boolean; source?: Source }[]) =>
+    items.filter((i) => i.source === "model" && !i.confirmed).length;
+  const confirmAll = (section: string, patch: Partial<Facts>, skipped = 0) => {
     set(patch);
-    announce(t.confirmAllDone(section));
+    announce(skipped > 0 ? t.confirmAllSkipped(section, skipped) : t.confirmAllDone(section));
   };
 
   const s = t.sections;
@@ -196,9 +214,9 @@ export function FactEditor({ facts, onChange, announce }: Props) {
       <Section
         id="sec-summary"
         title={s.summary}
-        onConfirmAll={() => confirmAll(s.summary, { summary: { ...facts.summary, confirmed: true } })}
+        onConfirmAll={() => confirmAll(s.summary, { summary: bulk(facts.summary) }, skippedIn([facts.summary]))}
       >
-        <Item confirmed={facts.summary.confirmed}>
+        <Item confirmed={facts.summary.confirmed} source={facts.summary.source}>
           <Field id="summary-text" label={t.fields.summary}>
             {(f) => (
               <Textarea
@@ -223,14 +241,16 @@ export function FactEditor({ facts, onChange, announce }: Props) {
         id="sec-experience"
         title={s.experience}
         onConfirmAll={() =>
-          confirmAll(s.experience, {
-            experience: facts.experience.map((j) => ({ ...j, confirmed: true, bullets: j.bullets.map((b) => ({ ...b, confirmed: true })) })),
-          })
+          confirmAll(
+            s.experience,
+            { experience: facts.experience.map((j) => ({ ...bulk(j), bullets: j.bullets.map(bulk) })) },
+            skippedIn(facts.experience) + skippedIn(facts.experience.flatMap((j) => j.bullets)),
+          )
         }
       >
         <div className="space-y-5">
           {facts.experience.map((job, ji) => (
-            <Item key={job.id} confirmed={job.confirmed}>
+            <Item key={job.id} confirmed={job.confirmed} source={job.source}>
               <h3 className="font-heading text-xl font-semibold">{t.jobHeading(ji + 1)}</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field id={`job-${job.id}-company`} label={t.fields.company}>
@@ -264,7 +284,7 @@ export function FactEditor({ facts, onChange, announce }: Props) {
                 <ul className="space-y-3">
                   {job.bullets.map((b) => (
                     <li key={b.id}>
-                      <Item confirmed={b.confirmed}>
+                      <Item confirmed={b.confirmed} source={b.source}>
                         <Field id={`bullet-${b.id}`} label={t.fields.bullet}>
                           {(f) => (
                             <Textarea
@@ -330,11 +350,11 @@ export function FactEditor({ facts, onChange, announce }: Props) {
       <Section
         id="sec-education"
         title={s.education}
-        onConfirmAll={() => confirmAll(s.education, { education: facts.education.map((e) => ({ ...e, confirmed: true })) })}
+        onConfirmAll={() => confirmAll(s.education, { education: facts.education.map(bulk) }, skippedIn(facts.education))}
       >
         <div className="space-y-4">
           {facts.education.map((e, i) => (
-            <Item key={e.id} confirmed={e.confirmed}>
+            <Item key={e.id} confirmed={e.confirmed} source={e.source}>
               <h3 className="font-heading text-xl font-semibold">{t.eduHeading(i + 1)}</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field id={`edu-${e.id}-school`} label={t.fields.school}>
@@ -382,13 +402,13 @@ export function FactEditor({ facts, onChange, announce }: Props) {
       <Section
         id="sec-skills"
         title={s.skills}
-        onConfirmAll={() => confirmAll(s.skills, { skills: facts.skills.map((k) => ({ ...k, confirmed: true })) })}
+        onConfirmAll={() => confirmAll(s.skills, { skills: facts.skills.map(bulk) }, skippedIn(facts.skills))}
       >
         {facts.skills.length === 0 ? <p className="text-muted">{t.noSkills}</p> : null}
         <ul className="grid gap-3 sm:grid-cols-2">
           {facts.skills.map((k) => (
             <li key={k.id}>
-              <Item confirmed={k.confirmed} label={false}>
+              <Item confirmed={k.confirmed} label={false} source={k.source}>
                 <Field id={`skill-${k.id}`} label={t.fields.skill}>
                   {(f) => <Input id={f.id} autoComplete="off" value={k.name} onChange={(e) => setSkill(k.id, { name: e.target.value, source: "user" })} />}
                 </Field>
