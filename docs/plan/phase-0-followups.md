@@ -32,3 +32,5 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-4 review | Alert when the daily purge stops succeeding | P1-6 |
 | P0-4 review | `getDb()` runs before auth, so a DB outage shows 500 not 401 | Optional, later |
 | P0-4 review | ADR 0004 line 17 still describes the purge as a host-scheduled script | Next ADR edit |
+| P0-4 re-review | Cloud Scheduler job: at least 3 retries, minimum backoff 60 s (outlasts the 45 s key-fetch refusal) | P1-6 |
+| P0-4 re-review | Floor the key cache at 300 s if Google ever omits `max-age` | Optional, later |
