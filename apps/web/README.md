@@ -55,6 +55,8 @@ Read from the process environment only.
 | `CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR` | The engine's data folder. Leave unset: the server points the engine at a fresh, empty temp folder before loading it, so it never reads files from the checkout. All user data is in the database. |
 | `ROLEWRIGHT_PURGE_AUDIENCE` | The audience Cloud Scheduler puts in its OIDC token: the service URL, e.g. `https://rolewright.example`. With this or the next variable unset, `POST /api/internal/purge` answers 401 to everyone. |
 | `ROLEWRIGHT_PURGE_SERVICE_ACCOUNT` | Email of the service account Cloud Scheduler signs as. Only a token for exactly this email, with `email_verified` true, is accepted. |
+| `ROLEWRIGHT_GRIEVANCE_NAME` | Name of the grievance contact shown on the privacy notice (ADR 0004). Until it and `ROLEWRIGHT_GRIEVANCE_EMAIL` are both set, the notice says the contact is not yet set. |
+| `ROLEWRIGHT_GRIEVANCE_EMAIL` | Email address of the grievance contact, shown with the name on the privacy notice. Must be a valid email address; otherwise the notice says the contact is not yet set. |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | Optional. A Chromium binary to use for PDF export instead of Playwright's own download. |
 | `BUILD_DIST` | Optional. A build folder other than `.next` (read by `next.config.mjs`). The flow test sets `.next-flow` so it can run beside another `next dev`. |
 | `FLOW_SHOW_SERVER_OUTPUT=1` | Optional, for `npm run test:flow` only: print everything the server logged. |
