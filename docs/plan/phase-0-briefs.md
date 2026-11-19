@@ -719,6 +719,40 @@ Report: as in the common list, plus memory and timing for the bomb and a normal 
 ```
 
 ```
+Task: P0-12 Phase-gate fix-ups: dev CSP keyed on the platform, notice names every recipient
+Worker: Sonnet
+Goal: Close the product follow-ups that block opening sign-ups and that no other Phase 0 task owns.
+ADRs: 0003, 0004, 0006
+Touches (only these):
+  apps/web/src/proxy.ts
+  apps/web/src/i18n/en.ts (existing and new keys, as listed below)
+  apps/web/src/lib/notice.mjs (NOTICE_VERSION only)
+  apps/web/src/components/privacy-notice.tsx (only to render the new recipients item)
+  apps/web/src/app/app/privacy/page.tsx (metadata title only)
+  apps/web/tests/ (new or edited unit tests for the above; not tests/e2e)
+Steps:
+ 1. proxy.ts: the development CSP relaxation ('unsafe-eval', ws:) is keyed on NODE_ENV. Key it on
+    !strictEnv(process.env) from src/lib/server/env-guard.mjs, after checking that module imports cleanly
+    into the proxy (edge or node) bundle; if it does not, inline the same K_SERVICE / ROLEWRIGHT_DEPLOYED
+    test. Unit test: deployed env with NODE_ENV=development gets the strict CSP.
+ 2. Privacy notice: add a "Who else handles your data" item naming, in plain words, what each gets:
+    - Resend: your email address, to send the sign-in link (only if you sign in by email);
+    - Google: if you sign in with Google, Google confirms who you are and shares your name, email and picture;
+    - Google Cloud (Mumbai region): hosts Rolewright and stores your account data;
+    - your AI provider: as already described.
+    Check each against the code (src/auth.ts, ADR 0009) and say nothing the code does not do.
+ 3. app.privacy.deleteBody: say the consent record is deleted with the account.
+ 4. Remove the now-unused keys en.app.resume.consent and consentError (grep src and tests first).
+ 5. /app/privacy metadata title: "Privacy notice".
+ 6. Bump NOTICE_VERSION to the next .N (the notice text changed).
+Done when:
+  - cd apps/web && npm run typecheck && npm test && npm run build
+  - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=... npm run test:e2e passes in full (copy changes can break selectors;
+    report any e2e step that needs a string update, and do not edit tests/e2e)
+Report: every string changed (old, new), the code reference behind each recipient claim, and counts.
+```
+
+```
 Task: P0-7 Deployed-environment safety switches
 Worker: Sonnet
 Goal: On a deployed host the app refuses the development sign-in, the mock AI, the fallback secret and the

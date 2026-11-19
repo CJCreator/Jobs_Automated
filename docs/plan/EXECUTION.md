@@ -113,6 +113,7 @@ Wave D  P0-8 (after P0-2, P0-4)   P0-11 (after all)
 | P0-9a | Haiku | HSTS, prod-smoke browser launcher |
 | P0-10 | Sonnet | Extracted facts checked against the upload; re-upload keeps confirmations |
 | P0-11 | Sonnet | Browser test sweep and baseline |
+| P0-12 | Sonnet | Phase-gate fix-ups: dev CSP keyed on the platform; notice names Resend, Google, Google Cloud (added from review follow-ups) |
 
 The `en.ts` rule changes: code tasks only append keys; P0-3b is the single editor of existing keys.
 
