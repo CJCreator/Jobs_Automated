@@ -209,3 +209,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 | P0-3b | `task/P0-3b` | approve | 2 | `0b068ec` |
 | P0-8 | `task/P0-8` | approve (merged; CI unproven until its first run) | 1 | `b9f8883` |
 | P0-12 | `task/P0-12` | approve | 1 | `314d3ee` |
+| P0-11 | `task/P0-11` | approve | 2 | `13d54f6` |

@@ -97,3 +97,5 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-11 review | After client-side navigation to `/privacy`, first Tab landed on the Next dev overlay in dev; check where focus lands in the production build (prod-smoke Chromium step) | P1 or next prod-smoke edit |
 | P0-13 re-review | With MAX_SUGGESTIONS 20, a resume with more than 20 confirmed bullets gets only the first 20 rewritten and the user is not told; all lines still go to the model | Owner should know; fix with follow-up B (Phase 1) |
 | P0-13 re-review | Caps proven on the test machine only: add a gate-timing line to the staging smoke (one check at the cap on the deployed instance); revisit caps if it is more than 2x the local figure | P1-7 |
+| P0-11 re-review | e2e dev reload loop ("Compiled in 1ms" + GET /): likely a second `next dev` in the same app dir rewriting tsconfig.json; fold into the harness task: group-kill in integration/run.mjs and prod-smoke, fail fast if another `next` runs in the app dir, log tsconfig/next-env mtimes on retry | Harness task |
+| P0-11 re-review | Drop "Target closed" from the e2e transient-error regex | Next run.mjs edit |
