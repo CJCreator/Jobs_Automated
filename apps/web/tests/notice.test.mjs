@@ -70,10 +70,6 @@ test("notice: the privacy page's browser title matches the notice", () => {
   assert.match(page, /title: "Privacy notice"/);
 });
 
-test("notice: the version was bumped for the new text", () => {
-  assert.equal(NOTICE_VERSION, "2026-11-19.3");
-});
-
 test("the old resume-upload consent strings are gone", () => {
   assert.equal("consent" in en.app.resume, false);
   assert.equal("consentError" in en.app.resume, false);

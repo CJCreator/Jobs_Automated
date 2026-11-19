@@ -347,7 +347,7 @@ export const en = {
       recipients: [
         "Resend: gets your email address, to send you the sign-in link. This happens only if you sign in by email.",
         "Google: if you sign in with Google, Google confirms who you are and shares your name, email and picture with Rolewright.",
-        "Google Cloud (Mumbai region): hosts Rolewright and stores your account data.",
+        "Google Cloud (Mumbai region): hosts Rolewright and stores everything listed under \"What we store\".",
         "Your AI provider: gets the text described under \"What goes to your AI provider\".",
       ],
     },
