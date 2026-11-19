@@ -76,3 +76,8 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1b re-review | Engine-only misses from the stop list ("Promoted to a lead role at Acme Corp", "Managed the position reconciliation at Acme Corp"): pass target company and role into the gate (ADR 0015) and drop the stop list; the app strict layer catches them today | Phase 2 cover letters |
 | P0-1b re-review | "Processed 14M evaluations for users" reported as `14m users` | Later gate task |
 | P0-1b re-review | Blank-line linear-time test is wall-clock based; watch it on shared CI | Note |
+| P0-2 review | Proof of consent after deletion: cascade removes the record on deletion and purge; decide on a minimal tombstone (hashed id, version, timestamps) under DPDP | Owner + lawyer; new ADR |
+| P0-2 review | Consent withdrawal other than account deletion (needs `withdrawn_at` or event rows) | Later ADR |
+| P0-2 review | `deleteBody` should say the consent record is deleted too | Copy task at the phase gate (with the "who else handles your data" item) |
+| P0-2 review | Data export (ADR 0004) must include consent rows | Phase 2 data export |
+| P0-2 review | Remove dead strings `en.app.resume.consent` and `consentError` | Next en.ts copy task |
