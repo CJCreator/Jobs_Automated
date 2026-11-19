@@ -59,20 +59,11 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.27'
-          # The module lives in dashboard/, so without this setup-go looks for
-          # go.sum at the root, warns, and caches nothing.
-          cache-dependency-path: dashboard/go.sum
       # Skip the postinstall (npx playwright install chromium): the ~170 MB
       # download on three OSes would buy only the few suites that launch a
       # browser, and those skip here and run in the tool-suites job instead.
       - run: npm install --ignore-scripts
       - run: node test-all.mjs --quick
-      - name: Go dashboard tests
-        run: go test ./...
-        working-directory: dashboard
 
   cv-visual:
     # Not a required check, so the merge queue never waits on it: a red queue
@@ -146,10 +137,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.27'   # old updaters rebuild the dashboard during apply
-          cache-dependency-path: dashboard/go.sum
       - run: npm install --ignore-scripts
       - name: Upgrade PR gate (newest old release -> this commit)
         run: node upgrade-tests.mjs --pr-gate

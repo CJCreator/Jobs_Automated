@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, ExternalLink, ChevronDown, Copy, Sparkles, BookOpen, Send, CheckCircle2, Columns2, FileCode, TrendingUp } from "lucide-react";
+import { ArrowLeft, FileText, ExternalLink, ChevronDown, Copy, Sparkles, BookOpen, Send, CheckCircle2, Columns2, FileCode } from "lucide-react";
 import type { Application } from "@/lib/career-ops";
 import { Badge } from "@/components/ui/badge";
 import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
@@ -161,14 +161,6 @@ export function ReportView({
             >
               <FileText className="size-3.5" /> View cover
             </a>
-          )}
-          {app?.status?.toLowerCase().includes("offer") && (
-            <Link
-              href={`/negotiation?company=${encodeURIComponent(companyName)}&role=${encodeURIComponent(app?.role || "")}`}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-500/20 dark:text-emerald-400 max-sm:min-h-[44px]"
-            >
-              <TrendingUp className="size-3.5" /> Negotiate Offer
-            </Link>
           )}
 
           {/* Mode Toggle: Full Report vs Studio Workspace */}

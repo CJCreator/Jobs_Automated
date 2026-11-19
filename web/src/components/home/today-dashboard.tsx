@@ -20,7 +20,6 @@ import { undoStatus } from "@/lib/pipeline-status.mjs";
 import { pickAwaitingDecision, groupAwaiting } from "@/lib/home/awaiting.mjs";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
 import { resolveHeroState, mayClaimAllClear, showsQueue, missingSourceLabel, displayCounts } from "@/lib/home/hero-state.mjs";
-import { AgentStatusHud } from "@/components/dashboard/agent-status-hud";
 
 // The retention "Today": a dual-loop action queue (the maintainer's
 // "N new matches this week · M follow-ups due"). SUPPLY loop = fresh free-scan
@@ -229,7 +228,6 @@ export function TodayDashboard({
       </section>
 
       <div className="mt-6">
-        <AgentStatusHud />
       </div>
 
       {dataError && !dataLoading && (

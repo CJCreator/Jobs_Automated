@@ -2316,43 +2316,8 @@ try {
 
 // ── 4. DASHBOARD BUILD ──────────────────────────────────────────
 
-if (!QUICK) {
-  console.log('\n4. Dashboard build');
-  let hasGo = false;
-  try {
-    execSync('go version', { stdio: 'ignore' });
-    hasGo = true;
-  } catch {}
-  if (!hasGo) {
-    warn('Dashboard build skipped — go compiler not in env');
-  } else {
-    const isWindows = process.platform === 'win32';
-    const dashboardBuildTmp = mkdtempSync(join(tmpdir(), 'career-dashboard-build-'));
-    const outPath = join(dashboardBuildTmp, isWindows ? 'career-dashboard-test.exe' : 'career-dashboard-test');
-    const goEnv = { ...process.env };
-    if (isWindows && !goEnv.GOCACHE) {
-      goEnv.GOCACHE = join(tmpdir(), 'career-ops-go-build-cache');
-    }
-    if (goEnv.GOCACHE) {
-      try { mkdirSync(goEnv.GOCACHE, { recursive: true }); } catch (e) {}
-    }
-    const goBuild = run('go', ['build', '-o', outPath, '.'], {
-      cwd: join(ROOT, 'dashboard'),
-      env: goEnv,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 60000,
-    });
-    if (goBuild !== null) {
-      pass('Dashboard compiles');
-      try { rmSync(outPath, { force: true }); } catch (e) {}
-    } else {
-      fail('Dashboard build failed');
-    }
-    try { rmSync(dashboardBuildTmp, { recursive: true, force: true }); } catch (e) {}
-  }
-} else {
-  console.log('\n4. Dashboard build (skipped --quick)');
-}
+// The Go dashboard was removed; section 4 is intentionally empty.
+console.log('\n4. Dashboard build (removed)');
 
 // ── 5. DATA CONTRACT ────────────────────────────────────────────
 
@@ -6110,22 +6075,6 @@ try {
     fail(`tracker writers bypass shared transaction scope: ${unsafeWriters.join(', ')}`);
   }
 
-  // The dashboard must use the same canonical writer as the CLI. Keep this
-  // boundary check beside the root-writer contract so a future UI refactor
-  // cannot silently reintroduce a direct tracker mutation that skips the
-  // shared lock, lifecycle ledger, or follow-up transaction.
-  const dashboardWriter = readFile('dashboard/internal/data/status_writer.go');
-  const runWriterStart = dashboardWriter.indexOf('func runStatusWriter(');
-  const runWriterBody = runWriterStart === -1 ? '' : dashboardWriter.slice(runWriterStart);
-  const delegatesToCanonicalWriter = runWriterBody.includes('set-status.mjs')
-    && runWriterBody.includes('exec.CommandContext')
-    && runWriterBody.includes('"--report-link"')
-    && !/writeFile(?:Atomic|Sync)\s*\(/.test(runWriterBody);
-  if (delegatesToCanonicalWriter) {
-    pass('dashboard status writer delegates tracker mutations to set-status.mjs transaction scope');
-  } else {
-    fail('dashboard status writer bypasses the shared set-status transaction scope');
-  }
 
 } catch (e) {
   fail(`tracker writer lock contract tests crashed: ${e.message}`);

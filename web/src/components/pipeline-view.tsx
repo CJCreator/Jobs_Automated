@@ -3,7 +3,7 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useOptimistic, useRef, useState, useTransition, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText, LayoutList, Columns3, TrendingUp } from "lucide-react";
+import { Search, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText, LayoutList, Columns3 } from "lucide-react";
 import type { Application, InboxJob } from "@/lib/career-ops";
 import { Badge } from "@/components/ui/badge";
 import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
@@ -738,15 +738,6 @@ export function PipelineView({
                           });
                         }}
                       />
-                      {r.status?.toLowerCase().includes("offer") && (
-                        <Link
-                          href={`/negotiation?company=${encodeURIComponent(company.label)}&role=${encodeURIComponent(r.role || "")}`}
-                          title="Simulate equity and 3-round negotiation plan"
-                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                        >
-                          <TrendingUp className="size-3" /> Negotiate
-                        </Link>
-                      )}
                     </div>
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-3 text-faint tabular-nums lg:table-cell">{r.date}</td>

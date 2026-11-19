@@ -18,7 +18,6 @@ import {
   Award,
   Archive,
   Compass,
-  TrendingUp,
 } from "lucide-react";
 import type { Application } from "@/lib/career-ops";
 import { canonStatus, scoreTone } from "@/lib/format";
@@ -363,15 +362,6 @@ export function KanbanBoard({
                         )}
 
                         {/* Offer Negotiation Quick Action */}
-                        {(col.id === "offer" || app.status?.toLowerCase().includes("offer")) && (
-                          <Link
-                            href={`/negotiation?company=${encodeURIComponent(app.company)}&role=${encodeURIComponent(app.role || "")}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                          >
-                            <TrendingUp className="size-3" /> Negotiate Offer
-                          </Link>
-                        )}
                       </div>
                     );
                   })
@@ -413,14 +403,6 @@ export function KanbanBoard({
                   >
                     Job Ad <ExternalLink className="size-3" />
                   </a>
-                )}
-                {selectedApp.status?.toLowerCase().includes("offer") && (
-                  <Link
-                    href={`/negotiation?company=${encodeURIComponent(selectedApp.company)}&role=${encodeURIComponent(selectedApp.role || "")}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20"
-                  >
-                    <TrendingUp className="size-3" /> Negotiate
-                  </Link>
                 )}
               </div>
 
