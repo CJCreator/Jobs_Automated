@@ -3,6 +3,10 @@
 // server. Input and output are plain messages; no state is shared with the parent.
 import { parentPort, workerData } from "node:worker_threads";
 
+// Top level, outside any try: a missing module fails the worker (a server fault the parent reports
+// as a 500), not every PDF as "could not be read".
+const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
 const TOO_MUCH_TEXT = "That PDF holds far more text than a resume. Upload only your resume pages.";
 const TOO_COMPLEX = "That PDF took too long to read. Upload only your resume pages, or export it again.";
 
@@ -16,9 +20,8 @@ class Refusal extends Error {
 
 async function read({ bytes, maxPages, maxChars, maxExpandedChars, timeBudgetMs }) {
   const deadline = performance.now() + timeBudgetMs;
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const task = getDocument({
-    data: new Uint8Array(bytes),
+    data: bytes, // already our own copy, transferred in
     // No code generation from font programs, no font loading: text only.
     isEvalSupported: false,
     disableFontFace: true,
