@@ -1,0 +1,95 @@
+name: App CI
+
+# CI for the hosted app (apps/web). The database tests run twice: once on the
+# embedded PGlite, and once on a real Postgres 16 server as the same kind of
+# login the app uses in production (no superuser, no CREATEDB, no BYPASSRLS),
+# with nothing allowed to skip (ADR 0009: row-level security and row locks are
+# proven on real Postgres).
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/app-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/app-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: app typecheck, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/web
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-admin-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci-admin-password
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # The roles, exactly as README.md "Database roles" creates them. The tests
+      # create and drop their own databases (the admin URL does that), so the
+      # `rolewright` database from the README is not needed here.
+      - name: Create the database roles
+        run: |
+          psql -v ON_ERROR_STOP=1 postgres <<'SQL'
+          CREATE ROLE rolewright_login LOGIN PASSWORD 'ci-login-password'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+          CREATE ROLE rolewright_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
+          GRANT rolewright_app TO rolewright_login;
+          SQL
+
+      # The fact gate and the PDF renderer live in the engine, which the app
+      # loads from the repository. It has no lockfile, so the install is
+      # `npm install` without scripts (as test.yml does), then the Chromium that
+      # its pinned Playwright version wants, installed with the system libraries.
+      - name: Install engine dependencies
+        run: npm install --ignore-scripts
+        working-directory: packages/engine
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/engine
+
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Tests on the embedded database
+        run: npm test
+      - name: Tests on Postgres 16, as the non-superuser login, nothing skipped
+        run: npm test
+        env:
+          ROLEWRIGHT_TEST_DATABASE_URL: postgres://rolewright_login:ci-login-password@localhost:5432/postgres
+          ROLEWRIGHT_TEST_ADMIN_URL: postgres://postgres:ci-admin-password@localhost:5432/postgres
+          ROLEWRIGHT_REQUIRE_PG: '1'
+      - run: npm run test:flow
+      - run: npm run build
