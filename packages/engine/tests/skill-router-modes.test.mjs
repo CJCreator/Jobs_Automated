@@ -1,11 +1,11 @@
 // tests/skill-router-modes.test.mjs — every mode AGENTS.md documents has a
 // route in the skill router (#4811).
 //
-// `/career-ops <mode>` goes through `.agents/skills/career-ops/SKILL.md`
+// `/rolewright <mode>` goes through `.agents/skills/rolewright/SKILL.md`
 // (every other CLI's SKILL.md is a symlink to it). Its fallback reads "If
 // `$mode` is not a sub-command AND doesn't look like a JD, show discovery", so
 // a mode with no row in the routing table is not just undocumented on that
-// path: `/career-ops triage` printed the command menu instead of running
+// path: `/rolewright triage` printed the command menu instead of running
 // triage. Plain-language requests still worked, since those go through
 // AGENTS.md, which is why the gap went unnoticed for triage, calibrate,
 // intake and ats.
@@ -51,7 +51,7 @@ for (const mode of ['triage', 'calibrate', 'intake', 'ats', 'retro']) {
   const missing = [];
   if (!argumentHint.includes(mode)) missing.push('argument-hint');
   if (!skill.includes(`| \`${mode}\` | \`${mode}\` |`)) missing.push('routing table');
-  if (!new RegExp(`^  /career-ops ${mode} +→`, 'm').test(skill)) missing.push('discovery menu');
+  if (!new RegExp(`^  /rolewright ${mode} +→`, 'm').test(skill)) missing.push('discovery menu');
   // triage reads only modes/_brief.md and tells the agent NOT to read
   // _profile.md or _shared.md (modes/triage.md "Context"), so it must not sit
   // in either list that would load them for it.
@@ -83,15 +83,15 @@ if (routedModes.length < 20) {
   fail(`routed modes with no context-loading rule: ${withoutContextRule.join(', ')}`);
 }
 
-// The discovery menu is what the agent prints for `/career-ops` with no
+// The discovery menu is what the agent prints for `/rolewright` with no
 // arguments. It had drifted from the routing table: `interview-redflag` and
 // `reply-watch` were routed but never listed, and `oferta` still read "A-F"
 // after the evaluation grew to A-H (#6214). The per-mode loop above only knows
 // five hard-coded names, so compare the two lists in full.
 const menu = skill.split('Show this menu:')[1]?.match(/```\n([\s\S]*?)\n```/)?.[1] ?? '';
-// The first word after `/career-ops` is the input, whatever arguments follow it.
+// The first word after `/rolewright` is the input, whatever arguments follow it.
 // `{JD}` is the auto-pipeline line, not a mode name, so it is checked on its own.
-const menuLines = [...menu.matchAll(/^  \/career-ops (\S+)/gm)].map((m) => m[1]);
+const menuLines = [...menu.matchAll(/^  \/rolewright (\S+)/gm)].map((m) => m[1]);
 const menuInputs = menuLines.filter((input) => input !== '{JD}');
 // Rows may carry extra spacing; the two special rows (no arguments, a pasted JD)
 // are the only ones without a backticked input and mode.
@@ -110,7 +110,7 @@ if (menuInputs.length < 20 || routeInputs.size < 20 || unparsedRows.length) {
 } else if (duplicateInputs.length) {
   fail(`routing table routes the same input more than once: ${duplicateInputs.join(', ')}`);
 } else if (!menuLines.includes('{JD}')) {
-  fail('discovery menu has no `/career-ops {JD}` auto-pipeline line');
+  fail('discovery menu has no `/rolewright {JD}` auto-pipeline line');
 } else {
   // An alias such as `inbox` → `agent-inbox` needs no line of its own while
   // another input for the same mode is listed.
@@ -125,7 +125,7 @@ if (menuInputs.length < 20 || routeInputs.size < 20 || unparsedRows.length) {
   }
 }
 
-const oferta = menu.match(/^  \/career-ops oferta .*$/m)?.[0] ?? '';
+const oferta = menu.match(/^  \/rolewright oferta .*$/m)?.[0] ?? '';
 if (/A-H/.test(oferta) && !/A-F/.test(oferta)) {
   pass('discovery menu describes oferta as the A-H evaluation');
 } else {

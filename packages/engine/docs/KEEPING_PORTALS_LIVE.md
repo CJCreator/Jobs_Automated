@@ -112,10 +112,10 @@ same `portals.yml` and the same scripts are behind all of them.
 
 | CLI | Invoke | Example prompt |
 | --- | --- | --- |
-| Claude Code | `claude` (then `/career-ops`) | "Validate my `portals.yml` and tell me which entries are broken." |
-| OpenCode | `opencode` (then `/career-ops`) | "Add Acme Corp to my portals and validate it." |
+| Claude Code | `claude` (then `/rolewright`) | "Validate my `portals.yml` and tell me which entries are broken." |
+| OpenCode | `opencode` (then `/rolewright`) | "Add Acme Corp to my portals and validate it." |
 | Codex | `codex` (plain text) | "Run career-ops: add Acme Corp to portals.yml and validate." |
-| Antigravity CLI | `agy` (then `/career-ops`) | "Check my portals.yml for dead boards." |
+| Antigravity CLI | `agy` (then `/rolewright`) | "Check my portals.yml for dead boards." |
 | Qwen | `qwen` | "Validate portals.yml and report broken companies." |
 | Copilot CLI | `copilot -p "…"` | `copilot -p "Validate portals.yml in this repo"` |
 

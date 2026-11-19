@@ -32,7 +32,7 @@ flowchart TD
     end
 
     subgraph AgentLayer ["AI Reasoning & Skill Layer"]
-        Router[".agents/skills/career-ops/SKILL.md (Skill Router)"]
+        Router[".agents/skills/rolewright/SKILL.md (Skill Router)"]
         SharedPrompt["modes/_shared.md (Scoring Rubric & Anti-Slop)"]
         OfertaPrompt["modes/oferta.md (Blocks A-H Structure)"]
         LLMConnectors["Claude / OpenRouter / Ollama / Gemini"]

@@ -3,9 +3,9 @@
  * must not report permanent system-files-changed drift over its materialized
  * CLI skill entrypoints (#3149, second cause).
  *
- * The regression: upstream ships `.claude/skills/career-ops/SKILL.md` and its
+ * The regression: upstream ships `.claude/skills/rolewright/SKILL.md` and its
  * siblings (SKILL_ENTRYPOINTS) as symlinks (git mode 120000) pointing at
- * `.agents/skills/career-ops/SKILL.md`. On a filesystem without symlink
+ * `.agents/skills/rolewright/SKILL.md`. On a filesystem without symlink
  * support — mostly Windows with core.symlinks=false — apply() cannot check
  * one out as a real symlink, so ensureSkillEntrypoints() writes a REAL copy
  * of the canonical file's content in its place and commits it ("Materialized
@@ -24,7 +24,7 @@
  * The fix: driftPathspecExcludingSkillEntrypoints() appends a git
  * `:(exclude)<path>` pathspec per SKILL_ENTRYPOINTS entry before the diff.
  * Safe because the materialized content is a byte-for-byte copy of
- * `.agents/skills/career-ops/SKILL.md`, which the `.agents/` SYSTEM_PATHS
+ * `.agents/skills/rolewright/SKILL.md`, which the `.agents/` SYSTEM_PATHS
  * entry already covers on its own — the exclusion only removes a redundant,
  * permanently-false signal, not real coverage.
  *
@@ -37,7 +37,7 @@
  *   - a materialized entrypoint (mode+content differ from upstream's
  *     symlink) is NOT drift once excluded                              (the fix)
  *   - the same fixture IS drift without the exclusion                  (the bug, reproduced)
- *   - a genuine upstream change to .agents/skills/career-ops/SKILL.md
+ *   - a genuine upstream change to .agents/skills/rolewright/SKILL.md
  *     (the canonical file the entrypoints point at) is STILL drift      (nothing hidden)
  *   - a genuine upstream change under scaffolder/ (the entrypoint
  *     mechanism itself) is STILL drift                                 (nothing hidden)
@@ -51,9 +51,9 @@ import { pass, fail, rmSync, ROOT, hermeticGitRunner } from './helpers.mjs';
 import { gitIn, systemTreeDiffers, driftPathspecExcludingSkillEntrypoints } from '../update-system.mjs';
 
 const SYSTEM_PATHS = ['scan.mjs', '.agents/', '.claude/skills/', 'scaffolder/'];
-const ENTRYPOINT_PATH = '.claude/skills/career-ops/SKILL.md';
+const ENTRYPOINT_PATH = '.claude/skills/rolewright/SKILL.md';
 const SKILL_ENTRYPOINTS = [{ path: ENTRYPOINT_PATH }];
-const POINTER_TEXT = '../../../.agents/skills/career-ops/SKILL.md';
+const POINTER_TEXT = '../../../.agents/skills/rolewright/SKILL.md';
 
 // Both fixture repos stage `.claude/skills/...` with `add -A`, so a
 // contributor's global ignore listing `.claude/` (a common entry, since
@@ -78,10 +78,10 @@ function makeOrigin() {
   const g = hermeticGitRunner(dir);
   g('init', '-q', '-b', 'main', '.');
   sealFixtureRepo(dir, g);
-  mkdirSync(join(dir, '.agents/skills/career-ops'), { recursive: true });
+  mkdirSync(join(dir, '.agents/skills/rolewright'), { recursive: true });
   mkdirSync(join(dir, 'scaffolder/bin'), { recursive: true });
   writeFileSync(join(dir, 'scan.mjs'), '// scan v1\n');
-  writeFileSync(join(dir, '.agents/skills/career-ops/SKILL.md'), 'canonical skill content v1\n');
+  writeFileSync(join(dir, '.agents/skills/rolewright/SKILL.md'), 'canonical skill content v1\n');
   writeFileSync(join(dir, 'scaffolder/bin/skill-entrypoints.mjs'), '// entrypoints v1\n');
   g('add', '-A');
   // The entrypoint ships as a real symlink upstream: git mode 120000, blob
@@ -182,7 +182,7 @@ console.log('\n🧪 Testing updater drift detection over materialized skill entr
     materializeAndCommit(install);
     install.g('fetch', '-q', origin.dir, 'main');
 
-    writeFileSync(join(origin.dir, '.agents/skills/career-ops/SKILL.md'), 'canonical skill content v2\n');
+    writeFileSync(join(origin.dir, '.agents/skills/rolewright/SKILL.md'), 'canonical skill content v2\n');
     origin.g('add', '-A');
     origin.g('commit', '-qm', 'genuine skill content update');
     install.g('fetch', '-q', origin.dir, 'main');
@@ -192,7 +192,7 @@ console.log('\n🧪 Testing updater drift detection over materialized skill entr
     if (systemTreeDiffers(excludedPaths, 'FETCH_HEAD', { git: runGit }) === true) {
       pass('a genuine upstream change to the canonical skill document is still detected as drift');
     } else {
-      fail('REGRESSION: a real content change to .agents/skills/career-ops/SKILL.md was hidden by the exclusion');
+      fail('REGRESSION: a real content change to .agents/skills/rolewright/SKILL.md was hidden by the exclusion');
     }
   } finally {
     cleanup(origin.dir, install.dir);

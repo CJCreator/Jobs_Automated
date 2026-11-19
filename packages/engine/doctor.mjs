@@ -357,7 +357,7 @@ function checkTrackedBakFiles(root) {
 // no router in it (career-ops#4589). update-system.mjs apply repairs these via
 // ensureSkillEntrypoints, but apply returns early on an install that is already
 // up to date, so a fresh clone never reaches it and nothing else says why
-// /career-ops does nothing. Read-only on purpose (doctor must not write): it
+// /rolewright does nothing. Read-only on purpose (doctor must not write): it
 // names the stubs and the one command that materializes them.
 // One script for every shell, deliberately free of quote characters so each
 // shell can wrap it in its own: backticks for the one string, and both paths
@@ -427,7 +427,7 @@ function checkSkillEntrypoints(root) {
   }
   return {
     warn: true,
-    label: `${stubs.length} CLI skill entrypoint${stubs.length === 1 ? ' is' : 's are'} a symlink-target stub, not the skill — this checkout has no symlink support, so that CLI loads an empty /career-ops`,
+    label: `${stubs.length} CLI skill entrypoint${stubs.length === 1 ? ' is' : 's are'} a symlink-target stub, not the skill — this checkout has no symlink support, so that CLI loads an empty /rolewright`,
     // Materializing first: it is the repair that works on the clone this
     // warning is most likely for, one that is already up to date, where apply
     // returns before reaching ensureSkillEntrypoints. Both are built from the
@@ -1119,7 +1119,7 @@ async function checkPortalSlugs(root) {
 
 const PIPELINE_SKELETON = `# Pipeline — Pending URLs
 
-Paste job URLs below as \`- [ ] {url}\` then run \`/career-ops pipeline\`.
+Paste job URLs below as \`- [ ] {url}\` then run \`/rolewright pipeline\`.
 
 ## Pending
 

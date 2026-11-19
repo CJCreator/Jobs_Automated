@@ -218,7 +218,7 @@ export { parseStories, tokenize, score, formatAts, STOPWORDS };
 if (isMainModule(import.meta.url)) {
 if (!existsSync(STORY_BANK_PATH)) {
   console.error(`Error: ${STORY_BANK_PATH} not found.`);
-  console.error('Run /career-ops interview-prep on a role first to populate your story bank.');
+  console.error('Run /rolewright interview-prep on a role first to populate your story bank.');
   process.exit(1);
 }
 
@@ -244,7 +244,7 @@ if (tableRows.length || invalid.length) {
 
 if (stories.length === 0) {
   console.error('No stories found in story-bank.md yet.');
-  console.error('Run /career-ops interview-prep on a role to add your first stories.');
+  console.error('Run /rolewright interview-prep on a role to add your first stories.');
   process.exit(1);
 }
 

@@ -59,7 +59,7 @@ flowchart TD
 ## Examples
 \`\`\`bash
 # Run offer evaluation prompt interactively
-/career-ops oferta https://jobs.ashbyhq.com/example/123
+/rolewright oferta https://jobs.ashbyhq.com/example/123
 \`\`\`
 
 ## Future Enhancements
@@ -115,7 +115,7 @@ stateDiagram-v2
 ## Examples
 \`\`\`bash
 # Run the retrospective learning workflow
-/career-ops retro
+/rolewright retro
 \`\`\`
 
 ## Future Enhancements

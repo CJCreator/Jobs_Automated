@@ -66,7 +66,7 @@ Paste a job posting URL or raw JD text directly into your AI coding CLI:
 
 ```bash
 # In Claude Code, Antigravity, or OpenCode:
-/career-ops oferta https://jobs.ashbyhq.com/company/job-id
+/rolewright oferta https://jobs.ashbyhq.com/company/job-id
 
 # Plain language in any CLI (Cursor, Codex, Grok, Qwen):
 "Evaluate this JD with career-ops: https://jobs.lever.co/company/job-id"

@@ -15,9 +15,9 @@ import { dirname, join } from 'path';
 console.log('\ndoctor.mjs — skill entrypoint stubs');
 
 const DOCTOR = join(ROOT, 'doctor.mjs');
-const POINTER = '../../../.agents/skills/career-ops/SKILL.md';
-const CLAUDE = '.claude/skills/career-ops/SKILL.md';
-const OPENCODE = '.opencode/skills/career-ops/SKILL.md';
+const POINTER = '../../../.agents/skills/rolewright/SKILL.md';
+const CLAUDE = '.claude/skills/rolewright/SKILL.md';
+const OPENCODE = '.opencode/skills/rolewright/SKILL.md';
 
 function runDoctor(cwd) {
   try {
@@ -94,7 +94,7 @@ function repairCase(label, dirPrefix, pickCommand, run) {
   const dir = mkdtempSync(join(tmpdir(), dirPrefix));
   const elsewhere = mkdtempSync(join(tmpdir(), 'co-skill-elsewhere-'));
   try {
-    put(dir, '.agents/skills/career-ops/SKILL.md', CANONICAL);
+    put(dir, '.agents/skills/rolewright/SKILL.md', CANONICAL);
     const mod = join(dir, 'scaffolder', 'bin', 'skill-entrypoints.mjs');
     mkdirSync(dirname(mod), { recursive: true });
     copyFileSync(join(ROOT, 'scaffolder', 'bin', 'skill-entrypoints.mjs'), mod);
@@ -190,7 +190,7 @@ if (process.platform !== 'win32') {
 {
   const dir = mkdtempSync(join(tmpdir(), 'co-skill-stub-4-'));
   try {
-    put(dir, '.agents/skills/career-ops/SKILL.md', 'router body\n');
+    put(dir, '.agents/skills/rolewright/SKILL.md', 'router body\n');
     const link = join(dir, ...CLAUDE.split('/'));
     mkdirSync(dirname(link), { recursive: true });
     let linked = true;

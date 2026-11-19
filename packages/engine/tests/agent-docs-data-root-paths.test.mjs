@@ -32,7 +32,7 @@ import { describeSpawn } from './helpers/describe-spawn.mjs';
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf-8');
 
-const ROUTER = '.agents/skills/career-ops/SKILL.md';
+const ROUTER = '.agents/skills/rolewright/SKILL.md';
 const TSV_DIR = 'batch/tracker-additions/';
 
 /** The router paragraph that assigns each path to a root. */

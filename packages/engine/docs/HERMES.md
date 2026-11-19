@@ -51,7 +51,7 @@ Hermes does not load a skill that ships inside a project folder until you allow 
 hermes skills trust
 ```
 
-That registers the router at `.agents/skills/career-ops/SKILL.md` for sessions in this directory. It is a one-time step per folder, and `hermes skills untrust` reverses it.
+That registers the router at `.agents/skills/rolewright/SKILL.md` for sessions in this directory. It is a one-time step per folder, and `hermes skills untrust` reverses it.
 
 Without this step the tool still works, because the prompt files are ordinary files the agent can read. You just have to name the task yourself, for example "read the evaluation mode in `modes/oferta.md` and evaluate this posting", instead of letting the router pick it.
 

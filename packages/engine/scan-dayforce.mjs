@@ -722,7 +722,7 @@ async function main() {
     }
   }
 
-  console.log('\n→ Run /career-ops pipeline to evaluate new offers.');
+  console.log('\n→ Run /rolewright pipeline to evaluate new offers.');
 }
 
 // Guarded like every sibling scanner (scan-hn.mjs, scan-interamt.mjs,

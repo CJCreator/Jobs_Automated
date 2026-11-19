@@ -64,7 +64,7 @@ test('a fresh checkout with a skill-entrypoint stub does not claim tools are rea
   const dir = checkout({ withSetup: false });
   try {
     mkdirSync(join(dir, '.claude', 'skills', 'career-ops'), { recursive: true });
-    writeFileSync(join(dir, '.claude', 'skills', 'career-ops', 'SKILL.md'), '../../../.agents/skills/career-ops/SKILL.md\n');
+    writeFileSync(join(dir, '.claude', 'skills', 'career-ops', 'SKILL.md'), '../../../.agents/skills/rolewright/SKILL.md\n');
     const { status, out } = runDoctor(dir);
     assert.equal(status, 0, out);
     assert.match(out, /Setup is not finished \(4 files missing:/);

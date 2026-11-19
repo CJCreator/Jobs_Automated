@@ -58,7 +58,7 @@ test('it reaches its checks instead of throwing at module scope', () => {
   try {
     const r = runAgainst(dir);
     assert.ok(!looksLikeCrash(r.all), `crashed instead of running:\n${r.all.slice(0, 400)}`);
-    assert.match(r.stdout, /career-ops sync check/, 'no report header — the run never reached its checks');
+    assert.match(r.stdout, /rolewright sync check/, 'no report header — the run never reached its checks');
   } finally {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10 });
   }
@@ -115,7 +115,7 @@ test('the shipped prompt files raise no hardcoded-metric warning', () => {
   const dir = mkdtempSync(join(tmpdir(), 'career-ops-sync-check-'));
   try {
     const r = runAgainst(dir);
-    assert.match(r.stdout, /career-ops sync check/);
+    assert.match(r.stdout, /rolewright sync check/);
     assert.doesNotMatch(r.stdout, /Possible hardcoded metric/);
   } finally {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10 });

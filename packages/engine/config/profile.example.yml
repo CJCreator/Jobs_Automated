@@ -19,7 +19,7 @@ candidate:
   # alternate_emails:
   #   - "jane@previous-employer.example"
   phone: "+1-555-0123"
-  # Optional. Used by `/career-ops email` contact blocks in markets where WeChat
+  # Optional. Used by `/rolewright email` contact blocks in markets where WeChat
   # is an expected recruiting channel. Omit or leave blank if not applicable.
   wechat: ""
   location: "San Francisco, CA"
@@ -204,7 +204,7 @@ spend_tier: standard
 
 cv:
   output_format: "html" # "html" (default), "latex", or "text" (tailored markdown, no PDF)
-  # (Optional) Canva resume design ID for visual CV generation via /career-ops pdf.
+  # (Optional) Canva resume design ID for visual CV generation via /rolewright pdf.
   # Find it in your Canva design URL: https://www.canva.com/design/DAxxxxxxx/...
   # The ID starts with "D" and is 11 characters long.
   # canva_resume_design_id: "DAxxxxxxxxx"
@@ -274,14 +274,14 @@ cv:
 #   # If false (or absent), lack of evidence defaults to a neutral 3/5.
 #   deprioritize_if_absent: true
 
-# Optional user-owned LaTeX CV for `/career-ops latex-tex` (opt-in tailoring in place).
+# Optional user-owned LaTeX CV for `/rolewright latex-tex` (opt-in tailoring in place).
 # cv.md remains the default source of truth for evaluations and auto-pipeline.
 # latex:
 #   source: resume.tex
 
 # ── Cover Letter Settings ──────────────────────────────────────────────────
 #
-# Used by `/career-ops cover` and the cover letter sub-flow in `/career-ops pdf`.
+# Used by `/rolewright cover` and the cover letter sub-flow in `/rolewright pdf`.
 # All fields are optional — omit any you don't need.
 
 cover_letter:
@@ -314,20 +314,20 @@ cover_letter:
 
 # ── Contact Preferences ──────────────────────────────────────────────────────
 #
-# Used by `/career-ops contacto` (outreach CTA) and `/career-ops email` (contact
+# Used by `/rolewright contacto` (outreach CTA) and `/rolewright email` (contact
 # block) to steer drafted messages toward how you actually want to be reached.
 # Optional. Omit the whole block, or set preferred_channel to "either", to keep
 # today's behavior unchanged (no channel steering).
 #
 # contact_preferences:
 #   preferred_channel: "email"   # email | phone | either — default "either" if omitted
-#   # Optional. Surfaced near the contact block in `/career-ops email` drafts and
-#   # can inform the CTA wording in `/career-ops contacto`. Keep it one line.
+#   # Optional. Surfaced near the contact block in `/rolewright email` drafts and
+#   # can inform the CTA wording in `/rolewright contacto`. Keep it one line.
 #   note: "Screens unknown numbers — please email or text first to schedule a call"
 
 # ── Outreach / greeting ─────────────────────────────────────────────────────
 #
-# Used by the greeting variant of `/career-ops contacto` (the short first-touch
+# Used by the greeting variant of `/rolewright contacto` (the short first-touch
 # message for BOSS Zhipin 打招呼, job-board chat, or a cold-email opener).
 #
 # greeting_max_chars is the hard character budget for that message. Default when
@@ -338,7 +338,7 @@ cover_letter:
 
 # ── Application Email Drafts ────────────────────────────────────────────────
 #
-# Used by `/career-ops email` when drafting formal application emails. This is
+# Used by `/rolewright email` when drafting formal application emails. This is
 # separate from `contacto` short outreach and `cover` full cover letters.
 # All fields are optional.
 #
@@ -368,7 +368,7 @@ cover_letter:
 
 # ── Auto-PDF threshold ──────────────────────────────────────────────────────
 #
-# Auto-PDF threshold during evaluation (used by `/career-ops pipeline` and
+# Auto-PDF threshold during evaluation (used by `/rolewright pipeline` and
 # `bash batch/batch-runner.sh`).
 #
 # An offer's tailored CV PDF is auto-generated only when its score is
@@ -377,19 +377,19 @@ cover_letter:
 # become an actual application — so the gate avoids wasted renders.
 #
 # Default (key absent OR commented out): 3.0 — the original gate of
-# `/career-ops pipeline`. Both evaluation paths apply the same default, so
+# `/rolewright pipeline`. Both evaluation paths apply the same default, so
 # a batch run and an interactive run treat the same offer identically.
 #
 # Raise it (e.g. 4.0) to auto-generate PDFs only for stronger matches and
 # leave the rest report-only — those can still be produced on demand via
-# `/career-ops pdf {company-slug}`. Fractional thresholds work (e.g. 3.5 —
+# `/rolewright pdf {company-slug}`. Fractional thresholds work (e.g. 3.5 —
 # half-point scores like 3.5/5 occur in evaluations). Set it to 0 to
 # generate a PDF for every offer.
 # auto_pdf_score_threshold: 4.0
 
 # ── Two-pass triage gate ────────────────────────────────────────────────────
 #
-# Used by `/career-ops pipeline`. Before running the full A-G evaluation on
+# Used by `/rolewright pipeline`. Before running the full A-G evaluation on
 # every URL in a batch, a lightweight first pass (`modes/triage.md`) scores each
 # role from a compact profile brief (`modes/_brief.md`) and filters out the ones
 # that would clearly disqualify — so the expensive full evaluation only runs on

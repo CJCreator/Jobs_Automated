@@ -106,9 +106,9 @@ if (failures.length === 0) {
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'career-ops-materialized-symlink-'));
 const fixtureTarget = join(fixtureRoot, '.agents', 'skills', 'career-ops', 'SKILL.md');
 const fixturePointer = join(fixtureRoot, '.claude', 'skills', 'career-ops', 'SKILL.md');
-const fixtureTargetRelative = '.agents/skills/career-ops/SKILL.md';
-const fixturePointerRelative = '.claude/skills/career-ops/SKILL.md';
-const pointerTarget = '../../../.agents/skills/career-ops/SKILL.md';
+const fixtureTargetRelative = '.agents/skills/rolewright/SKILL.md';
+const fixturePointerRelative = '.claude/skills/rolewright/SKILL.md';
+const pointerTarget = '../../../.agents/skills/rolewright/SKILL.md';
 
 try {
   mkdirSync(dirname(fixtureTarget), { recursive: true });

@@ -145,11 +145,11 @@ careers_url) and the unresolved list with reasons. Call out:
   host after — are never probed further or written. Report them as skipped; to
   track one anyway, the user removes it from the blacklist first.
 - **Genuinely unknown**: for a JS-only portal with no ATS API, paste a specific
-  JD into `data/pipeline.md` and run `/career-ops pipeline`.
+  JD into `data/pipeline.md` and run `/rolewright pipeline`.
 
 ## Step 3 — Handoff
 
-After writing, tell the user to run `/career-ops scan` to pull matching roles from the newly tracked boards.
+After writing, tell the user to run `/rolewright scan` to pull matching roles from the newly tracked boards.
 
 ## Rules
 

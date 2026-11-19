@@ -30,7 +30,7 @@ below have to know which files under the checkout are yours.
 Use a folder **outside** the checkout, for example `~/career-data`:
 
 ```bash
-cd ~/career-ops
+cd ~/rolewright
 dest="$HOME/career-data"
 
 (
@@ -113,9 +113,9 @@ it as `\%`:
 **On a new machine** (or at the start of a cloud session):
 
 ```bash
-git clone https://github.com/career-ops-hq/career-ops.git ~/career-ops
+git clone https://github.com/career-ops-hq/career-ops.git ~/rolewright
 gh repo clone career-data ~/career-data
-cd ~/career-ops && npm install && npx playwright install chromium
+cd ~/rolewright && npm install && npx playwright install chromium
 echo "$HOME/career-data" > .career-ops-data
 node doctor.mjs
 ```
@@ -179,7 +179,7 @@ the backup cannot be read.
 
 - **Restore once before you rely on it.** Restore into a scratch folder, point
   `CAREER_OPS_ROOT` at it, and run `node doctor.mjs`.
-- **Nothing personal in the checkout.** After Step 0, `git status` in `~/career-ops`
+- **Nothing personal in the checkout.** After Step 0, `git status` in `~/rolewright`
   should show no personal files, and nothing you push from the checkout contains them.
 - **Updates are unaffected.** `node update-system.mjs` only touches the System Layer in the
   checkout. Your data root is outside it.

@@ -68,8 +68,8 @@ async function decodePng(buf) {
 }
 
 test('the skill and the license are byte-identical copies of the canonical ones', () => {
-  assert.equal(read('antigravity-directory/skills/career-ops/SKILL.md'), read('.agents/skills/career-ops/SKILL.md'),
-    'antigravity-directory/skills/career-ops/SKILL.md diverged: copy .agents/skills/career-ops/SKILL.md over it');
+  assert.equal(read('antigravity-directory/skills/rolewright/SKILL.md'), read('.agents/skills/rolewright/SKILL.md'),
+    'antigravity-directory/skills/rolewright/SKILL.md diverged: copy .agents/skills/rolewright/SKILL.md over it');
   assert.equal(read('antigravity-directory/LICENSE'), read('LICENSE'), 'antigravity-directory/LICENSE diverged: copy LICENSE over it');
 });
 
@@ -168,7 +168,7 @@ test('every line that carries the release version is marked for release-please',
   const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
   assert.ok(extra.some((f) => f.path === 'antigravity-directory/plugin.json' && f.jsonpath === '$.version'),
     'release-please-config.json does not bump antigravity-directory/plugin.json');
-  for (const rel of ['antigravity-directory/skills/career-ops/SKILL.md', 'antigravity-directory/README.md']) {
+  for (const rel of ['antigravity-directory/skills/rolewright/SKILL.md', 'antigravity-directory/README.md']) {
     assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
     for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
       assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);

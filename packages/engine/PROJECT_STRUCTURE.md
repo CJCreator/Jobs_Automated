@@ -10,7 +10,7 @@
 
 ```
 career-ops/
-├── .agents/                 # Open Agent Skill Standard router (.agents/skills/career-ops/SKILL.md)
+├── .agents/                 # Open Agent Skill Standard router (.agents/skills/rolewright/SKILL.md)
 ├── batch/                   # Headless parallel batch processing engine
 ├── config/                  # Candidate configuration templates & schema definitions
 ├── dashboard/               # Standalone Go terminal dashboard (Charm Bubbletea)

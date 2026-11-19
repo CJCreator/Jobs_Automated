@@ -2,7 +2,7 @@
 // lead the user to career-ops instead of stopping in silence.
 //
 // Skill catalogs (`npx skills add career-ops-hq/career-ops`) copy only
-// .agents/skills/career-ops/SKILL.md. Nothing around it holds AGENTS.md or
+// .agents/skills/rolewright/SKILL.md. Nothing around it holds AGENTS.md or
 // modes/, so Project Root Resolution finds no PROJECT_ROOT. The router used to
 // say only "stop and locate the checkout", which left a user who had pasted a
 // job URL with no next step. It now carries a "Skill installed without
@@ -61,22 +61,22 @@ test('the missing-sentinel rule points at the standalone branch', () => {
 
 test('the standalone branch looks for an install, asks before init and resumes the request', () => {
   const branch = standaloneBranch(readFileSync(SOURCE, 'utf8'));
-  for (const place of ['CAREER_OPS_ROOT', './career-ops', '~/career-ops']) {
+  for (const place of ['CAREER_OPS_ROOT', './career-ops', '~/rolewright']) {
     assert.ok(branch.includes(place), `standalone branch does not look in ${place}`);
   }
   // Pinned to the release (the Claude plugin directory blocks an unpinned npx); release-please bumps it.
   const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   assert.ok(branch.includes(`npx @santifer/career-ops@${version} init`), `standalone branch does not name the init command pinned to ${version}`);
-  assert.doesNotMatch(branch, /npx @santifer\/career-ops init/, 'standalone branch has an unpinned init command');
+  assert.doesNotMatch(branch, /npx @santifer\/rolewright init/, 'standalone branch has an unpinned init command');
   assert.match(branch, /Ask before running it/, 'standalone branch must ask before installing');
   assert.match(branch, /original request/, 'standalone branch must pick the user\'s request back up');
-  assert.match(branch, /https:\/\/github\.com\/career-ops-hq\/career-ops(?![\w-])/, 'standalone branch must link the canonical repo');
+  assert.match(branch, /https:\/\/github\.com\/career-ops-hq\/rolewright(?![\w-])/, 'standalone branch must link the canonical repo');
   assert.doesNotMatch(branch, /github\.com\/santifer\//, 'standalone branch links the old repo path');
 });
 
 test('every SKILL.md entrypoint carries the same standalone branch', () => {
   const expected = standaloneBranch(readFileSync(SOURCE, 'utf8'));
   for (const entry of ENTRYPOINTS) {
-    assert.equal(standaloneBranch(readFileSync(entry, 'utf8')), expected, `${entry} differs from .agents/skills/career-ops/SKILL.md`);
+    assert.equal(standaloneBranch(readFileSync(entry, 'utf8')), expected, `${entry} differs from .agents/skills/rolewright/SKILL.md`);
   }
 });

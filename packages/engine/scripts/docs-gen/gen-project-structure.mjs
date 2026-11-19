@@ -10,7 +10,7 @@ This document provides a comprehensive map of the entire \`career-ops\` reposito
 
 \`\`\`
 career-ops/
-├── .agents/                 # Open Agent Skill Standard definition (.agents/skills/career-ops/SKILL.md)
+├── .agents/                 # Open Agent Skill Standard definition (.agents/skills/rolewright/SKILL.md)
 ├── batch/                   # Headless batch processing orchestrator & parallel worker prompts
 ├── config/                  # Candidate configuration templates (profile.yml, cv-facts.json)
 ├── dashboard/               # Standalone Go Terminal TUI (Charm Bubbletea)

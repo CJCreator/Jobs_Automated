@@ -97,8 +97,8 @@ test('the logo exists and is a square PNG', () => {
 });
 
 test('the skill and the license are byte-identical copies of the canonical ones', () => {
-  assert.equal(read('cursor-directory/skills/career-ops/SKILL.md'), read('.agents/skills/career-ops/SKILL.md'),
-    'cursor-directory/skills/career-ops/SKILL.md diverged: copy .agents/skills/career-ops/SKILL.md over it');
+  assert.equal(read('cursor-directory/skills/rolewright/SKILL.md'), read('.agents/skills/rolewright/SKILL.md'),
+    'cursor-directory/skills/rolewright/SKILL.md diverged: copy .agents/skills/rolewright/SKILL.md over it');
   assert.equal(read('cursor-directory/LICENSE'), read('LICENSE'), 'cursor-directory/LICENSE diverged: copy LICENSE over it');
   for (const { path, rel } of files.filter(({ rel }) => rel.endsWith('/SKILL.md'))) {
     assert.match(rel, /^skills\/[a-z0-9-]+\/SKILL\.md$/, `${rel}: skills live at skills/<name>/SKILL.md`);
@@ -142,7 +142,7 @@ test('every line that carries the release version is marked for release-please',
   const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
   assert.ok(extra.some((f) => f.path === 'cursor-directory/.cursor-plugin/plugin.json' && f.jsonpath === '$.version'),
     'release-please-config.json does not bump cursor-directory/.cursor-plugin/plugin.json');
-  for (const rel of ['cursor-directory/skills/career-ops/SKILL.md', 'cursor-directory/README.md']) {
+  for (const rel of ['cursor-directory/skills/rolewright/SKILL.md', 'cursor-directory/README.md']) {
     assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
     for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
       assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);

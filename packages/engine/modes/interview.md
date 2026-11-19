@@ -1,12 +1,12 @@
 # Mode: interview — Interactive Profile & CV Onboarding
 
-When the user runs `/career-ops interview`, execute this interactive profile/CV interview flow.
+When the user runs `/rolewright interview`, execute this interactive profile/CV interview flow.
 
 The purpose of this mode is to conduct a conversational interview to extract rich context, specific project tasks, technologies used, and measurable business impact to build or enhance `cv.md`, `config/profile.yml`, and `modes/_profile.md`.
 
 ---
 
-**Unattended runs** (`modes/_shared.md` → **Unattended runs**): do not start. This mode asks one question at a time and has no default answers. End with `needs_confirmation: interactive_only interview - run /career-ops interview in a chat session`.
+**Unattended runs** (`modes/_shared.md` → **Unattended runs**): do not start. This mode asks one question at a time and has no default answers. End with `needs_confirmation: interactive_only interview - run /rolewright interview in a chat session`.
 
 ## Guidelines for the AI Agent
 

@@ -1,5 +1,5 @@
 ---
-name: career-ops
+name: rolewright
 description: "Open-source AI job search agent -- evaluate offers, generate CVs, scan portals, track applications. Use when the user pastes a job URL or JD, asks to scan portals, generate a CV/PDF, track applications, prepare for interviews, draft outreach/emails, or run any career-ops mode."
 arguments: mode
 user_invocable: true
@@ -22,7 +22,7 @@ Resolve every path in this router against one of these two roots, never against 
 
 A skills catalog, or the career-ops plugin from a plugin directory (Claude or OpenAI), installs only this `SKILL.md`. The modes, scripts and `AGENTS.md` it routes to live in the career-ops repository, so no mode can run until career-ops is installed. Never improvise a mode from this file alone: an evaluation without the repo's modes and the user's CV is not a career-ops evaluation.
 
-1. Look for an existing install before offering a new one: the directory in `CAREER_OPS_ROOT` if it is set, then `./career-ops`, then `~/career-ops`. The first one that contains both `AGENTS.md` and `modes/` is `PROJECT_ROOT`; tell the user which one you are using, read `PROJECT_ROOT/AGENTS.md` in full, and continue with their request.
+1. Look for an existing install before offering a new one: the directory in `CAREER_OPS_ROOT` if it is set, then `./career-ops`, then `~/rolewright`. The first one that contains both `AGENTS.md` and `modes/` is `PROJECT_ROOT`; tell the user which one you are using, read `PROJECT_ROOT/AGENTS.md` in full, and continue with their request.
 2. If there is none, tell the user in a few lines that career-ops runs from its own folder, and offer to set it up with `npx @santifer/career-ops@1.38.0 init`. It needs Node.js, downloads the latest release from https://github.com/career-ops-hq/career-ops into `./career-ops` and installs its dependencies. Ask before running it: it downloads and installs software. <!-- x-release-please-version -->
 3. With a yes, run it from the current directory (or the folder the user picks). Then treat the new `career-ops` folder as `PROJECT_ROOT`: read its `AGENTS.md` in full, run every script from it, and pick up the user's original request (a pasted job URL or JD included). If their CV and profile are not there yet, the first-run setup in `AGENTS.md` comes first: it walks them through it by chatting. Tell them that next time they can open their AI CLI inside that folder.
 4. If they prefer to install it themselves, give the one command (`npx @santifer/career-ops@1.38.0 init`, then `cd career-ops` and open the AI CLI there) and, for Claude Code, the plugin alternative: `/plugin marketplace add career-ops-hq/career-ops` then `/plugin install career-ops@career-ops`. Then stop. <!-- x-release-please-version -->
@@ -33,10 +33,10 @@ When `PROJECT_ROOT` is a plugin install copy, the session's working folder is no
 
 ## Invocation Notes
 
-- CLIs with slash-command registration can expose this router as `/career-ops`.
-- In Cursor, this skill lives at `.agents/skills/career-ops/` and is auto-discovered; ask for a mode by name, or paste a JD/URL to trigger auto-pipeline.
-- In Pi, this skill is auto-discovered from `.agents/skills/career-ops/` and exposed as `/skill:career-ops`; `AGENTS.md` loads from the repo root as project context, so there is no wrapper file. Headless Pi workers use `pi -p "prompt"`. Project skill discovery follows Pi's per-folder trust decision: `/trust` applies to future Pi processes, so restart `pi` before invoking `/skill:career-ops` (`-a` trusts a single run and needs no restart).
-- Interactive Codex sessions use `codex` in the repo root. Slash commands are not guaranteed in Codex, so ask Codex to run the same mode by name if `/career-ops` is unavailable.
+- CLIs with slash-command registration can expose this router as `/rolewright`.
+- In Cursor, this skill lives at `.agents/skills/rolewright/` and is auto-discovered; ask for a mode by name, or paste a JD/URL to trigger auto-pipeline.
+- In Pi, this skill is auto-discovered from `.agents/skills/rolewright/` and exposed as `/skill:rolewright`; `AGENTS.md` loads from the repo root as project context, so there is no wrapper file. Headless Pi workers use `pi -p "prompt"`. Project skill discovery follows Pi's per-folder trust decision: `/trust` applies to future Pi processes, so restart `pi` before invoking `/skill:rolewright` (`-a` trusts a single run and needs no restart).
+- Interactive Codex sessions use `codex` in the repo root. Slash commands are not guaranteed in Codex, so ask Codex to run the same mode by name if `/rolewright` is unavailable.
 - Headless Codex workers use `codex exec "prompt"`.
 - The routing semantics below stay the same regardless of whether the entrypoint is a slash command or a natural-language prompt.
 
@@ -139,17 +139,17 @@ Hosts that title sessions automatically name them after the invocation, so every
 
 ## Discovery Mode (no arguments)
 
-If your CLI supports `/career-ops`, show this menu. In Codex, surface the same options in plain text and map the requested mode the same way.
+If your CLI supports `/rolewright`, show this menu. In Codex, surface the same options in plain text and map the requested mode the same way.
 
 Concrete equivalents for Codex prompt-driven sessions:
 
 ```text
-/career-ops {JD}           ↔ "Evaluate this JD with career-ops auto-pipeline: {JD or URL}"
-/career-ops scan           ↔ "Run the career-ops scan mode and summarize new matches."
-/career-ops pipeline       ↔ "Run the career-ops pipeline mode for data/pipeline.md."
-/career-ops pdf            ↔ "Run the career-ops pdf mode for the latest evaluated role."
-/career-ops email          ↔ "Run the career-ops email mode for the latest evaluated role."
-/career-ops tracker        ↔ "Run the career-ops tracker mode and summarize the current statuses."
+/rolewright {JD}           ↔ "Evaluate this JD with career-ops auto-pipeline: {JD or URL}"
+/rolewright scan           ↔ "Run the career-ops scan mode and summarize new matches."
+/rolewright pipeline       ↔ "Run the career-ops pipeline mode for data/pipeline.md."
+/rolewright pdf            ↔ "Run the career-ops pdf mode for the latest evaluated role."
+/rolewright email          ↔ "Run the career-ops email mode for the latest evaluated role."
+/rolewright tracker        ↔ "Run the career-ops tracker mode and summarize the current statuses."
 ```
 
 Show this menu:
@@ -158,51 +158,51 @@ Show this menu:
 career-ops -- AI Job Search Agent
 
 Available commands:
-  /career-ops {JD}      → AUTO-PIPELINE: evaluate + report + PDF + tracker (paste text or URL)
-  /career-ops pipeline  → Process pending URLs from inbox (data/pipeline.md)
-  /career-ops oferta    → Evaluation only A-H (no auto PDF)
-  /career-ops ofertas   → Compare and rank multiple offers
-  /career-ops contacto  → LinkedIn power move: find contacts + draft message
-  /career-ops deep      → Deep research prompt about company
-  /career-ops interview-prep → Generate company-specific interview prep doc
-  /career-ops interview    → Interactive profile/CV onboarding interview
-  /career-ops master-profile → Import, review, and validate your Master Career Profile
-  /career-ops intake    → Build or enrich your profile from documents/ (master CV, LinkedIn export; nothing written without confirm)
-  /career-ops retro     → Review this session and keep what you taught it as rules (writes only the ids you accept)
-  /career-ops eu-swe    → Calibrate a European SWE application before CV/apply/interview
-  /career-ops interview/plan → Time-blocked prep plan for an upcoming interview
-  /career-ops interview/practice → Practice interview, one question at a time with feedback
-  /career-ops interview/debrief → Post-interview debrief: close gaps, predict next round
-  /career-ops interview-redflag → Analyze employer warning signs before joining a company
-  /career-ops pdf       → PDF only, ATS-optimized CV
-  /career-ops ats       → ATS-friendliness check of a generated CV (score + fixable issues)
-  /career-ops text      → Tailored markdown CV (mirrors cv.md, no PDF)
-  /career-ops latex     → Export CV as LaTeX/Overleaf .tex
-  /career-ops latex-tex → Tailor your own resume.tex in place (opt-in; cv.md stays default)
-  /career-ops cover     → Cover letter: standalone JD paste or /career-ops cover {slug}
-  /career-ops email     → Formal application email draft (draft-only; never sends, submits, or clicks)
-  /career-ops add       → Add a project/paper/role to your CV (fetch + preview + confirm)
-  /career-ops expand    → Auto-discover and add missing competencies from profile links
-  /career-ops training  → Evaluate course/cert against North Star
-  /career-ops project   → Evaluate portfolio project idea
-  /career-ops tracker   → Application status overview
-  /career-ops agent-inbox → Queue/drain requests for the next session (data/agent-inbox.md)
-  /career-ops apply     → Live application assistant (Playwright from this checkout, does not submit)
-  /career-ops scan      → Scan portals and discover new offers
-  /career-ops discover  → Resolve a company list to scannable ATS boards + append to portals.yml (zero-token)
-  /career-ops triage    → Fast first-pass go/no-go score from modes/_brief.md (writes no files)
-  /career-ops batch     → Batch processing with parallel workers
-  /career-ops patterns  → Analyze rejection patterns and improve targeting
-  /career-ops calibrate → Check whether evaluation scores predict your real outcomes (advisory only)
-  /career-ops offer-prep → Read a received offer/contract with the candidate: clause walk + lawyer questions (not legal advice)
-  /career-ops titles    → Suggest adjacent job titles from your CV to broaden the search
-  /career-ops upskill   → Aggregate skill-gap analysis from your evaluated reports
-  /career-ops followup  → Follow-up cadence tracker: flag overdue, generate drafts
-  /career-ops reply-watch → Classify employer replies and suggest tracker updates
-  /career-ops outcome   → Record application outcome & archive artifacts
-  /career-ops update    → Update career-ops system files with diff preview + compat check
+  /rolewright {JD}      → AUTO-PIPELINE: evaluate + report + PDF + tracker (paste text or URL)
+  /rolewright pipeline  → Process pending URLs from inbox (data/pipeline.md)
+  /rolewright oferta    → Evaluation only A-H (no auto PDF)
+  /rolewright ofertas   → Compare and rank multiple offers
+  /rolewright contacto  → LinkedIn power move: find contacts + draft message
+  /rolewright deep      → Deep research prompt about company
+  /rolewright interview-prep → Generate company-specific interview prep doc
+  /rolewright interview    → Interactive profile/CV onboarding interview
+  /rolewright master-profile → Import, review, and validate your Master Career Profile
+  /rolewright intake    → Build or enrich your profile from documents/ (master CV, LinkedIn export; nothing written without confirm)
+  /rolewright retro     → Review this session and keep what you taught it as rules (writes only the ids you accept)
+  /rolewright eu-swe    → Calibrate a European SWE application before CV/apply/interview
+  /rolewright interview/plan → Time-blocked prep plan for an upcoming interview
+  /rolewright interview/practice → Practice interview, one question at a time with feedback
+  /rolewright interview/debrief → Post-interview debrief: close gaps, predict next round
+  /rolewright interview-redflag → Analyze employer warning signs before joining a company
+  /rolewright pdf       → PDF only, ATS-optimized CV
+  /rolewright ats       → ATS-friendliness check of a generated CV (score + fixable issues)
+  /rolewright text      → Tailored markdown CV (mirrors cv.md, no PDF)
+  /rolewright latex     → Export CV as LaTeX/Overleaf .tex
+  /rolewright latex-tex → Tailor your own resume.tex in place (opt-in; cv.md stays default)
+  /rolewright cover     → Cover letter: standalone JD paste or /rolewright cover {slug}
+  /rolewright email     → Formal application email draft (draft-only; never sends, submits, or clicks)
+  /rolewright add       → Add a project/paper/role to your CV (fetch + preview + confirm)
+  /rolewright expand    → Auto-discover and add missing competencies from profile links
+  /rolewright training  → Evaluate course/cert against North Star
+  /rolewright project   → Evaluate portfolio project idea
+  /rolewright tracker   → Application status overview
+  /rolewright agent-inbox → Queue/drain requests for the next session (data/agent-inbox.md)
+  /rolewright apply     → Live application assistant (Playwright from this checkout, does not submit)
+  /rolewright scan      → Scan portals and discover new offers
+  /rolewright discover  → Resolve a company list to scannable ATS boards + append to portals.yml (zero-token)
+  /rolewright triage    → Fast first-pass go/no-go score from modes/_brief.md (writes no files)
+  /rolewright batch     → Batch processing with parallel workers
+  /rolewright patterns  → Analyze rejection patterns and improve targeting
+  /rolewright calibrate → Check whether evaluation scores predict your real outcomes (advisory only)
+  /rolewright offer-prep → Read a received offer/contract with the candidate: clause walk + lawyer questions (not legal advice)
+  /rolewright titles    → Suggest adjacent job titles from your CV to broaden the search
+  /rolewright upskill   → Aggregate skill-gap analysis from your evaluated reports
+  /rolewright followup  → Follow-up cadence tracker: flag overdue, generate drafts
+  /rolewright reply-watch → Classify employer replies and suggest tracker updates
+  /rolewright outcome   → Record application outcome & archive artifacts
+  /rolewright update    → Update career-ops system files with diff preview + compat check
 
-Inbox: add URLs to data/pipeline.md → /career-ops pipeline
+Inbox: add URLs to data/pipeline.md → /rolewright pipeline
 Or paste a JD directly to run the full pipeline.
 ```
 

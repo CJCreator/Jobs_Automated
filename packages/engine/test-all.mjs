@@ -2330,12 +2330,12 @@ const systemFiles = [
   'modes/oferta.md', 'modes/pdf.md', 'modes/scan.md',
   'modes/heuristics/recruiter-side.md',
   'templates/states.yml', 'templates/cv-template.html',
-  '.claude/skills/career-ops/SKILL.md',
-  '.opencode/skills/career-ops/SKILL.md',
-  '.qwen/skills/career-ops/SKILL.md',
-  '.antigravitycli/skills/career-ops/SKILL.md',
-  '.grok/skills/career-ops/SKILL.md',
-  '.kimi/skills/career-ops/SKILL.md',
+  '.claude/skills/rolewright/SKILL.md',
+  '.opencode/skills/rolewright/SKILL.md',
+  '.qwen/skills/rolewright/SKILL.md',
+  '.antigravitycli/skills/rolewright/SKILL.md',
+  '.grok/skills/rolewright/SKILL.md',
+  '.kimi/skills/rolewright/SKILL.md',
 ];
 
 for (const f of systemFiles) {
@@ -2366,7 +2366,7 @@ for (const f of systemFiles) {
 // defect is actually about, and still catches #1051: a link-path blob never
 // equals the canonical blob. Reading the INDEX (not the filesystem) keeps this
 // true on Windows checkouts, where a symlink entry materializes as a text file.
-const CANONICAL_ENTRYPOINT = '.agents/skills/career-ops/SKILL.md';
+const CANONICAL_ENTRYPOINT = '.agents/skills/rolewright/SKILL.md';
 const stagedBlob = (path) => {
   const entry = run('git', ['ls-files', '-s', path]);
   if (entry === null || entry === '') return null;
@@ -2379,7 +2379,7 @@ if (!canonicalEntry) {
   fail(`Could not read git index entry for the canonical entrypoint ${CANONICAL_ENTRYPOINT}`);
 }
 
-const skillEntrypoints = systemFiles.filter((f) => f.endsWith('/skills/career-ops/SKILL.md'));
+const skillEntrypoints = systemFiles.filter((f) => f.endsWith('/skills/rolewright/SKILL.md'));
 for (const f of skillEntrypoints) {
   const staged = stagedBlob(f);
   if (!staged) {
@@ -3070,7 +3070,7 @@ console.log('\n7d. Output language contract');
 const profileExample = readTextLF('config/profile.example.yml');
 const outputLanguageAgentsDoc = readTextLF('AGENTS.md');
 const outputLanguageClaudeDoc = readTextLF('CLAUDE.md');
-const careerOpsSkill = readTextLF('.agents/skills/career-ops/SKILL.md');
+const careerOpsSkill = readTextLF('.agents/skills/rolewright/SKILL.md');
 const batchPrompt = readTextLF('batch/batch-prompt.md');
 
 if (/language:\s*\n(?:\s*#.*\n)*\s*output:\s*["']?en["']?/.test(profileExample)) {
@@ -3626,26 +3626,26 @@ if (
   fail('_custom.md read-path regressed: missing Sources of Truth row, honor rule in _shared.md, or the pre-generation read in pdf.md (#1388 would reopen)');
 }
 
-for (const skillPath of ['.claude/skills/career-ops/SKILL.md', '.agents/skills/career-ops/SKILL.md']) {
+for (const skillPath of ['.claude/skills/rolewright/SKILL.md', '.agents/skills/rolewright/SKILL.md']) {
   if (!fileExists(skillPath)) {
     fail(`${skillPath} is missing`);
     continue;
   }
   const skill = readFile(skillPath);
-  if (skill.includes('/career-ops latex')) {
-    pass(`${skillPath} exposes /career-ops latex in discovery menu`);
+  if (skill.includes('/rolewright latex')) {
+    pass(`${skillPath} exposes /rolewright latex in discovery menu`);
   } else {
-    fail(`${skillPath} does not expose /career-ops latex in discovery menu`);
+    fail(`${skillPath} does not expose /rolewright latex in discovery menu`);
   }
   if (
     skill.includes('email') &&
     skill.includes('| `email` | `email` |') &&
-    skill.includes('/career-ops email') &&
+    skill.includes('/rolewright email') &&
     /Standalone modes[\s\S]*Applies to:[^\n]*`email`/.test(skill)
   ) {
-    pass(`${skillPath} exposes /career-ops email in routing, discovery, and standalone loading`);
+    pass(`${skillPath} exposes /rolewright email in routing, discovery, and standalone loading`);
   } else {
-    fail(`${skillPath} does not fully expose /career-ops email`);
+    fail(`${skillPath} does not fully expose /rolewright email`);
   }
 }
 
@@ -3672,7 +3672,7 @@ if (
   fail('email mode missing required application-email behavior');
 }
 
-for (const skillPath of ['.claude/skills/career-ops/SKILL.md', '.agents/skills/career-ops/SKILL.md']) {
+for (const skillPath of ['.claude/skills/rolewright/SKILL.md', '.agents/skills/rolewright/SKILL.md']) {
   if (!fileExists(skillPath)) {
     fail(`${skillPath} is missing`);
     continue;
@@ -4560,11 +4560,11 @@ if (
   }
 }
 
-const routerSkill = readFile('.agents/skills/career-ops/SKILL.md');
+const routerSkill = readFile('.agents/skills/rolewright/SKILL.md');
 if (
   /argument-hint:.*offer-prep/.test(routerSkill) &&
   routerSkill.includes('| `offer-prep` | `offer-prep` |') &&
-  routerSkill.includes('/career-ops offer-prep') &&
+  routerSkill.includes('/rolewright offer-prep') &&
   /Applies to:.*`offer-prep`/.test(routerSkill) &&
   !/Modes delegated to subagent[\s\S]*offer-prep/.test(routerSkill)
 ) {
@@ -5064,13 +5064,13 @@ if (
   fail('upskill trust rule 7 (effort from stated length only) missing');
 }
 
-// Rule 8 — scope boundary: link to /career-ops training; never run training's scoring.
+// Rule 8 — scope boundary: link to /rolewright training; never run training's scoring.
 if (
-  upskillModeDoc.includes('/career-ops training {name}') &&
+  upskillModeDoc.includes('/rolewright training {name}') &&
   upskillModeDoc.includes('6-dimension scoring') &&
   upskillModeDoc.includes('`upskill` finds; `training` judges')
 ) {
-  pass('upskill trust rule 8: scope boundary — links to /career-ops training, never runs training scoring');
+  pass('upskill trust rule 8: scope boundary — links to /rolewright training, never runs training scoring');
 } else {
   fail('upskill trust rule 8 (scope boundary: upskill finds, training judges) missing');
 }
@@ -7077,8 +7077,8 @@ for (const [name, marker] of criticalRoutingContracts) {
   if (marker.test(agents)) pass(`AGENTS.md preserves ${name} routing for Claude`);
   else fail(`AGENTS.md is missing ${name} routing required by the Claude wrapper`);
 }
-const claudeSkillEntrypoint = readFile('.claude/skills/career-ops/SKILL.md');
-if (/\.agents\/skills\/career-ops\/SKILL\.md/.test(claudeSkillEntrypoint) || claudeSkillEntrypoint === readFile('.agents/skills/career-ops/SKILL.md')) {
+const claudeSkillEntrypoint = readFile('.claude/skills/rolewright/SKILL.md');
+if (/\.agents\/skills\/rolewright\/SKILL\.md/.test(claudeSkillEntrypoint) || claudeSkillEntrypoint === readFile('.agents/skills/rolewright/SKILL.md')) {
   pass('Claude skill invocation resolves to the canonical career-ops router');
 } else {
   fail('Claude skill invocation does not resolve to the canonical career-ops router');
@@ -7088,13 +7088,13 @@ if (/\.agents\/skills\/career-ops\/SKILL\.md/.test(claudeSkillEntrypoint) || cla
 
 console.log('\n12. Skill symlink integrity');
 
-const canonicalSkill = '.agents/skills/career-ops/SKILL.md';
+const canonicalSkill = '.agents/skills/rolewright/SKILL.md';
 const symlinks = [
-  '.claude/skills/career-ops/SKILL.md',
-  '.opencode/skills/career-ops/SKILL.md',
-  '.qwen/skills/career-ops/SKILL.md',
-  '.antigravitycli/skills/career-ops/SKILL.md',
-  '.grok/skills/career-ops/SKILL.md',
+  '.claude/skills/rolewright/SKILL.md',
+  '.opencode/skills/rolewright/SKILL.md',
+  '.qwen/skills/rolewright/SKILL.md',
+  '.antigravitycli/skills/rolewright/SKILL.md',
+  '.grok/skills/rolewright/SKILL.md',
 ];
 
 let canonicalReal = null;
@@ -7138,7 +7138,7 @@ if (
   /`codex`/.test(canonicalContent ?? '') &&
   /`codex exec/.test(canonicalContent ?? '') &&
   /prompt/i.test(canonicalContent ?? '') &&
-  /\/career-ops/.test(canonicalContent ?? '')
+  /\/rolewright/.test(canonicalContent ?? '')
 ) {
   pass('career-ops skill router documents the Codex invocation model');
 } else {
@@ -7195,7 +7195,7 @@ console.log('\n12a. Skill entrypoint materialization');
     mkdirSync(opencodeDir, { recursive: true });
 
     const fixtureSkill = '---\nname: career-ops\n---\n\n# canonical skill\n';
-    const pointer = '../../../.agents/skills/career-ops/SKILL.md';
+    const pointer = '../../../.agents/skills/rolewright/SKILL.md';
     writeFileSync(join(canonicalDir, 'SKILL.md'), fixtureSkill);
     writeFileSync(join(claudeDir, 'SKILL.md'), pointer);
     writeFileSync(join(opencodeDir, 'SKILL.md'), pointer);
@@ -7203,8 +7203,8 @@ console.log('\n12a. Skill entrypoint materialization');
     const skills = await import(pathToFileURL(join(ROOT, 'scaffolder/bin/skill-entrypoints.mjs')).href);
     const materialized = skills.materializeSkillEntrypoints(fixtureRoot).sort();
     const expected = [
-      '.claude/skills/career-ops/SKILL.md',
-      '.opencode/skills/career-ops/SKILL.md',
+      '.claude/skills/rolewright/SKILL.md',
+      '.opencode/skills/rolewright/SKILL.md',
     ];
 
     if (JSON.stringify(materialized) === JSON.stringify(expected)) {
@@ -7232,7 +7232,7 @@ console.log('\n12a. Skill entrypoint materialization');
 // these files on filesystems without symlink support. A tracked-but-unlisted
 // entrypoint checks out as a pointer text file on Windows and stays that way:
 // the user opens their CLI and the skill is the literal string
-// "../../../.agents/skills/career-ops/SKILL.md". That is bug #1051, and it hit
+// "../../../.agents/skills/rolewright/SKILL.md". That is bug #1051, and it hit
 // a second time because Kimi shipped after the list was written and nobody
 // compared the two. Adding a CLI touches five wiring points; this asserts the
 // sixth instead of trusting a reviewer to remember it.
@@ -7242,7 +7242,7 @@ console.log('\n12a-bis. Every tracked skill entrypoint is materializable');
   try {
     const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf-8' })
       .split('\n')
-      .filter((p) => /^\.[^/]+\/skills\/career-ops\/SKILL\.md$/.test(p))
+      .filter((p) => /^\.[^/]+\/skills\/rolewright\/SKILL\.md$/.test(p))
       .filter((p) => !p.startsWith('.agents/')) // the canonical target, not an entrypoint
       .sort();
 
@@ -7277,7 +7277,7 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
     mkdirSync(claudeDir, { recursive: true });
 
     const fixtureSkill = '---\nname: career-ops\n---\n\n# canonical skill\n';
-    const pointer = '../../../.agents/skills/career-ops/SKILL.md';
+    const pointer = '../../../.agents/skills/rolewright/SKILL.md';
     writeFileSync(join(canonicalDir, 'SKILL.md'), fixtureSkill);
     writeFileSync(join(claudeDir, 'SKILL.md'), pointer);
 
@@ -7387,7 +7387,7 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
     mkdirSync(canonicalDir, { recursive: true });
     mkdirSync(claudeDir, { recursive: true });
 
-    const pointer = '../../../.agents/skills/career-ops/SKILL.md';
+    const pointer = '../../../.agents/skills/rolewright/SKILL.md';
     mkdirSync(join(canonicalDir, 'SKILL.md'));
     writeFileSync(join(claudeDir, 'SKILL.md'), pointer);
 
@@ -7417,7 +7417,7 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
     mkdirSync(opencodeDir, { recursive: true });
 
     const fixtureSkill = '---\nname: career-ops\n---\n\n# canonical skill\n';
-    const pointer = '../../../.agents/skills/career-ops/SKILL.md';
+    const pointer = '../../../.agents/skills/rolewright/SKILL.md';
     writeFileSync(join(canonicalDir, 'SKILL.md'), fixtureSkill);
     mkdirSync(join(claudeDir, 'SKILL.md'));
     writeFileSync(join(opencodeDir, 'SKILL.md'), pointer);
@@ -7425,7 +7425,7 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
     const skills = await import(pathToFileURL(join(ROOT, 'scaffolder/bin/skill-entrypoints.mjs')).href);
     const materialized = skills.materializeSkillEntrypoints(fixtureRoot);
     const opencodeSkill = readFileSync(join(opencodeDir, 'SKILL.md'), 'utf-8');
-    if (JSON.stringify(materialized) === JSON.stringify(['.opencode/skills/career-ops/SKILL.md']) && opencodeSkill === fixtureSkill) {
+    if (JSON.stringify(materialized) === JSON.stringify(['.opencode/skills/rolewright/SKILL.md']) && opencodeSkill === fixtureSkill) {
       pass('update-system skips non-file skill entrypoints while materializing valid pointers');
     } else {
       fail(`non-file skill entrypoint handling was unexpected: ${JSON.stringify(materialized)}`);
@@ -7489,7 +7489,7 @@ console.log('\n12c. Materialized skill index mode');
     mkdirSync(opencodeDir, { recursive: true });
 
     const fixtureSkill = '---\nname: career-ops\n---\n\n# canonical skill\n';
-    const pointer = '../../../.agents/skills/career-ops/SKILL.md';
+    const pointer = '../../../.agents/skills/rolewright/SKILL.md';
 
     gitRun(['init']);
     // core.excludesFile is only the GLOBAL layer. `git init` also seeds
@@ -7526,8 +7526,8 @@ console.log('\n12c. Materialized skill index mode');
     // index check together, and let one assertion speak for both.
     let canonicalStaged = '';
     try {
-      gitRun(['add', '--', '.agents/skills/career-ops/SKILL.md']);
-      canonicalStaged = gitRun(['ls-files', '--', '.agents/skills/career-ops/SKILL.md']);
+      gitRun(['add', '--', '.agents/skills/rolewright/SKILL.md']);
+      canonicalStaged = gitRun(['ls-files', '--', '.agents/skills/rolewright/SKILL.md']);
     } catch {
       // Left empty: the assertion below is the report.
     }
@@ -7543,8 +7543,8 @@ console.log('\n12c. Materialized skill index mode');
     }
 
     const pointerBlob = gitRun(['hash-object', '-w', '--stdin'], { input: pointer });
-    gitRun(['update-index', '--add', '--cacheinfo', `120000,${pointerBlob},.claude/skills/career-ops/SKILL.md`]);
-    gitRun(['update-index', '--add', '--cacheinfo', `120000,${pointerBlob},.opencode/skills/career-ops/SKILL.md`]);
+    gitRun(['update-index', '--add', '--cacheinfo', `120000,${pointerBlob},.claude/skills/rolewright/SKILL.md`]);
+    gitRun(['update-index', '--add', '--cacheinfo', `120000,${pointerBlob},.opencode/skills/rolewright/SKILL.md`]);
 
     const updater = await import(pathToFileURL(join(ROOT, 'update-system.mjs')).href);
     const skills = await import(pathToFileURL(join(ROOT, 'scaffolder/bin/skill-entrypoints.mjs')).href);
@@ -7552,16 +7552,16 @@ console.log('\n12c. Materialized skill index mode');
     updater.prepareMaterializedSkillEntrypointsForStage(materialized, fixtureRoot);
     gitRun(['add', '--', '.claude/skills/', '.opencode/skills/']);
 
-    const claudeIndex = gitRun(['ls-files', '-s', '--', '.claude/skills/career-ops/SKILL.md']);
-    const opencodeIndex = gitRun(['ls-files', '-s', '--', '.opencode/skills/career-ops/SKILL.md']);
+    const claudeIndex = gitRun(['ls-files', '-s', '--', '.claude/skills/rolewright/SKILL.md']);
+    const opencodeIndex = gitRun(['ls-files', '-s', '--', '.opencode/skills/rolewright/SKILL.md']);
     if (claudeIndex.startsWith('100644 ') && opencodeIndex.startsWith('100644 ')) {
       pass('materialized skill entrypoints stage as regular files, not symlink blobs');
     } else {
       fail(`materialized skill entrypoints staged with wrong modes: ${JSON.stringify([claudeIndex, opencodeIndex])}`);
     }
 
-    const claudeBlob = gitRaw(['show', ':.claude/skills/career-ops/SKILL.md']);
-    const opencodeBlob = gitRaw(['show', ':.opencode/skills/career-ops/SKILL.md']);
+    const claudeBlob = gitRaw(['show', ':.claude/skills/rolewright/SKILL.md']);
+    const opencodeBlob = gitRaw(['show', ':.opencode/skills/rolewright/SKILL.md']);
     if (claudeBlob === fixtureSkill && opencodeBlob === fixtureSkill) {
       pass('materialized skill blobs contain canonical skill content');
     } else {
@@ -7628,8 +7628,8 @@ console.log('\n12c. Materialized skill index mode');
     // assertion below is still the verdict; this only says why it failed.
     let stagingError = '';
     try {
-      gitRun(['add', '--', '.agents/skills/career-ops/SKILL.md']);
-      staged = gitRun(['ls-files', '--', '.agents/skills/career-ops/SKILL.md']);
+      gitRun(['add', '--', '.agents/skills/rolewright/SKILL.md']);
+      staged = gitRun(['ls-files', '--', '.agents/skills/rolewright/SKILL.md']);
     } catch (e) {
       stagingError = e.message;
     }
@@ -10163,7 +10163,7 @@ try {
   fail(`follow-up cadence module crashed: ${e.message}`);
 }
 
-// ── 14b. ADD-ENTRY (/career-ops add) ────────────────────────────────
+// ── 14b. ADD-ENTRY (/rolewright add) ────────────────────────────────
 
 console.log('\n14b. add-entry.mjs (dedup + insertion)');
 
@@ -18152,7 +18152,7 @@ try {
   }
 
   if (
-    titlesMode.includes('/career-ops scan') &&
+    titlesMode.includes('/rolewright scan') &&
     titlesMode.includes('upskill')
   ) {
     pass('titles mode suggests scan after the filter grows and upskill against a stretch title');
@@ -18272,18 +18272,18 @@ try {
   fail(`modes/titles.md missing or unreadable: ${e.message}`);
 }
 
-for (const skillPath of ['.claude/skills/career-ops/SKILL.md', '.agents/skills/career-ops/SKILL.md']) {
+for (const skillPath of ['.claude/skills/rolewright/SKILL.md', '.agents/skills/rolewright/SKILL.md']) {
   if (!fileExists(skillPath)) continue; // existence already checked in section 8
   const skill = readFile(skillPath);
   if (
     /argument-hint:[^\n]*titles/.test(skill) &&
     skill.includes('| `titles` | `titles` |') &&
-    skill.includes('/career-ops titles') &&
+    skill.includes('/rolewright titles') &&
     /Standalone modes[\s\S]*Applies to:[^\n]*`titles`/.test(skill)
   ) {
-    pass(`${skillPath} exposes /career-ops titles in argument-hint, routing, discovery, and standalone loading`);
+    pass(`${skillPath} exposes /rolewright titles in argument-hint, routing, discovery, and standalone loading`);
   } else {
-    fail(`${skillPath} does not fully expose /career-ops titles`);
+    fail(`${skillPath} does not fully expose /rolewright titles`);
   }
 }
 

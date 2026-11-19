@@ -2,7 +2,7 @@
 
 career-ops ships a Claude Code plugin manifest (`.claude-plugin/`), so you can install it once and use it from any folder: the Claude Code CLI, or the Code tab of the Claude desktop app. You don't need to open the career-ops checkout as your project.
 
-If you already work inside a career-ops checkout, you don't need the plugin: the checkout's own `.claude/skills/career-ops` gives you `/career-ops` there.
+If you already work inside a career-ops checkout, you don't need the plugin: the checkout's own `.claude/skills/rolewright` gives you `/rolewright` there.
 
 ## Install
 
@@ -23,7 +23,7 @@ The plugin is saved to your claude.ai account. The Code tab downloads it as a sy
 
 For a fork, replace `career-ops-hq/career-ops` with your fork's `owner/repo`.
 
-Then start a new session. The first start takes a few seconds longer while the plugin installs its Node packages. Run `/career-ops:career-ops` to open the command menu, or paste a job URL. On a fresh setup the agent walks you through onboarding.
+Then start a new session. The first start takes a few seconds longer while the plugin installs its Node packages. Run `/rolewright:career-ops` to open the command menu, or paste a job URL. On a fresh setup the agent walks you through onboarding.
 
 ## Where your files live
 
@@ -47,7 +47,7 @@ To use another folder, set `CAREER_OPS_ROOT` (or `CAREER_OPS_DATA_DIR`) to an ab
 
 That setting applies to every Claude Code session, including one you open in a career-ops checkout, where it moves the checkout's data root too.
 
-To keep using the files in a checkout you already have, point `CAREER_OPS_ROOT` at that checkout. Alternatively, add the checkout itself as a local marketplace (`/plugin marketplace add ~/career-ops`). Claude Code then loads the plugin in place from the checkout, nothing is copied, and the checkout keeps its own data and `node_modules`.
+To keep using the files in a checkout you already have, point `CAREER_OPS_ROOT` at that checkout. Alternatively, add the checkout itself as a local marketplace (`/plugin marketplace add ~/rolewright`). Claude Code then loads the plugin in place from the checkout, nothing is copied, and the checkout keeps its own data and `node_modules`.
 
 Uninstalling the plugin deletes the Node packages folder, not `~/career-ops-data`.
 
@@ -73,6 +73,6 @@ The manifest pins `version`, so an install stays on that version until `version`
 
 ## Known limits
 
-- **Two skills inside a checkout.** In a session opened in a career-ops checkout with the plugin enabled, both `/career-ops` (the checkout's) and `/career-ops:career-ops` (the plugin's) appear. They read different data roots unless `CAREER_OPS_ROOT` is set, so pick one.
+- **Two skills inside a checkout.** In a session opened in a career-ops checkout with the plugin enabled, both `/rolewright` (the checkout's) and `/rolewright:career-ops` (the plugin's) appear. They read different data roots unless `CAREER_OPS_ROOT` is set, so pick one.
 - **Windows.** The hook links `node_modules` with a directory junction. This hasn't been verified on Windows yet.
 - **Chat and Cowork.** A Customize install also appears in Chat and Cowork, but career-ops only runs in Claude Code. Chat has no access to your files, and Cowork's shell can't install the plugin's packages. For Cowork, mount a checkout instead: see [COWORK.md](COWORK.md).

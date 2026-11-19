@@ -30,8 +30,8 @@ const files = listTree(DIR, { links: 'reject' })
   .map((path) => ({ path, rel: relative(DIR, path).split(sep).join('/'), st: lstatSync(path) }));
 
 test('the skill and the license are byte-identical copies of the canonical ones', () => {
-  assert.equal(read('claude-directory/skills/career-ops/SKILL.md'), read('.agents/skills/career-ops/SKILL.md'),
-    'claude-directory/skills/career-ops/SKILL.md diverged: copy .agents/skills/career-ops/SKILL.md over it');
+  assert.equal(read('claude-directory/skills/rolewright/SKILL.md'), read('.agents/skills/rolewright/SKILL.md'),
+    'claude-directory/skills/rolewright/SKILL.md diverged: copy .agents/skills/rolewright/SKILL.md over it');
   assert.equal(read('claude-directory/LICENSE'), read('LICENSE'), 'claude-directory/LICENSE diverged: copy LICENSE over it');
 });
 
@@ -69,7 +69,7 @@ test('every line that carries the release version is marked for release-please',
   const extra = config.packages['.']['extra-files'];
   const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
   assert.ok(extra.some((f) => f.path === 'claude-directory/.claude-plugin/plugin.json' && f.jsonpath === '$.version'));
-  for (const rel of ['claude-directory/skills/career-ops/SKILL.md', 'claude-directory/README.md', '.agents/skills/career-ops/SKILL.md']) {
+  for (const rel of ['claude-directory/skills/rolewright/SKILL.md', 'claude-directory/README.md', '.agents/skills/rolewright/SKILL.md']) {
     assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
     for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
       assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);

@@ -2286,9 +2286,9 @@ export function systemTreeDiffers(systemPaths, upstreamRef = 'FETCH_HEAD', ctx =
  * Pathspecs for systemTreeDiffers()'s drift diff, with the CLI skill
  * entrypoints excluded (#3149, second cause).
  *
- * Upstream ships those entrypoints (`.claude/skills/career-ops/SKILL.md` and
+ * Upstream ships those entrypoints (`.claude/skills/rolewright/SKILL.md` and
  * its siblings) as symlinks (git mode 120000) pointing at
- * `.agents/skills/career-ops/SKILL.md`. On a filesystem without symlink
+ * `.agents/skills/rolewright/SKILL.md`. On a filesystem without symlink
  * support (core.symlinks=false — mostly Windows), apply() materializes a
  * REAL copy of that file's content in their place and commits it (logged as
  * "Materialized N skill entrypoint(s)..."), because the install genuinely
@@ -2300,7 +2300,7 @@ export function systemTreeDiffers(systemPaths, upstreamRef = 'FETCH_HEAD', ctx =
  * clears, unlike ordinary drift which a re-`apply()` resolves.
  *
  * Excluding these paths from the comparison hides nothing: the materialized
- * content is a byte-for-byte copy of `.agents/skills/career-ops/SKILL.md`,
+ * content is a byte-for-byte copy of `.agents/skills/rolewright/SKILL.md`,
  * which SYSTEM_PATHS already covers via the `.agents/` entry, so a genuine
  * upstream change to the skill document still surfaces there. A change to
  * the entrypoint MECHANISM itself (the pointer paths in

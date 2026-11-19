@@ -598,7 +598,7 @@ Report header:
 **Legitimacy:** {High Confidence | Proceed with Caution | Suspicious}
 **Work Auth:** {✅ Sponsors | ➖ Not needed | ⚠️ Unstated | ⛔ No sponsorship}
 **URL:** {{URL}}
-**PDF:** {output/cv-candidate-{{REPORT_NUM}}-{company-slug}-{{DATE}}.pdf if score >= resolved auto_pdf_score_threshold, otherwise a localized equivalent of `not generated — run /career-ops pdf {company-slug} to create on demand` in `language.output`}
+**PDF:** {output/cv-candidate-{{REPORT_NUM}}-{company-slug}-{{DATE}}.pdf if score >= resolved auto_pdf_score_threshold, otherwise a localized equivalent of `not generated — run /rolewright pdf {company-slug} to create on demand` in `language.output`}
 **Batch ID:** {{ID}}
 
 {the `## Verdict (lead)` sentence, copied verbatim}
@@ -732,7 +732,7 @@ Read `config/profile.yml` and resolve `auto_pdf_score_threshold`. If absent, def
 Only generate the PDF when the score from Step 2 is greater than or equal to the threshold. If the score is below the threshold:
 
 - Skip PDF generation.
-- In the report header, write a localized equivalent of `**PDF:** not generated — run /career-ops pdf {company-slug} to create on demand` in `language.output`.
+- In the report header, write a localized equivalent of `**PDF:** not generated — run /rolewright pdf {company-slug} to create on demand` in `language.output`.
 - In Step 5, use `pdf_emoji` = `❌`.
 - In Step 6, set `"pdf": null`.
 

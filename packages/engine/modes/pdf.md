@@ -1,8 +1,8 @@
 # Mode: pdf — ATS-Optimized PDF Generation
 
 Optional passes:
-- **`--hm-audit`:** `/career-ops pdf --hm-audit` adds the hiring-manager audit at Step 20 — an adversarial read of the tailored CV by a separate, research-grounded reviewer before it becomes a PDF (`modes/pdf/hm-audit.md`). Off by default: it costs a subagent dispatch plus web research. Turn it on per run with the flag, or for every run in your own `modes/_custom.md`.
-- **`--ats`:** `/career-ops pdf --ats` adds Step 21a — a second, ATS-parseable render of the same tailored CV, for the application form you paste into while the styled PDF is the one you attach. Off by default: only candidates applying through ATS text forms need it, and everyone else would pay a second render for nothing. Turn it on per run with the flag, or for every run in your own `modes/_custom.md`.
+- **`--hm-audit`:** `/rolewright pdf --hm-audit` adds the hiring-manager audit at Step 20 — an adversarial read of the tailored CV by a separate, research-grounded reviewer before it becomes a PDF (`modes/pdf/hm-audit.md`). Off by default: it costs a subagent dispatch plus web research. Turn it on per run with the flag, or for every run in your own `modes/_custom.md`.
+- **`--ats`:** `/rolewright pdf --ats` adds Step 21a — a second, ATS-parseable render of the same tailored CV, for the application form you paste into while the styled PDF is the one you attach. Off by default: only candidates applying through ATS text forms need it, and everyone else would pay a second render for nothing. Turn it on per run with the flag, or for every run in your own `modes/_custom.md`.
 
 ## Full pipeline
 
@@ -87,7 +87,7 @@ Run `npm run jd:similarity -- {bundle-root}/jd/current.md {bundle-root}/jd/previ
     - This is a hard gate before PDF rendering.
     - If it fails, stop and fix the generated HTML by removing invented metrics or adding verified evidence to `cv.md`, `article-digest.md`, or `config/cv-facts.json`.
 20. **Hiring-manager audit — off by default, opt-in only.** Run `modes/pdf/hm-audit.md` if and only if one of these is true; otherwise skip straight to Step 21 without prompting.
-    - The invocation carried `--hm-audit` (`/career-ops pdf --hm-audit`, or the same flag on a natural-language request).
+    - The invocation carried `--hm-audit` (`/rolewright pdf --hm-audit`, or the same flag on a natural-language request).
     - `modes/_custom.md` turns it on as a house rule.
 
     The fact gate proves nothing was invented; it cannot tell you whether these are the *right* bullets for the role. The audit researches the likely reviewer, dispatches a separate subagent role-playing them, and returns a bullet-by-bullet keep/cut/rewrite verdict plus a blunt "would I advance this to a screen?" call. It adds a subagent dispatch plus web research on top of the tailoring, which is why it is opted into rather than run on every PDF.
@@ -99,7 +99,7 @@ Run `npm run jd:similarity -- {bundle-root}/jd/current.md {bundle-root}/jd/previ
     - If the rendered PDF exceeds its threshold and the budget is warning-only (no `--strict-pages`, no `cv.strict_pages: true`), generation warns loudly with the actual and allowed page counts plus trimming guidance, then reports and indexes the unchanged PDF so existing longer-CV flows keep working.
     - Pass `--strict-pages`, or rely on `cv.strict_pages: true`, only when the user or market requires a hard limit. A strict overflow writes the rejected render to a sibling `{pdf-path minus .pdf}.overflow.pdf` draft for inspection (`.overflow-2.pdf` and so on when that name is taken, so no existing file is replaced; the error names the path it used), leaves any PDF already at `{pdf-path}` unchanged, and does not report or index it as successful; trim lower-priority content and rerun.
     - Generation fails when Work Experience is not newest-first, quoting the dates of the role that starts later than the one above it. Return to Step 17 with the roles in reverse-chronological order, rebuild the HTML, and re-run the fact gate before rendering; tailor through the summary, competencies, and bullet selection, never by moving roles. Pass `--allow-nonchronological`, which turns the failure into a warning, only when the user explicitly asks for a non-chronological CV.
-21a. **ATS variant — off by default, opt-in only.** Run this step if and only if the invocation carried `--ats` (`/career-ops pdf --ats`, or the same flag on a natural-language request) or `modes/_custom.md` turns it on as a house rule; otherwise skip straight to Step 22 without prompting. It runs after Step 21 so the payload is final (any Step 20 rewrites are already in it) and the styled CV is done: the variant is an extra, and a failure here never touches the styled HTML/PDF.
+21a. **ATS variant — off by default, opt-in only.** Run this step if and only if the invocation carried `--ats` (`/rolewright pdf --ats`, or the same flag on a natural-language request) or `modes/_custom.md` turns it on as a house rule; otherwise skip straight to Step 22 without prompting. It runs after Step 21 so the payload is final (any Step 20 rewrites are already in it) and the styled CV is done: the variant is an extra, and a failure here never touches the styled HTML/PDF.
     - **This is not a template swap.** The `ats` template owns the DOM, not the payload. `competencies[]` renders as tags separated only by CSS gap, under a header parsers don't recognise, so it gets dropped whole whatever the template looks like. Fold the payload first, and fold only this copy; the styled payload keeps its competency grid:
       `node ats-payload.mjs /tmp/cv-{candidate}[-{report}]-{company}.json --summary > /tmp/cv-{candidate}[-{report}]-{company}-ats.json`
       The fold moves the competencies into a `skills[]` entry (same facts, comma-delimited, under `Skills`) and invents nothing. Its three lints (`employer-in-role`, `parenthetical-in-company`, `multiple-date-ranges`) print on stderr and are **never** applied by the script. Show each finding to the user and leave the decision to them, the same way as Step 17a. A fix they choose goes into the Step 17 payload and both renders are rebuilt; never patch the ATS payload by hand. Exit 1 means the input was unreadable or malformed. Stop and report it; do not render from a partial file.
@@ -437,7 +437,7 @@ CV PDF generated: output/{path}
 
 Want a cover letter for this role too?
 - Say "yes" or "cover letter" to generate one now
-- Or run `/career-ops cover {slug}` later
+- Or run `/rolewright cover {slug}` later
 ```
 
 Apply `voice-dna.md` (if present) to the cover letter — full guardrail, conversational voice included (Tier 1 + Tier 2). The CV PDF itself stays Tier 1 only (formal ATS register). See `_writing.md` → Voice DNA.

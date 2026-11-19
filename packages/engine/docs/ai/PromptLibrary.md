@@ -48,7 +48,7 @@ flowchart TD
 ## Examples
 ```bash
 # Run offer evaluation prompt interactively
-/career-ops oferta https://jobs.ashbyhq.com/example/123
+/rolewright oferta https://jobs.ashbyhq.com/example/123
 ```
 
 ## Future Enhancements

@@ -2,7 +2,7 @@
 // rule (#5303).
 //
 // Hosts that title sessions automatically name them after the invocation, so a
-// week of `/career-ops <url>` runs leaves a sidebar of identical "Career ops
+// week of `/rolewright <url>` runs leaves a sidebar of identical "Career ops
 // LinkedIn job" titles. The router now tells an interactive single-posting mode
 // to rename the session `{Role}, {Company}` once the JD is read.
 //
@@ -21,7 +21,7 @@ console.log('\nRouter session-title rule (#5303)');
 const read = (path) => readFileSync(join(ROOT, path), 'utf-8').replace(/\r\n/g, '\n');
 const check = (label, cond) => (cond ? pass(label) : fail(label));
 
-const skill = read('.agents/skills/career-ops/SKILL.md');
+const skill = read('.agents/skills/rolewright/SKILL.md');
 const section = skill.split('## Session Title (host-optional, #5303)')[1]?.split('\n---')[0] ?? '';
 
 check('router has a Session Title section', section.length > 0);

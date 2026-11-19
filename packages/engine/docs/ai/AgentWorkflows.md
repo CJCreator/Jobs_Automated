@@ -46,7 +46,7 @@ stateDiagram-v2
 ## Examples
 ```bash
 # Run the retrospective learning workflow
-/career-ops retro
+/rolewright retro
 ```
 
 ## Future Enhancements

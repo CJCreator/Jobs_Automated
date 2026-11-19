@@ -1,6 +1,6 @@
 {
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
-  "name": "career-ops",
+  "name": "rolewright",
   "displayName": "career-ops",
   "version": "1.38.0",
   "description": "Open-source AI job search agent: finds openings, scores each job posting against your CV, tailors your CV and cover letter, and tracks applications.",
@@ -11,10 +11,8 @@
     "Prepare me for my interview for this role"
   ],
   "author": {
-    "name": "santifer",
-    "url": "https://santifer.io"
+    "name": "Rolewright contributors"
   },
-  "homepage": "https://career-ops.org",
   "repository": "https://github.com/career-ops-hq/career-ops",
   "license": "MIT",
   "keywords": [
