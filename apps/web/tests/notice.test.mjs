@@ -22,7 +22,7 @@ test("grievance contact: name only", () => {
 });
 
 test("grievance contact: bad email", () => {
-  for (const email of ["nope", "a@b", "a b@c.com", "@c.com", "a@"]) {
+  for (const email of ["nope", "a@b", "a b@c.com", "@c.com", "a@", "a@b.c?subject=x", "a@b.c&body=hi", "a@b.c%0d%0aSubject:x", "\"><script>@x.y"]) {
     const c = grievanceContact({ ROLEWRIGHT_GRIEVANCE_NAME: "Asha", ROLEWRIGHT_GRIEVANCE_EMAIL: email });
     assert.equal(c.set, false, email);
   }

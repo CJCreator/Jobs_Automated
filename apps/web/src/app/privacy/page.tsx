@@ -4,7 +4,7 @@ import { PrivacyNotice } from "@/components/privacy-notice";
 import { buttonClass } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
 
-export const metadata: Metadata = { title: "Privacy notice" };
+export const metadata: Metadata = { title: en.notice.pageTitle };
 // The grievance contact comes from environment variables read per request.
 export const dynamic = "force-dynamic";
 

@@ -65,7 +65,7 @@ export function PrivacyNotice() {
             <p>
               {contact.name}
               {" · "}
-              <a href={`mailto:${contact.email}`} className="text-brand underline underline-offset-4">
+              <a href={`mailto:${contact.email}`} className="inline-block min-h-8 py-1 text-brand underline underline-offset-4">
                 {contact.email}
               </a>
             </p>
