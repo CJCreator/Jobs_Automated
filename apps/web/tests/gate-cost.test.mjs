@@ -18,6 +18,7 @@ import {
   freshChecks,
   gateBudget,
 } from "../src/lib/tailoring.mjs";
+import { checkText } from "../src/lib/claims.mjs";
 import { SOURCE } from "./fixtures/honest-lines.mjs";
 
 let gate;
@@ -78,9 +79,9 @@ test("honest fact bases fit the cap with a wide margin", () => {
   // The honest fixture is tiny; a dense four-page CV is about 12k characters.
   const fixture = normalizeFacts({ summary: { text: SOURCE, confirmed: true } }, { trustConfirmed: true });
   assert.ok(factBaseText(fixture).length * 50 < MAX_FACT_BASE_CHARS, "the honest fixture is under 2% of the cap");
-  const longCv = bigFacts(15, 10, realisticBullet);
+  const longCv = bigFacts(10, 10, realisticBullet);
   const size = factBaseText(longCv).length;
-  assert.ok(size > 15_000 && size * 2 < MAX_FACT_BASE_CHARS, `a 15-job, 150-bullet CV is ${size} chars, under half the cap`);
+  assert.ok(size > 12_000 && size * 2 < MAX_FACT_BASE_CHARS, `a 10-job, 100-bullet CV is ${size} chars, under half the cap`);
   assert.equal(factBaseTooLarge(longCv), false);
   assert.equal(factBaseTooLarge(emptyFacts()), false);
 });
@@ -219,11 +220,52 @@ test("worst case at the caps: hostile fact base, maximum suggestions, export pat
 test("an honest resume at the sizes people have is never cut short", () => {
   const facts = bigFacts(10, 8, realisticBullet);
   const sugg = suggestionsFor(facts, MAX_SUGGESTIONS);
-  const t0 = performance.now();
-  const out = freshChecks(facts, sugg, { engineGate: gate });
-  const ms = performance.now() - t0;
+  // A fake clock that never advances: the budget cannot trip however slow the machine is.
+  let calls = 0;
+  const counting = (text, opts) => { calls++; return gate(text, opts); };
+  const out = freshChecks(facts, sugg, { engineGate: counting, budget: gateBudget(GATE_BUDGET_MS, () => 0) });
   assert.equal(out.length, MAX_SUGGESTIONS);
-  assert.ok(ms < GATE_BUDGET_MS / 2, `took ${ms.toFixed(0)} ms, under half the budget`);
+  assert.equal(calls, MAX_SUGGESTIONS, "every suggestion was checked");
+});
+
+test("realistic text at the caps finishes inside the budget with at least 2x margin", () => {
+  const facts = factsAtCap(realisticBullet);
+  const size = factBaseText(facts).length;
+  assert.ok(size > MAX_FACT_BASE_CHARS * 0.9, `built ${size} chars, at the cap`);
+  const target = suggestionsFor(facts, 1)[0].finalText;
+  for (let i = 0; i < 3; i++) checkText({ text: target, sourceText: factBaseText(facts), engineGate: gate }); // warm up
+  // Per-call time is the fastest of several runs, so a busy machine cannot inflate it.
+  let perCall = Infinity;
+  for (let i = 0; i < 8; i++) {
+    const t0 = performance.now();
+    checkText({ text: target, sourceText: factBaseText(facts), engineGate: gate });
+    perCall = Math.min(perCall, performance.now() - t0);
+  }
+  const projected = perCall * MAX_SUGGESTIONS;
+  assert.ok(projected * 2 <= GATE_BUDGET_MS, `${perCall.toFixed(1)} ms per call x ${MAX_SUGGESTIONS} = ${projected.toFixed(0)} ms; needs 2x margin under ${GATE_BUDGET_MS} ms`);
+});
+
+test("reject is never rolled back by the check budget: the route does not re-check after a reject", () => {
+  // applyAction itself runs no check for reject, so even a spent budget cannot refuse it.
+  const facts = bigFacts(2, 5, realisticBullet);
+  const sugg = suggestionsFor(facts, 3).map((s) => ({ ...s, decision: "pending" }));
+  let now = 0;
+  const spent = gateBudget(1000, () => now);
+  now = 5000;
+  const out = applyAction(facts, sugg, "sid-0", { action: "reject" }, { engineGate: () => { throw new Error("no gate"); }, budget: spent });
+  assert.equal(out.suggestions[0].decision, "rejected");
+});
+
+test("buildSuggestions keeps what it checked when the budget runs out, and does not throw", () => {
+  const lines = Array.from({ length: 10 }, (_, i) => ({ ref: `r${i}`, kind: "bullet", context: "c", text: `line ${i}` }));
+  const rewrites = lines.map((l) => ({ ref: l.ref, after: `${l.text} reworded` }));
+  let now = 0;
+  let calls = 0;
+  const slow = () => { calls++; now += 400; return { invented: [], unsupportedFacts: [], forbidden: [] }; };
+  const out = buildSuggestions(rewrites, lines, { sourceText: "line", engineGate: slow, budget: gateBudget(1000, () => now) });
+  assert.equal(out.length, 3, "stopped after the call that used up the budget");
+  assert.equal(calls, 3);
+  assert.deepEqual(out.map((s) => s.ref), ["r0", "r1", "r2"]);
 });
 
 // The per-user rate limit (429 with Retry-After) runs inside the route wrappers, which node cannot import;

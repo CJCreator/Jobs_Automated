@@ -16,10 +16,10 @@ const MAX_VALUE = 200;
 const MAX_EXTRAS = 60;
 const MAX_CANNOT_CONFIRM = 200;
 
-// How many suggestions one tailoring keeps. The AI is asked to rewrite the lines of one resume
-// for one job; 30 is more than a person reviews in one sitting, and each is gate-checked on every
-// read, so the count multiplies the cost of every GET, review action and export.
-export const MAX_SUGGESTIONS = 30;
+// How many suggestions one tailoring keeps. Each is gate-checked on every read, review action and
+// export, so the count multiplies their cost. 20 at the fact-base cap, on realistic text, is about
+// 0.4 s: at least 2x under the budget. A test holds that margin.
+export const MAX_SUGGESTIONS = 20;
 
 // The most gate time one request may spend, checked between checks. When it runs out the request
 // fails closed (503) rather than answering with a partial check. Together with the fact-base cap
@@ -58,7 +58,7 @@ export function gateBudget(ms = GATE_BUDGET_MS, clock = () => performance.now())
 
 function assertBudget(ctx) {
   if (ctx?.budget?.exhausted()) {
-    throw new TailoringError(503, "check_too_slow", "Checking your changes is taking too long right now, so nothing was changed. Try again in a moment.");
+    throw new TailoringError(503, "check_too_slow", "Your confirmed facts and this tailoring are too large to check in time. Shorten or unconfirm some facts on your facts page, then open this again.");
   }
 }
 
@@ -116,9 +116,12 @@ export function buildSuggestions(rawRewrites, lines, ctx) {
   const byRef = new Map((lines ?? []).map((l) => [l.ref, l]));
   const seen = new Set();
   const out = [];
+  ctx = { ...ctx, budget: ctx.budget ?? gateBudget() };
   for (const raw of Array.isArray(rawRewrites) ? rawRewrites : []) {
-    const line = byRef.get(raw?.ref);
     if (out.length >= MAX_SUGGESTIONS) break;
+    // The model call is already paid for: out of time, keep what was checked and stop.
+    if (ctx.budget.exhausted()) break;
+    const line = byRef.get(raw?.ref);
     if (!line || seen.has(line.ref) || typeof raw.after !== "string") continue;
     const after = raw.after.trim().slice(0, MAX_TEXT);
     if (!after) continue;

@@ -25,6 +25,9 @@ export const POST = route<{ id: string }>("tailorings.export", async (_req, { pa
   // Every changed line is checked again here, from scratch, against the facts
   // as they are now. Stored checks and decisions alone never let text through.
   const blockers = exportBlockers(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate });
+  if (blockers.length === 1 && blockers[0].issues.length === 1 && blockers[0].issues[0].kind === "facts_too_large") {
+    throw new HttpError(409, "facts_too_large", blockers[0].issues[0].message);
+  }
   if (blockers.length) {
     throw new HttpError(
       409,

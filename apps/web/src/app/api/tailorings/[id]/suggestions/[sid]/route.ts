@@ -33,7 +33,8 @@ export const PATCH = route<{ id: string; sid: string }>("suggestions.patch", asy
     const result = applyAction(facts, tailoring.suggestions, sid, input, ctx);
     return {
       facts: result.factsChanged ? result.facts : undefined,
-      suggestions: freshChecks(result.facts, result.suggestions, ctx),
+      // A reject changes no text, so it is saved without a re-check: a spent budget cannot roll it back.
+      suggestions: input.action === "reject" ? result.suggestions : freshChecks(result.facts, result.suggestions, ctx),
     };
   });
   if (!changed) throw notFound();
