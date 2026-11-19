@@ -412,6 +412,27 @@ async function pdfFixture() {
   return renderPdf(resumeHtml(fixture));
 }
 
+/**
+ * A second resume PDF: the same person, but the "₹2 crore" bullet is missing from the file. The mock AI still
+ * proposes it, so it is a fact the upload does not contain (source "model").
+ */
+async function pdfFixtureWithoutBudget() {
+  const fixture = {
+    contact: { ...MOCK_RESUME.contact },
+    summary: MOCK_RESUME.summary,
+    experience: MOCK_RESUME.experience.map((e) => ({
+      company: e.company,
+      title: e.title,
+      location: e.location,
+      dates: `${e.start} – ${e.end}`,
+      bullets: e.bullets.filter((b) => !b.includes("crore")),
+    })),
+    education: ["B.Com, Christ University, 2019"],
+    skills: MOCK_RESUME.skills,
+  };
+  return renderPdf(resumeHtml(fixture));
+}
+
 /** Find the four suggestion cards by what they say; returns their ids. */
 async function findCards(page) {
   await poll(async () => (await page.locator('li[id^="sug-"]').count()) === 4, "four suggestion cards", 60_000);
@@ -528,9 +549,11 @@ try {
 
     // An old build kept the key in localStorage: loading the page removes it.
     await page.evaluate((k) => window.localStorage.setItem("rolewright.llm", JSON.stringify({ provider: "mock", key: k, model: "mock-1", verifiedAt: "2020-01-01T00:00:00.000Z" })), MOCK_KEY);
+    assert.notEqual(await page.evaluate(() => window.localStorage.getItem("rolewright.llm")), null, "the legacy item is seeded");
     await page.reload();
     await settle(page);
     await page.locator("#llm-key").waitFor();
+    assert.equal(await page.evaluate(() => window.localStorage.getItem("rolewright.llm")), null, "the legacy rolewright.llm item was removed by the page load");
     assert.equal(await page.locator("#saved-key-title").count(), 0, "after a reload the saved-key card is gone");
     await assertNoStoredKey(page, "after reload (legacy item removed)");
     await enterKey(page);
@@ -693,6 +716,181 @@ try {
     const section = page.locator('section[aria-labelledby="sec-cannot-title"]');
     await section.waitFor();
     assert.equal(await section.locator("li").count(), 0, `the claim is gone after reload:\n${await section.innerText()}`);
+  });
+
+  await step("g3. a refused export names the failing line and its words, and 'Go to this suggestion' focuses that card", async () => {
+    const { crore } = state.cards;
+    await go(page, state.reviewUrl);
+    await findCards(page);
+    const card = cardLoc(page, crore);
+    await card.locator('[id^="accept-btn-"]').click();
+    await poll(async () => (await card.innerText()).includes("Accepted"), "the 5 crore card is accepted (it was attested in step g)");
+
+    // In a second tab of the same account, take the attested fact away again. This tab still shows the old state.
+    const other = await main.ctx.newPage();
+    watch(other);
+    try {
+      await go(other, "/app/resume");
+      const extras = other.locator('section[aria-labelledby="sec-extras-title"]');
+      await extras.locator("textarea").first().waitFor();
+      const values = await extras.locator("textarea").evaluateAll((els) => els.map((e) => e.value));
+      const at = values.findIndex((v) => v.includes("5 crore"));
+      assert.ok(at >= 0, `the attested fact is listed: ${JSON.stringify(values)}`);
+      await extras.getByRole("button", { name: /Remove this fact/ }).nth(at).click();
+      await other.locator("#save-facts").click();
+      await other.getByText("Facts saved.").waitFor();
+    } finally {
+      await other.close();
+      currentPage = page;
+    }
+
+    assert.equal(await page.locator("#export-pdf").isDisabled(), false, "this tab still allows export");
+    await page.locator("#export-pdf").click();
+    const notice = page.getByRole("alert").filter({ hasText: "The export was stopped" });
+    await notice.waitFor();
+    const lines = notice.getByTestId("export-blocked-line");
+    assert.equal(await lines.count(), 1, "one failing line is listed");
+    const text = await lines.first().innerText();
+    assert.ok(text.includes("portfolios"), `the failing line's own text is shown:\n${text}`);
+    assert.ok(/Not in your facts:\s*₹?5 crore/.test(text), `the failing words are shown:\n${text}`);
+    await checkpoint(page, "review-export-refused");
+
+    // Move focus away, then follow the link.
+    await page.locator("#export-pdf").focus();
+    await lines.first().getByRole("button", { name: "Go to this suggestion" }).click();
+    await poll(async () => (await page.evaluate(() => document.activeElement?.id)) === `sug-${crore}`, "focus is on the failing suggestion's card");
+  });
+
+  await step("p. /privacy signed out: linked from / and /sign-in, axe clean, targets, skip link first, no sideways scroll at 360", async () => {
+    const anon = await newContext();
+    try {
+      const p = anon.page;
+      await go(p, "/");
+      await p.getByRole("link", { name: "Privacy notice" }).first().click();
+      await p.waitForURL("**/privacy");
+      assert.equal(new URL(p.url()).pathname, "/privacy", "the landing page links to /privacy");
+      await go(p, "/sign-in");
+      await p.getByRole("link", { name: /privacy notice/i }).first().click();
+      await p.waitForURL("**/privacy");
+
+      await settle(p);
+      await p.getByRole("heading", { level: 1 }).first().waitFor();
+      assert.match(await p.locator("main").innerText(), /privacy/i, "the notice is shown");
+      const findings = [];
+      await runAxe(p, appDir, "privacy (signed out)", findings);
+      assert.equal(findings.length, 0, `axe on /privacy:\n${describeAxe(findings)}`);
+      await assertTargets(p, "/privacy");
+      await assertSkipLinkFirst(p, "/privacy");
+      await shot(p, "privacy-public");
+
+      await p.setViewportSize({ width: 360, height: 740 });
+      await go(p, "/privacy");
+      const m = await noHorizontalScroll(p);
+      assert.ok(m.scroll <= m.client, `/privacy at 360 wide: no horizontal scroll (${m.scroll} > ${m.client})`);
+      await assertTargets(p, "/privacy at 360");
+      await shot(p, "privacy-public", { dark: false });
+    } catch (err) {
+      await saveArtifacts("p-inner");
+      throw err;
+    } finally {
+      await anon.ctx.close();
+      currentPage = page;
+    }
+  });
+
+  await step("k. tailor form asks for consent from an account that has facts but none given; once given it stops asking", async () => {
+    // Facts typed by hand need no consent; uploading a resume does. This is the only way to reach the state without a server hook.
+    const u = await newContext();
+    try {
+      const p = u.page;
+      await signInByUi(p, "hand.e2e@example.com");
+      await enterKey(p);
+      await nav(p, "Resume and facts").click();
+      await p.waitForURL("**/app/resume");
+      await settle(p);
+      await p.locator("#add-job").click();
+      await p.locator('input[id^="job-"][id$="-company"]').fill("Acme Traders");
+      await p.locator('input[id^="job-"][id$="-title"]').fill("Accounts Executive");
+      await p.locator('input[id^="job-"][id$="-confirmed"]').check();
+      await p.locator('button[id^="add-bullet-"]').click();
+      await p.locator('textarea[id^="bullet-"]').fill("Prepared monthly bank reconciliations");
+      await p.locator('input[id^="bullet-"][id$="-confirmed"]').check();
+      await p.locator("#save-facts").click();
+      await p.getByText("Facts saved.").waitFor();
+
+      await nav(p, "Tailor").click();
+      await p.waitForURL("**/app/tailor");
+      await settle(p);
+      await p.locator("#job-title").waitFor();
+      assert.equal(await p.locator("#tailor-consent").count(), 1, "the consent box is on the tailor form");
+      await p.locator("#job-title").fill("Finance Analyst");
+      await p.locator("#job-company").fill("Zeta Fintech");
+      await p.locator("#job-jd").fill(JD);
+      await checkpoint(p, "tailor-form-consent");
+      await p.locator("#tailor-submit").click();
+      await p.getByText("Tick the box to continue.").waitFor();
+      assert.equal(await p.evaluate(() => document.activeElement?.id), "tailor-consent", "focus goes to the unticked consent box");
+      assert.match(new URL(p.url()).pathname, /\/app\/tailor$/, "nothing was submitted");
+      await checkpoint(p, "tailor-form-consent-error");
+
+      await p.locator("#tailor-consent").check();
+      await p.locator("#tailor-submit").click();
+      await p.waitForURL(/\/app\/tailor\/[0-9a-f-]{36}$/, { timeout: 120_000 });
+
+      // Consent is stored: the form does not ask again.
+      await nav(p, "Tailor").click();
+      await p.waitForURL("**/app/tailor");
+      await settle(p);
+      await p.locator("#job-title").waitFor();
+      assert.equal(await p.locator("#tailor-consent").count(), 0, "the consent box is gone once consent is on record");
+    } catch (err) {
+      await saveArtifacts("k-inner");
+      throw err;
+    } finally {
+      await u.ctx.close();
+      currentPage = page;
+    }
+  });
+
+  await step("m. 'Not found in your resume' badge on a fact the upload lacks; 'Confirm all' skips it and says so", async () => {
+    const u = await newContext();
+    try {
+      const p = u.page;
+      await signInByUi(p, "second.e2e@example.com");
+      await enterKey(p);
+      await nav(p, "Resume and facts").click();
+      await p.waitForURL("**/app/resume");
+      await settle(p);
+      const pdf = await pdfFixtureWithoutBudget();
+      assert.ok(!squash((await pdfText(pdf)).text).includes("2crore"), "the second fixture really lacks the bullet");
+      await p.locator("#resume-file").setInputFiles({ name: "second-resume.pdf", mimeType: "application/pdf", buffer: pdf });
+      await p.getByLabel(/I understand my resume text/).check();
+      await p.locator("#upload-resume").click();
+      await p.getByText(/Resume read\./).first().waitFor({ timeout: 120_000 });
+
+      const badges = p.getByText("Not found in your resume", { exact: true });
+      assert.equal(await badges.count(), 1, "exactly one fact is labelled not found in the resume");
+      const item = p.locator("li", { has: p.locator("textarea") }).filter({ has: badges });
+      assert.ok((await item.first().locator("textarea").inputValue()).includes("crore"), "the labelled fact is the budget bullet");
+      await checkpoint(p, "resume-not-found");
+
+      const bar = p.getByText(/^\d+ of \d+ facts confirmed$/);
+      const total = Number((await bar.innerText()).match(/of (\d+)/)[1]);
+      const buttons = p.getByRole("button", { name: /^Confirm all in this section/ });
+      const n = await buttons.count();
+      for (let i = 0; i < n; i++) await buttons.nth(i).click();
+      await poll(async () => (await bar.innerText()) === `${total - 1} of ${total} facts confirmed`, "everything but the not-found fact is confirmed");
+      await p.getByText(/Items in Experience confirmed\. 1 item was skipped because it was not found in your resume\./).waitFor({ state: "attached" });
+      assert.equal(await badges.count(), 1, "the badge is still there");
+      assert.equal(await item.first().locator('input[id$="-confirmed"]').isChecked(), false, "the not-found bullet stayed unconfirmed");
+      await checkpoint(p, "resume-not-found-skipped");
+    } catch (err) {
+      await saveArtifacts("m-inner");
+      throw err;
+    } finally {
+      await u.ctx.close();
+      currentPage = page;
+    }
   });
 
   await step("5. keyboard only: sign in, key, resume, tailor and review work without a mouse; focus stays sensible", async () => {
