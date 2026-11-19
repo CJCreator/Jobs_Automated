@@ -88,3 +88,4 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-8 review | Still unproven: app served through `pg` end to end, several server processes, Cloud SQL itself | P1-6 / P1-7 |
 | P0-8 review | Optional: second `changeFacts` lock probe on an existing row | Later |
 | P0-8 review | One unexplained PGlite `npm test` failure (name not recorded); capture on recurrence | Watch in CI |
+| P0-12 review | Notice says "Google Cloud (Mumbai region) hosts Rolewright": confirm Cloud Run and Cloud SQL are in asia-south1 before sign-ups open; if region or host differs, change the line and bump NOTICE_VERSION | P1-7 (gate before sign-ups) |
