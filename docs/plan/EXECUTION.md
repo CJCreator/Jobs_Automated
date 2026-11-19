@@ -198,3 +198,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 | P0-10 | `task/P0-10` | approve | 1 | `1ddf1d0` |
 | P0-6b | `task/P0-6b` | approve (memory half open: P0-6c) | 0 | `f5ee350` |
 | P0-3a | `task/P0-3a` | approve | 1 | `2545bda` |
+| P0-fix-e2e | `task/P0-fix-e2e` | approve | 1 | `ba86b01` |
