@@ -393,6 +393,7 @@ async function assertNoKeyInUse(page, what) {
 
 /** Follow a header link with the keyboard only (no page load, so the in-memory key survives). */
 async function kbNav(page, href) {
+  // Focusing the skip link with page.evaluate only sets the starting point; the Tab and Enter that follow are real keys.
   await page.evaluate(() => document.querySelector(".skip-link")?.focus());
   await tabTo(page, `a[href="${href}"]`);
   await page.keyboard.press("Enter");
@@ -716,6 +717,12 @@ try {
       await go(p, "/app");
       await assertSkipLinkFirst(p, "home");
       await assertTargets(p, "home");
+      // Skip-link order on the screens that are later reached without a page load.
+      await go(p, "/app/resume");
+      await assertSkipLinkFirst(p, "resume");
+      await go(p, "/app/tailor");
+      await assertSkipLinkFirst(p, "tailor");
+      await go(p, "/app");
       await tabTo(p, 'a[href="/app/key"]');
       await p.keyboard.press("Enter");
       await p.waitForURL("**/app/key");
@@ -952,7 +959,14 @@ try {
       await signInByUi(third.page, "chitra.e2e@example.com");
       await enterKey(third.page);
       await assertNoStoredKey(third.page, "key in use");
-      await switchUserWithoutReload(third.page, "dev.e2e@example.com", () => third.page.getByRole("button", { name: "Sign out" }).click());
+      // Same person signing back in: only the sign-out clearing the key can explain "no key".
+      const signOut = () => third.page.getByRole("button", { name: "Sign out" }).click();
+      await switchUserWithoutReload(third.page, "chitra.e2e@example.com", signOut);
+      await assertNoKeyInUse(third.page, "after sign-out and signing back in as the same user");
+      await assertNoStoredKey(third.page, "after signing back in");
+      // A different person: the owner change drops it too.
+      await enterKey(third.page);
+      await switchUserWithoutReload(third.page, "dev.e2e@example.com", signOut);
       await assertNoKeyInUse(third.page, "after sign-out and a different sign-in");
       await assertNoStoredKey(third.page, "after switching user");
     } finally {
@@ -998,7 +1012,7 @@ try {
     await page.locator("#delete-confirm").fill("DELETE");
     assert.equal(await del.isDisabled(), false, "enabled once DELETE is typed");
     // Deleting the account must also forget the key held in this tab. Delete,
-    // then sign in as someone else in the same tab (no reload) and look for it.
+    // then sign in again as the same person in the same tab (no reload) and look for it.
     await page.evaluate(() => {
       window.__noReload = true;
     });
@@ -1006,7 +1020,7 @@ try {
     await page.waitForURL(`${base}/`, { timeout: 60_000 });
     await page.getByRole("link", { name: "Sign in" }).first().click();
     await page.waitForURL("**/sign-in");
-    await page.locator("#dev-email").fill("esha.e2e@example.com");
+    await page.locator("#dev-email").fill("asha.e2e@example.com");
     await page.getByRole("button", { name: "Development sign-in" }).click();
     await page.waitForURL("**/app", { timeout: 90_000 });
     await settle(page);
