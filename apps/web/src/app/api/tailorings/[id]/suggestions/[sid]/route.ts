@@ -6,7 +6,7 @@ import { json, route } from "@/lib/server/http";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
 import { notFound, tailoringView } from "@/lib/server/views";
-import { applyAction, freshChecks, gateBudget } from "@/lib/tailoring.mjs";
+import { applyAction, checksAfterAction, gateBudget } from "@/lib/tailoring.mjs";
 
 export const runtime = "nodejs";
 
@@ -33,8 +33,8 @@ export const PATCH = route<{ id: string; sid: string }>("suggestions.patch", asy
     const result = applyAction(facts, tailoring.suggestions, sid, input, ctx);
     return {
       facts: result.factsChanged ? result.facts : undefined,
-      // A reject changes no text, so it is saved without a re-check: a spent budget cannot roll it back.
-      suggestions: input.action === "reject" ? result.suggestions : freshChecks(result.facts, result.suggestions, ctx),
+      // Each suggestion is checked once per action; a reject is saved with no check at all.
+      suggestions: checksAfterAction(result, input.action, ctx),
     };
   });
   if (!changed) throw notFound();

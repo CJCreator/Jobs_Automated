@@ -23,7 +23,7 @@ export const MAX_SUGGESTIONS = 20;
 
 // The most gate time one request may spend, checked between checks. When it runs out the request
 // fails closed (503) rather than answering with a partial check. Together with the fact-base cap
-// the worst case is this budget plus one gate call (about 100 ms at the cap).
+// the worst case is this budget plus one gate call (about 70 ms at the cap, worst shape).
 export const GATE_BUDGET_MS = 1000;
 
 /** A refused action, carrying the HTTP status a route should answer with. */
@@ -257,6 +257,18 @@ export function applyAction(facts, suggestions, sid, { action, text, value } = {
 export function freshChecks(facts, suggestions, ctx = {}) {
   const c = contextFor(facts, ctx);
   return asList(suggestions).map((s) => checkSuggestion(s, c));
+}
+
+/**
+ * The suggestions to save after a review action. A reject changes no text, and an attest or
+ * can't-confirm has already re-checked every suggestion against the changed facts inside
+ * applyAction, so neither is checked again; any other action re-checks all of them once.
+ * @param {{ facts: any, suggestions: any[], factsChanged: boolean }} result from applyAction
+ * @param {string | undefined} action
+ * @param {ActionContext} ctx
+ */
+export function checksAfterAction(result, action, ctx = {}) {
+  return action === "reject" || result.factsChanged ? result.suggestions : freshChecks(result.facts, result.suggestions, ctx);
 }
 
 /**

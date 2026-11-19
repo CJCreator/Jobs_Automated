@@ -14,6 +14,7 @@ import {
   TailoringError,
   applyAction,
   buildSuggestions,
+  checksAfterAction,
   exportBlockers,
   freshChecks,
   gateBudget,
@@ -245,8 +246,7 @@ test("realistic text at the caps finishes inside the budget with at least 2x mar
   assert.ok(projected * 2 <= GATE_BUDGET_MS, `${perCall.toFixed(1)} ms per call x ${MAX_SUGGESTIONS} = ${projected.toFixed(0)} ms; needs 2x margin under ${GATE_BUDGET_MS} ms`);
 });
 
-test("reject is never rolled back by the check budget: the route does not re-check after a reject", () => {
-  // applyAction itself runs no check for reject, so even a spent budget cannot refuse it.
+test("applyAction rejects without running any check, even with a spent budget", () => {
   const facts = bigFacts(2, 5, realisticBullet);
   const sugg = suggestionsFor(facts, 3).map((s) => ({ ...s, decision: "pending" }));
   let now = 0;
@@ -254,6 +254,54 @@ test("reject is never rolled back by the check budget: the route does not re-che
   now = 5000;
   const out = applyAction(facts, sugg, "sid-0", { action: "reject" }, { engineGate: () => { throw new Error("no gate"); }, budget: spent });
   assert.equal(out.suggestions[0].decision, "rejected");
+});
+
+function tableauSetup(n) {
+  const facts = bigFacts(1, n, (i) => `Built reporting number ${i}`);
+  const sugg = suggestionsFor(facts, n).map((s) => ({ ...s, decision: "pending", finalText: "Built dashboards in Tableau", after: "Built dashboards in Tableau" }));
+  let calls = 0;
+  const counting = (text, opts) => { calls++; return gate(text, opts); };
+  return { facts, sugg, counting, calls: () => calls };
+}
+
+test("checksAfterAction: an attest checks each suggestion once (N + 1 gate calls) and matches freshChecks", () => {
+  const N = 8;
+  const { facts, sugg, counting, calls } = tableauSetup(N);
+  const ctx = { engineGate: counting, budget: gateBudget(GATE_BUDGET_MS, () => 0) };
+  const result = applyAction(facts, sugg, "sid-0", { action: "attest", value: "Tableau" }, ctx);
+  assert.equal(result.factsChanged, true);
+  const out = checksAfterAction(result, "attest", ctx);
+  assert.ok(calls() <= N + 1, `${calls()} gate calls for ${N} suggestions`);
+  const reference = freshChecks(result.facts, result.suggestions, { engineGate: gate });
+  assert.deepEqual(out.map((s) => s.check), reference.map((s) => s.check));
+});
+
+test("checksAfterAction: cannot_confirm also checks once, and reject not at all", () => {
+  const N = 6;
+  const { facts, sugg, counting, calls } = tableauSetup(N);
+  const ctx = { engineGate: counting, budget: gateBudget(GATE_BUDGET_MS, () => 0) };
+  const cc = applyAction(facts, sugg, "sid-0", { action: "cannot_confirm", value: "Tableau" }, ctx);
+  checksAfterAction(cc, "cannot_confirm", ctx);
+  assert.ok(calls() <= N + 1, `${calls()} gate calls`);
+
+  const before = calls();
+  let now = 0;
+  const spent = gateBudget(1000, () => now);
+  now = 5000;
+  const rej = applyAction(facts, sugg, "sid-1", { action: "reject" }, { engineGate: counting, budget: spent });
+  const out = checksAfterAction(rej, "reject", { engineGate: counting, budget: spent });
+  assert.equal(calls(), before, "a reject runs no gate");
+  assert.equal(out.find((s) => s.id === "sid-1").decision, "rejected");
+});
+
+test("checksAfterAction: edit re-checks every suggestion once", () => {
+  const N = 4;
+  const { facts, sugg, counting, calls } = tableauSetup(N);
+  const ctx = { engineGate: counting, budget: gateBudget(GATE_BUDGET_MS, () => 0) };
+  const edited = applyAction(facts, sugg, "sid-0", { action: "edit", text: "Built dashboards" }, ctx);
+  const before = calls();
+  checksAfterAction(edited, "edit", ctx);
+  assert.equal(calls() - before, N);
 });
 
 test("buildSuggestions keeps what it checked when the budget runs out, and does not throw", () => {
