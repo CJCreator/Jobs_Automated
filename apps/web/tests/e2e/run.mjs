@@ -559,6 +559,12 @@ try {
     await enterKey(page);
     await afterSave();
     await assertNoStoredKey(page, "after entering the key again");
+    // The removal is not specific to the key page: seed it again and load plain /app.
+    await page.evaluate(() => window.localStorage.setItem("rolewright.llm", JSON.stringify({ provider: "mock", key: "x", model: "m" })));
+    await go(page, "/app");
+    await page.getByText("Nothing tailored yet").waitFor();
+    assert.equal(await page.evaluate(() => window.localStorage.getItem("rolewright.llm")), null, "the legacy item was removed by loading /app");
+    await enterKey(page);
   });
 
   await step("c. resume: consent, upload, fact review starts at 0 confirmed, confirm all, save, reload keeps it", async () => {
@@ -576,6 +582,7 @@ try {
     const before = await bar.innerText();
     assert.match(before, /^0 of \d+ facts confirmed$/);
     state.total = Number(before.match(/of (\d+)/)[1]);
+    assert.equal(await page.getByText("Not found in your resume", { exact: true }).count(), 0, "every fact of the first fixture is in its upload");
     assert.ok(state.total >= 8, `a useful number of facts was read (${state.total})`);
     await checkpoint(page, "resume-review");
 
@@ -780,6 +787,7 @@ try {
       await runAxe(p, appDir, "privacy (signed out)", findings);
       assert.equal(findings.length, 0, `axe on /privacy:\n${describeAxe(findings)}`);
       await assertTargets(p, "/privacy");
+      await go(p, "/privacy");
       await assertSkipLinkFirst(p, "/privacy");
       await shot(p, "privacy-public");
 
@@ -876,11 +884,13 @@ try {
 
       const bar = p.getByText(/^\d+ of \d+ facts confirmed$/);
       const total = Number((await bar.innerText()).match(/of (\d+)/)[1]);
+      // The page announces one message at a time, so check Experience's before the other sections overwrite it.
+      await p.locator('section[aria-labelledby="sec-experience-title"]').getByRole("button", { name: /^Confirm all in this section/ }).click();
+      await p.getByText(/Items in Experience confirmed\. 1 item was skipped because it was not found in your resume\./).waitFor({ state: "attached" });
       const buttons = p.getByRole("button", { name: /^Confirm all in this section/ });
       const n = await buttons.count();
       for (let i = 0; i < n; i++) await buttons.nth(i).click();
       await poll(async () => (await bar.innerText()) === `${total - 1} of ${total} facts confirmed`, "everything but the not-found fact is confirmed");
-      await p.getByText(/Items in Experience confirmed\. 1 item was skipped because it was not found in your resume\./).waitFor({ state: "attached" });
       assert.equal(await badges.count(), 1, "the badge is still there");
       assert.equal(await item.first().locator('input[id$="-confirmed"]').isChecked(), false, "the not-found bullet stayed unconfirmed");
       await checkpoint(p, "resume-not-found-skipped");
