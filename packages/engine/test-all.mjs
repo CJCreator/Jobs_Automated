@@ -15410,7 +15410,9 @@ try {
     fail('AGENTS.md custom-rule source boundary or CLAUDE.md inheritance is incomplete (#1198, #1736)');
   }
 
-  const noUserData = readFileSync(join(ROOT, '.github/workflows/no-user-data.yml'), 'utf-8');
+  // ADR 0002/0013: workflows live at the monorepo root, two levels up.
+  const noUserDataPath = [join(ROOT, '.github/workflows/no-user-data.yml'), join(ROOT, '..', '..', '.github/workflows/no-user-data.yml')].find((p) => existsSync(p));
+  const noUserData = readFileSync(noUserDataPath, 'utf-8');
   const guardedPaths = (noUserData.match(/const USER_PATHS = \[([\s\S]*?)\];/) || [, ''])[1];
   if (
     guardedPaths.includes('/^modes\\/_custom\\.md$/') &&
@@ -16820,7 +16822,8 @@ try {
   // the form edit this assertion.
   const mergeSrc = readFileSync(join(ROOT, 'merge-tracker.mjs'), 'utf-8');
   const parseSrc = readFileSync(join(ROOT, 'tracker-parse.mjs'), 'utf-8');
-  const goCareerSrc = readFileSync(join(ROOT, 'dashboard', 'internal', 'data', 'career.go'), 'utf-8');
+  const goCareerPath = join(ROOT, 'dashboard', 'internal', 'data', 'career.go');
+  const goCareerSrc = existsSync(goCareerPath) ? readFileSync(goCareerPath, 'utf-8') : null;
   const historySeedsSrc = readFileSync(join(ROOT, 'history-ats-seeds.mjs'), 'utf-8');
   const urlCellReaders = [
     ["tracker-parse.mjs exports the shared extractor", /export function extractCellUrl\(/.test(parseSrc)],
@@ -16830,9 +16833,10 @@ try {
     // JobURL goes through trackerPostingURL, which reads the cell with
     // extractCellURL and then drops a "—"/"N/A"/local:jds/ value that names no
     // posting: kept, it switched off every JobURL enrichment tier.
-    ["the Go dashboard extracts the href", /func extractCellURL\(/.test(goCareerSrc)
+    // ADR 0013: the Go dashboard was removed, so it no longer reads this cell.
+    ["the Go dashboard is removed or extracts the href", goCareerSrc === null || (/func extractCellURL\(/.test(goCareerSrc)
       && /JobURL:\s+trackerPostingURL\(at\("url"\)\)/.test(goCareerSrc)
-      && /func trackerPostingURL\(cell string\) string \{\s*value := extractCellURL\(cell\)/.test(goCareerSrc)],
+      && /func trackerPostingURL\(cell string\) string \{\s*value := extractCellURL\(cell\)/.test(goCareerSrc))],
     // history-ats-seeds reads the cell directly rather than through
     // parseTrackerRow, so it is listed on its own.
     ["history-ats-seeds.mjs extracts the href", /extractCellUrl\(cells\[columns\.url\]\)/.test(historySeedsSrc)],
@@ -19582,7 +19586,10 @@ try {
 
 console.log('\n72. Funding manifest integrity (funding.json)');
 
-try {
+// ADR 0013: the upstream funding manifest was removed with the sponsor material.
+if (!existsSync(join(ROOT, 'funding.json'))) {
+  pass('funding.json removed (ADR 0013) — manifest checks skipped');
+} else try {
   const fundingRaw = readFile('funding.json');
   let funding = null;
   try {
@@ -19798,25 +19805,7 @@ try {
 // JD-archive validator wiring + read-only boundary (#2789) moved to
 // tests/jd-archive-wiring.test.mjs (#3935) — discovered automatically below.
 
-console.log('\n76. README sponsors section is generated from .github/sponsors.json');
-try {
-  // The Sponsors section of README.md (heading, intro, per-sponsor rows,
-  // independence note, placement between the community section and the value
-  // proposition) and the per-sponsor rows of every README.<lang>.md are
-  // rendered by .github/scripts/sponsors.mjs; a hand edit on either side is
-  // drift that the next --write would silently undo, so the two are pinned
-  // together here. The script also refuses a logo that is not a file inside
-  // docs/sponsors/ (no hotlinking), a non-https sponsor URL, and a sponsor URL
-  // carrying tracking parameters.
-  const r = spawnSync(process.execPath, [join(ROOT, '.github', 'scripts', 'sponsors.mjs'), '--check'], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status === 0) {
-    pass('README.md and every README.<lang>.md match .github/sponsors.json');
-  } else {
-    fail(`README sponsors drifted or invalid: ${String(r.stderr || r.stdout).trim().split('\n')[0]}`);
-  }
-} catch (e) {
-  fail(`sponsors check: ${e.message}`);
-}
+// 76. README sponsors check removed with the sponsor material (ADR 0013).
 
 // ── INLINE SECTIONS: END ────────────────────────────────────────
 

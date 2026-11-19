@@ -12,7 +12,7 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 | After the monorepo move | `61c7e9a` | 19,988 | 49 | New failures were tests reading upstream `.github/` from the engine and tests of features about to be removed. |
 | After removals and rebrand | `c357f7e` | 18,331 | 110 | Removed market mode sets and community files broke tests that hard-code them. |
 | After the skill rename | `97fd9d1` | 18,316 | 117 | The rename also rewrote some regex literals; reverted in the next commit. |
-| After test repairs | see the final row added at commit time | | | |
+| After test repairs | this commit | 19,509 | 28 | Every inline section runs to the end; earlier runs stopped at a crash reading the removed `modes/zh`, which hid later sections. All 28 failures are on the pre-existing list below. |
 
 ## The app
 
@@ -32,6 +32,10 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 - `check-jd-archive.mjs --self-test`.
 - The archive-posting egress guard check.
 - Follow-up lock timeouts and the follow-up sweep permission check, which fail under parallel load or in fresh checkouts (`scripts/followup-sweep.sh` is committed without the executable bit).
+- `set-status` lock scope and its three suites, `walk-tree`, `writer-scripts-data-root`, `updater-migration-tests.mjs`.
+- `SYSTEM_PATHS` coverage gap, README Codex guidance, `readme-shared-layer` and `readme-usage-commands`.
+- Legacy web UI: the doctor route contract and the PDF write-scope suites (retired with `packages/engine/web`, ADR 0007).
+- `#2346` and "Multiple tracker IDs", which are flaky under parallel load.
 
 ## Rules for changes
 
