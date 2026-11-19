@@ -123,7 +123,7 @@ This set-up has not yet been run against a real Postgres server (see below); `te
 
 The privacy screen tells people that an account with no sign-in for 12 months is deleted. The app does not schedule this itself: a daily job must call `POST /api/internal/purge`. The endpoint runs `purgeInactiveUsers` (in `src/lib/db/repo.mjs`) and answers `{ "purged": <count> }`. It deletes every user whose last sign-in (`last_seen_at`) is more than 12 calendar months before now, everything they own (resumes, facts, jobs, tailorings, linked accounts), their email-link sign-in tokens, and any expired token. Deleting an account from the app removes its tokens too. It never emails anyone and logs no token or email address.
 
-The endpoint takes no session. It accepts only a Google-signed OpenID Connect token for one service account, and answers every other request with the same 401. Set both variables on the app, or it refuses everything:
+The endpoint takes no session. It accepts only a Google-signed OpenID Connect token for one service account, and answers every other POST with the same 401. Set both variables on the app, or it refuses everything:
 
 - `ROLEWRIGHT_PURGE_AUDIENCE`: the service URL.
 - `ROLEWRIGHT_PURGE_SERVICE_ACCOUNT`: the scheduler's service account email.
@@ -133,7 +133,7 @@ Cloud Scheduler job settings:
 - Target: HTTP, method `POST`, URL `<service URL>/api/internal/purge`.
 - Frequency: once a day, for example `17 3 * * *`.
 - Auth header: OIDC token, with the service account above and **audience = the service URL** (the same value as `ROLEWRIGHT_PURGE_AUDIENCE`).
-- That account needs permission to invoke the service if Cloud Run requires authentication.
+- The Cloud Run service must allow unauthenticated invocations (it is a public site); the app checks the token itself. Do not turn on Cloud Run's own IAM check for this service: the app would then be unable to verify the token.
 
 The token's signature is checked against Google's published keys (`https://www.googleapis.com/oauth2/v3/certs`), so the server needs outbound access to `www.googleapis.com`.
 

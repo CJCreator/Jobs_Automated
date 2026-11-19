@@ -42,8 +42,14 @@ test("a valid token purges the user idle 13 months, keeps the 11-month one, retu
   await db.system.query("DELETE FROM users");
   const old = await seed("v-old@example.com", monthsAgo(13));
   const recent = await seed("v-recent@example.com", monthsAgo(11));
-  const res = await handlePurge(req("tok"), { env: ENV, db, verify: verifyOk });
+  const seen = [];
+  const verify = async (token, opts) => { seen.push({ token, ...opts }); return { ok: true }; };
+  const res = await handlePurge(req("tok"), { env: ENV, db, verify });
   assert.equal(res.status, 200);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].token, "tok");
+  assert.equal(seen[0].audience, ENV.ROLEWRIGHT_PURGE_AUDIENCE);
+  assert.equal(seen[0].email, ENV.ROLEWRIGHT_PURGE_SERVICE_ACCOUNT);
   assert.deepEqual(await res.json(), { purged: 1 });
   assert.equal(await exists(old.id), false);
   assert.equal(await exists(recent.id), true);
