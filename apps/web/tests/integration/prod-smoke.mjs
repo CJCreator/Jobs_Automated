@@ -95,6 +95,8 @@ async function stopServer() {
 }
 
 async function launchBrowser() {
+  const envExe = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  if (envExe) return chromium.launch({ executablePath: envExe });
   try {
     return await chromium.launch();
   } catch (err) {
@@ -247,6 +249,30 @@ try {
     assert.ok(fs.existsSync(path.join(appDir, ".next-prod", "BUILD_ID")), "the build finished");
   });
 
+  await step("2b. a deployed host (K_SERVICE set) with no DATABASE_URL refuses to start: non-zero exit, nothing listening", async () => {
+    assert.ok(await portIsFree(PORT), `port ${PORT} is free`);
+    const env = { ...serverEnv(), K_SERVICE: "x" };
+    delete env.DATABASE_URL;
+    let out = "";
+    const proc = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    proc.stdout.on("data", (d) => (out += d.toString()));
+    proc.stderr.on("data", (d) => (out += d.toString()));
+    const code = await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        killTree(proc);
+        resolve("timeout");
+      }, 90_000);
+      proc.once("exit", (c) => {
+        clearTimeout(timer);
+        resolve(c);
+      });
+    });
+    assert.notEqual(code, "timeout", `the server kept running instead of exiting.\n${out.slice(-1500)}`);
+    assert.ok(typeof code === "number" && code !== 0, `exit code is non-zero, got ${code}.\n${out.slice(-1500)}`);
+    assert.match(out, /DATABASE_URL/, "the refusal names DATABASE_URL");
+    assert.ok(await portIsFree(PORT), `nothing is listening on ${PORT}`);
+  });
+
   await step("3. next start with NODE_ENV=production answers", async () => {
     child = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env: serverEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     child.stdout.on("data", (d) => (serverOutput += d.toString()));
@@ -343,12 +369,33 @@ try {
     assert.equal(res.headers.get("x-frame-options"), "DENY");
     assert.equal(res.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
     assert.equal(res.headers.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
+    assert.equal(res.headers.get("strict-transport-security"), "max-age=63072000; includeSubDomains");
     // A new nonce on every request.
     const again = await request(null, "GET", "/sign-in");
     const nonce = (h) => /'nonce-([^']+)'/.exec(h.get("content-security-policy") ?? "")?.[1];
     assert.notEqual(nonce(res.headers), nonce(again.headers), "the nonce changes per request");
     // The page's own scripts carry that nonce.
     assert.ok(res.data.includes(`nonce="${nonce(res.headers)}"`), "inline and framework scripts in the HTML carry the nonce");
+  });
+
+  await step("11b. signed-out /privacy is 200 with a nonce CSP; / and /sign-in link to it; purge without a token is 401", async () => {
+    const res = await request(null, "GET", "/privacy");
+    assert.equal(res.status, 200);
+    const csp = res.headers.get("content-security-policy") ?? "";
+    assert.match(csp, /script-src[^;]*'nonce-[A-Za-z0-9+/=_-]{16,}'/, `/privacy CSP carries a nonce: ${csp}`);
+    assert.equal(res.headers.get("strict-transport-security"), "max-age=63072000; includeSubDomains");
+    if (process.env.ROLEWRIGHT_EXPECT_GRIEVANCE === "1") {
+      assert.ok(!res.data.includes('data-testid="grievance-unset"'), "the grievance contact is configured (ROLEWRIGHT_EXPECT_GRIEVANCE=1)");
+    } else {
+      assert.ok(res.data.includes("grievance-unset"), "with no grievance contact configured, /privacy says so");
+    }
+    for (const route of ["/", "/sign-in"]) {
+      const page = await request(null, "GET", route);
+      assert.equal(page.status, 200, route);
+      assert.ok(page.data.includes('href="/privacy"'), `${route} links to /privacy`);
+    }
+    const purge = await request(null, "POST", "/api/internal/purge");
+    assert.equal(purge.status, 401, JSON.stringify(purge.data));
   });
 
   await step("12. the mock AI provider does not exist in production", async () => {
@@ -385,7 +432,7 @@ try {
     assert.equal(await keyInput.inputValue(), "not-a-real-key-123456");
     // A client-side navigation (no full reload) needs the framework's scripts to be running.
     const marker = await page.evaluate(() => (window.__smoke = Math.random()));
-    await page.getByRole("link", { name: /privacy/i }).first().click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Privacy", exact: true }).click();
     await page.waitForURL(/\/app\/privacy/);
     assert.equal(await page.evaluate(() => window.__smoke), marker, "the navigation was client-side, so the scripts ran");
     assert.deepEqual(problems, [], "no Content Security Policy violation or page error on the real pages");
