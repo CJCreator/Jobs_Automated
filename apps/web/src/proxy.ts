@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// A user's AI key lives in browser storage, so an injected inline script is
-// the main way to steal one. Pages therefore get a fresh nonce on every
+// A user's AI key lives in page memory, so an injected inline script is the
+// main way to steal one. Pages therefore get a fresh nonce on every
 // request, and only scripts carrying it (Next adds it to its own) may run:
 // no 'unsafe-inline' in script-src. Styles may stay inline; they cannot read
-// storage. The AI providers are only ever called from the server, so
+// page memory. The AI providers are only ever called from the server, so
 // connect-src is this origin.
 //
 // API routes are not matched (see the matcher): they return JSON or a PDF, and

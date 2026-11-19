@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { bindLlmKeyOwner, clearLlmKey } from "@/lib/client/llm-key";
 import { en } from "@/i18n/en";
 import { cn } from "@/components/ui/cn";
 import { CloseIcon, MenuIcon } from "@/components/ui/icons";
@@ -24,6 +25,9 @@ function isCurrent(pathname: string, href: string) {
 export function AppHeader({ email, children }: { email: string; children: ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // The AI key belongs to whoever is signed in; a different person gets none.
+  useEffect(() => bindLlmKeyOwner(email), [email]);
 
   // Close the mobile menu after navigating.
   useEffect(() => setOpen(false), [pathname]);
@@ -85,7 +89,8 @@ export function AppHeader({ email, children }: { email: string; children: ReactN
               <span className="sr-only">{en.app.signedInAs} </span>
               {email}
             </p>
-            {children}
+            {/* The sign-out form's submit bubbles up to here: forget the key first. */}
+            <div onSubmit={() => clearLlmKey()}>{children}</div>
           </div>
         </div>
       </div>

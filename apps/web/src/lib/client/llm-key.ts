@@ -1,77 +1,52 @@
-// The user's AI key lives only in this browser. Everything here tolerates
-// blocked storage: reads fall back to "no key", writes report failure.
+// The user's AI key lives only in this page's memory (ADR 0003). It is never
+// written to any browser storage, so a reload, a sign-out or deleting the
+// account all forget it.
 
 import { useSyncExternalStore } from "react";
-import type { ProviderId, StoredLlmKey } from "./types";
+import type { StoredLlmKey } from "./types";
 
-const STORAGE_KEY = "rolewright.llm";
+// An older build kept the key under this name in localStorage.
+const LEGACY_STORAGE_KEY = "rolewright.llm";
 
 const listeners = new Set<() => void>();
-let cachedRaw: string | null | undefined;
-let cachedValue: StoredLlmKey | null = null;
+let current: StoredLlmKey | null = null;
+let owner: string | null = null;
 
-function parse(raw: string | null): StoredLlmKey | null {
-  if (!raw) return null;
+function removeLegacyItem() {
+  if (typeof window === "undefined") return;
   try {
-    const v = JSON.parse(raw) as Partial<StoredLlmKey>;
-    if (
-      v &&
-      typeof v.key === "string" &&
-      v.key &&
-      typeof v.model === "string" &&
-      typeof v.verifiedAt === "string" &&
-      typeof v.provider === "string" &&
-      /^[a-z0-9-]{1,30}$/.test(v.provider)
-    ) {
-      return { provider: v.provider, key: v.key, model: v.model, verifiedAt: v.verifiedAt };
-    }
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
-    // Corrupt value: treat as no key.
-  }
-  return null;
-}
-
-function readRaw(): string | null {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
+    // Blocked storage: nothing to remove.
   }
 }
+removeLegacyItem();
 
-/** The saved key, or null. Returns the same object until storage changes. */
+/** The key held in memory, or null. Returns the same object until it changes. */
 export function getLlmKey(): StoredLlmKey | null {
-  if (typeof window === "undefined") return null;
-  const raw = readRaw();
-  if (raw !== cachedRaw) {
-    cachedRaw = raw;
-    cachedValue = parse(raw);
-  }
-  return cachedValue;
+  return current;
 }
 
 function emit() {
   listeners.forEach((l) => l());
 }
 
-/** Returns false when the browser refused to store it. */
+/** Always true: holding it in memory cannot be refused. */
 export function setLlmKey(value: StoredLlmKey): boolean {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-  } catch {
-    return false;
-  }
+  current = { provider: value.provider, key: value.key, model: value.model, verifiedAt: value.verifiedAt };
   emit();
   return true;
 }
 
 export function clearLlmKey(): void {
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Nothing stored that we could remove.
-  }
+  current = null;
   emit();
+}
+
+/** Call with the signed-in email. When the owner changes, the previous owner's key is dropped. */
+export function bindLlmKeyOwner(email: string): void {
+  if (owner !== null && owner !== email) clearLlmKey();
+  owner = email;
 }
 
 /** First 4 and last 4 characters, the rest hidden. */
@@ -82,13 +57,8 @@ export function maskKey(key: string): string {
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY || e.key === null) cb();
-  };
-  window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(cb);
-    window.removeEventListener("storage", onStorage);
   };
 }
 

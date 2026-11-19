@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
+import { clearLlmKey } from "@/lib/client/llm-key";
 import { Button, Card, Field, Input, Notice, Spinner } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
 
@@ -22,6 +23,7 @@ export function DeleteAccount({ signOutAction }: { signOutAction: () => Promise<
       setBusy(false);
       return;
     }
+    clearLlmKey();
     // The account is gone; this clears the session cookie and goes home.
     await signOutAction();
   };
