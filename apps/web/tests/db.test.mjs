@@ -9,6 +9,9 @@
 // admin URL (default: the same URL) is only used to create and drop those
 // databases, so the app login needs no CREATEDB; see README.md for the
 // production role set-up these tests assume.
+//
+// ROLEWRIGHT_REQUIRE_PG=1 (set in CI) makes the run fail, rather than quietly
+// fall back to PGlite, when no Postgres URL is set.
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -19,6 +22,7 @@ import { emptyFacts, normalizeFacts } from "../src/lib/facts.mjs";
 const PG_URL = process.env.ROLEWRIGHT_TEST_DATABASE_URL || "";
 const PG_ADMIN_URL = process.env.ROLEWRIGHT_TEST_ADMIN_URL || PG_URL;
 const PG = Boolean(PG_URL);
+const REQUIRE_PG = process.env.ROLEWRIGHT_REQUIRE_PG === "1";
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function adminQuery(sql) {
@@ -35,6 +39,7 @@ async function adminQuery(sql) {
 const quoteIdent = (s) => `"${String(s).replace(/"/g, '""')}"`;
 const open = [];
 const createdDatabases = [];
+const databaseNames = new WeakMap();
 
 async function freshDb() {
   let db;
@@ -46,6 +51,7 @@ async function freshDb() {
     const url = new URL(PG_URL);
     url.pathname = `/${name}`;
     db = await createDb({ connectionString: url.toString() });
+    databaseNames.set(db, name);
   } else {
     db = await createDb();
   }
@@ -412,4 +418,258 @@ test("deleteUserData removes one user's data and leaves the other's", async () =
   assert.equal((await repo.getFacts(db, B)).summary.text, "Designer.");
   assert.ok(await repo.getTailoring(db, B, bTailoring));
   assert.equal((await repo.listTailorings(db, B)).length, 1);
+});
+
+// ---- real-Postgres requirement ------------------------------------------------
+
+test("ROLEWRIGHT_REQUIRE_PG=1 fails the run when there is no Postgres to test against", () => {
+  if (!REQUIRE_PG) return;
+  assert.ok(PG, "ROLEWRIGHT_REQUIRE_PG=1 but ROLEWRIGHT_TEST_DATABASE_URL is not set: refusing to fall back to PGlite");
+  assert.equal(db.driver, "pg");
+});
+
+test("on Postgres the login is neither a superuser nor able to bypass row-level security", { skip: !PG && "PGlite always runs as a superuser" }, async () => {
+  const { rows } = await db.system.query(
+    "SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname = current_user");
+  assert.deepEqual(rows[0], { rolsuper: false, rolbypassrls: false, rolcreaterole: false, rolcreatedb: false });
+  const app = (await db.system.query(
+    "SELECT rolsuper, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname = 'rolewright_app'")).rows[0];
+  assert.deepEqual(app, { rolsuper: false, rolbypassrls: false, rolcanlogin: false });
+});
+
+// ---- per-table isolation, structure and privileges -----------------------------
+
+const USER_TABLES = ["resumes", "fact_bases", "jobs", "tailorings", "consents"];
+const IDENTITY_TABLES = ["users", "accounts", "verification_tokens"];
+const newId = () => crypto.randomUUID();
+
+/** One row per user-data table for `user`, written inside that user's own scope. Returns the ids. */
+async function seedUser(d, user) {
+  const ids = { resume: newId(), job: newId(), tailoring: newId(), consent: newId() };
+  await d.withUser(user, async (tx) => {
+    await tx.query("INSERT INTO resumes (id, user_id, filename, raw_text) VALUES ($1, $2, 'f.pdf', 'text')", [ids.resume, user]);
+    await tx.query("INSERT INTO fact_bases (user_id, facts) VALUES ($1, '{\"marker\":\"original\"}'::jsonb)", [user]);
+    await tx.query("INSERT INTO jobs (id, user_id, title) VALUES ($1, $2, 'original')", [ids.job, user]);
+    await tx.query(
+      "INSERT INTO tailorings (id, user_id, job_id, suggestions) VALUES ($1, $2, $3, '[]'::jsonb)", [ids.tailoring, user, ids.job]);
+    await tx.query("INSERT INTO consents (id, user_id, notice_version, purpose) VALUES ($1, $2, 'v1', 'ai_processing')", [ids.consent, user]);
+  });
+  return ids;
+}
+
+/** Counts rows of a table for a user while bypassing row-level security (a superuser connection). */
+async function rawCount(d, table, userId) {
+  const sql = `SELECT count(*)::int AS n FROM ${table} WHERE ${table === "users" ? "id" : "user_id"} = $1`;
+  if (!PG) return (await d.system.query(sql, [userId])).rows[0].n;
+  const { default: pg } = await import("pg");
+  const url = new URL(PG_ADMIN_URL);
+  url.pathname = `/${databaseNames.get(d)}`;
+  const client = new pg.Client({ connectionString: url.toString() });
+  await client.connect();
+  try {
+    return (await client.query(sql, [userId])).rows[0].n;
+  } finally {
+    await client.end();
+  }
+}
+
+async function everyRawCount(d, userId) {
+  const out = {};
+  for (const t of [...USER_TABLES, "accounts"]) out[t] = await rawCount(d, t, userId);
+  out.users = await rawCount(d, "users", userId);
+  return out;
+}
+
+test("per table, B's scope cannot select, update or delete A's rows, nor insert one with A's user_id", async () => {
+  const d = await freshDb();
+  const a = (await repo.upsertUserByEmail(d, { email: "iso-a@example.com" })).id;
+  const b = (await repo.upsertUserByEmail(d, { email: "iso-b@example.com" })).id;
+  const ids = await seedUser(d, a);
+  await seedUser(d, b);
+  const insertAs = (table, owner, id, job) => ({
+    resumes: [`INSERT INTO resumes (id, user_id) VALUES ($1, $2)`, [id, owner]],
+    fact_bases: [`INSERT INTO fact_bases (user_id, facts) VALUES ($1, '{}'::jsonb)`, [owner]],
+    jobs: [`INSERT INTO jobs (id, user_id) VALUES ($1, $2)`, [id, owner]],
+    tailorings: [`INSERT INTO tailorings (id, user_id, job_id, suggestions) VALUES ($1, $2, $3, '[]'::jsonb)`, [id, owner, job]],
+    consents: [`INSERT INTO consents (id, user_id, notice_version, purpose) VALUES ($1, $2, 'v2', 'x')`, [id, owner]],
+  })[table];
+  // Each statement runs in its own scope: a refused one aborts its transaction.
+  const inB = (sql, params = []) => d.withUser(b, async (tx) => (await tx.query(sql, params)).rows);
+  const aRowKey = { resumes: ids.resume, fact_bases: a, jobs: ids.job, tailorings: ids.tailoring, consents: ids.consent };
+  const keyCol = { resumes: "id", fact_bases: "user_id", jobs: "id", tailorings: "id", consents: "id" };
+  const setClause = { resumes: "filename = 'hijacked'", fact_bases: "facts = '{}'::jsonb", jobs: "title = 'hijacked'", tailorings: "provider = 'hijacked'", consents: "purpose = 'hijacked'" };
+
+  for (const table of USER_TABLES) {
+    const where = `${keyCol[table]} = $1`;
+    assert.equal((await inB(`SELECT 1 FROM ${table} WHERE ${where}`, [aRowKey[table]])).length, 0, `${table}: select by A's key`);
+    assert.deepEqual((await inB(`SELECT user_id FROM ${table}`)).map((r) => r.user_id), [b], `${table}: scan shows only B`);
+
+    if (table === "consents") {
+      // The app role is append-only here: it has no UPDATE or DELETE at all.
+      await assert.rejects(inB(`UPDATE ${table} SET ${setClause[table]} WHERE ${where}`, [aRowKey[table]]), /permission denied/, `${table}: update`);
+      await assert.rejects(inB(`DELETE FROM ${table} WHERE ${where}`, [aRowKey[table]]), /permission denied/, `${table}: delete`);
+    } else {
+      assert.equal((await inB(`UPDATE ${table} SET ${setClause[table]} WHERE ${where} RETURNING 1`, [aRowKey[table]])).length, 0, `${table}: update touched A's row`);
+      assert.equal((await inB(`DELETE FROM ${table} WHERE ${where} RETURNING 1`, [aRowKey[table]])).length, 0, `${table}: delete touched A's row`);
+      assert.deepEqual(
+        (await inB(`UPDATE ${table} SET ${setClause[table]} RETURNING user_id`)).map((r) => r.user_id), [b], `${table}: unqualified update`);
+      await assert.rejects(inB(`UPDATE ${table} SET user_id = $1`, [a]), /row-level security/, `${table}: reassign to A`);
+    }
+    const [sql, params] = insertAs(table, a, newId(), ids.job);
+    await assert.rejects(inB(sql, params), /row-level security/, `${table}: insert as A`);
+  }
+
+  // A's data is exactly as seeded, and A can still read it (positive control).
+  assert.equal(await rawCount(d, "consents", a), 1);
+  assert.equal(await rawCount(d, "resumes", a), 1);
+  const inA = (sql) => d.withUser(a, async (tx) => (await tx.query(sql)).rows);
+  assert.deepEqual((await inA("SELECT facts FROM fact_bases")).map((r) => r.facts), [{ marker: "original" }]);
+  assert.deepEqual((await inA("SELECT title FROM jobs")).map((r) => r.title), ["original"]);
+  assert.deepEqual((await inA("SELECT provider FROM tailorings")).map((r) => r.provider), [null]);
+  assert.deepEqual((await inA("SELECT filename FROM resumes")).map((r) => r.filename), ["f.pdf"]);
+  assert.deepEqual((await inA("SELECT purpose FROM consents")).map((r) => r.purpose), ["ai_processing"]);
+});
+
+/** Tables in the public schema with a user_id column but no forced row-level security or no policy. */
+async function unprotectedUserTables(d) {
+  const { rows } = await d.system.query(`
+    SELECT c.relname AS name, c.relrowsecurity AS enabled, c.relforcerowsecurity AS forced,
+           (SELECT count(*)::int FROM pg_policies p WHERE p.schemaname = n.nspname AND p.tablename = c.relname) AS policies
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+      AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'user_id' AND NOT a.attisdropped)
+      AND c.relname <> 'accounts'
+    ORDER BY c.relname`);
+  return { all: rows.map((r) => r.name), bad: rows.filter((r) => !r.enabled || !r.forced || r.policies < 1).map((r) => r.name) };
+}
+
+test("every table with a user_id column (except accounts) has forced row-level security and a policy", async () => {
+  const { all, bad } = await unprotectedUserTables(db);
+  assert.deepEqual(all, [...USER_TABLES].sort(), "the set of user-data tables changed: update USER_TABLES and the per-table isolation test");
+  assert.deepEqual(bad, [], `tables without enabled+forced RLS and a policy: ${bad}`);
+});
+
+test("negative control: the structural check flags a new user table that skips row-level security", async () => {
+  const d = await freshDb();
+  await d.system.query("CREATE TABLE notes (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users (id))");
+  assert.deepEqual((await unprotectedUserTables(d)).bad, ["notes"]);
+  await d.system.query("ALTER TABLE notes ENABLE ROW LEVEL SECURITY");
+  assert.deepEqual((await unprotectedUserTables(d)).bad, ["notes"], "enabled but not forced and without a policy is still flagged");
+  await d.system.query("ALTER TABLE notes FORCE ROW LEVEL SECURITY");
+  assert.deepEqual((await unprotectedUserTables(d)).bad, ["notes"], "forced but without a policy is still flagged");
+  await d.system.query("CREATE POLICY notes_isolation ON notes USING (user_id = current_setting('app.user_id')::uuid)");
+  assert.deepEqual((await unprotectedUserTables(d)).bad, []);
+});
+
+test("rolewright_app has no privilege at all on users, accounts or verification_tokens", async () => {
+  for (const t of IDENTITY_TABLES) {
+    for (const priv of ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+      const { rows } = await db.system.query("SELECT has_table_privilege('rolewright_app', $1, $2) AS ok", [t, priv]);
+      assert.equal(rows[0].ok, false, `rolewright_app has ${priv} on ${t}`);
+    }
+    const { rows } = await db.system.query(
+      "SELECT has_any_column_privilege('rolewright_app', $1, 'SELECT, INSERT, UPDATE, REFERENCES') AS ok", [t]);
+    assert.equal(rows[0].ok, false, `rolewright_app has a column privilege on ${t}`);
+    await assert.rejects(db.withUser(A, (tx) => tx.query(`SELECT 1 FROM ${t}`)), /permission denied/);
+    await assert.rejects(db.withUser(A, (tx) => tx.query(`DELETE FROM ${t}`)), /permission denied/);
+  }
+});
+
+test("rolewright_app holds exactly the intended privileges on the user-data tables", async () => {
+  const privs = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
+  for (const t of USER_TABLES) {
+    const granted = [];
+    for (const priv of privs) {
+      const { rows } = await db.system.query("SELECT has_table_privilege('rolewright_app', $1, $2) AS ok", [t, priv]);
+      if (rows[0].ok) granted.push(priv);
+    }
+    const expected = t === "consents" ? ["SELECT", "INSERT"] : ["SELECT", "INSERT", "UPDATE", "DELETE"];
+    assert.deepEqual(granted, expected, `${t}`);
+  }
+});
+
+// ---- account deletion and the inactivity purge, as the non-superuser login ----
+
+/** Everything a user can own: the five user tables, a linked account and an email-link token. */
+async function seedEverything(d, email) {
+  const user = (await repo.upsertUserByEmail(d, { email })).id;
+  await seedUser(d, user);
+  await repo.linkAccount(d, { userId: user, provider: "google", providerAccountId: `g-${user}` });
+  await repo.createVerificationToken(d, { identifier: email, token: `tok-${user}`, expires: new Date(Date.now() + 3_600_000) });
+  return user;
+}
+const tokenCount = async (d, email) =>
+  (await d.system.query("SELECT count(*)::int AS n FROM verification_tokens WHERE identifier = $1", [email])).rows[0].n;
+const ALL_ONE = { resumes: 1, fact_bases: 1, jobs: 1, tailorings: 1, consents: 1, accounts: 1, users: 1 };
+const ALL_ZERO = Object.fromEntries(Object.keys(ALL_ONE).map((k) => [k, 0]));
+
+test("deleteUserData cascades through every table under forced RLS (checked on a connection that bypasses it)", async () => {
+  const d = await freshDb();
+  const a = await seedEverything(d, "del-a@example.com");
+  const b = await seedEverything(d, "del-b@example.com");
+  // The checking connection really does see rows (it is not just blind).
+  assert.deepEqual(await everyRawCount(d, a), ALL_ONE);
+  assert.deepEqual(await everyRawCount(d, b), ALL_ONE);
+
+  assert.equal(await repo.deleteUserData(d, a), true);
+
+  assert.deepEqual(await everyRawCount(d, a), ALL_ZERO, "rows of the deleted user remain");
+  assert.equal(await tokenCount(d, "del-a@example.com"), 0);
+  assert.deepEqual(await everyRawCount(d, b), ALL_ONE, "the other user lost data");
+  assert.equal(await tokenCount(d, "del-b@example.com"), 1);
+  assert.equal(await repo.deleteUserData(d, a), false, "deleting again is a no-op");
+});
+
+test("purgeInactiveUsers cascades through every table under forced RLS and spares active users", async () => {
+  const d = await freshDb();
+  const stale = await seedEverything(d, "old@example.com");
+  const active = await seedEverything(d, "new@example.com");
+  const now = new Date("2026-11-19T00:00:00Z");
+  await d.system.query("UPDATE users SET last_seen_at = $2 WHERE id = $1", [stale, "2025-11-18T00:00:00Z"]);
+  await d.system.query("UPDATE users SET last_seen_at = $2 WHERE id = $1", [active, "2025-11-20T00:00:00Z"]);
+  await repo.createVerificationToken(d, { identifier: "nobody@example.com", token: "expired", expires: new Date(Date.now() - 3_600_000) });
+
+  assert.equal(await repo.purgeInactiveUsers(d, { now }), 1);
+
+  assert.deepEqual(await everyRawCount(d, stale), ALL_ZERO);
+  assert.equal(await tokenCount(d, "old@example.com"), 0);
+  assert.equal(await tokenCount(d, "nobody@example.com"), 0, "an expired token is purged");
+  assert.deepEqual(await everyRawCount(d, active), ALL_ONE);
+  assert.equal(await tokenCount(d, "new@example.com"), 1);
+  assert.equal(await repo.purgeInactiveUsers(d, { now }), 0);
+});
+
+// ---- row locks, observed directly ----------------------------------------------
+
+test("changeTailoring holds row locks on the tailoring and the Fact Base while its callback runs", { skip: !PG && "PGlite runs one transaction at a time, so a second connection cannot probe a lock" }, async () => {
+  const { d, u, t } = await reviewFixture();
+  const probe = (sql, params) => d.withUser(u, (tx) => tx.query(sql, params));
+  let tailoringBlocked = false;
+  let factsBlocked = false;
+  await repo.changeTailoring(d, u, t, async () => {
+    await probe("SELECT 1 FROM tailorings WHERE id = $1 FOR UPDATE NOWAIT", [t]).catch((e) => { tailoringBlocked = e.code === "55P03"; });
+    await probe("SELECT 1 FROM fact_bases WHERE user_id = $1 FOR UPDATE NOWAIT", [u]).catch((e) => { factsBlocked = e.code === "55P03"; });
+    return {};
+  });
+  assert.ok(tailoringBlocked, "the tailoring row was not locked");
+  assert.ok(factsBlocked, "the Fact Base row was not locked");
+  await probe("SELECT 1 FROM tailorings WHERE id = $1 FOR UPDATE NOWAIT", [t]);
+  await probe("SELECT 1 FROM fact_bases WHERE user_id = $1 FOR UPDATE NOWAIT", [u]);
+});
+
+test("changeFacts holds a row lock on the Fact Base while its callback runs, even for a first save", { skip: !PG && "PGlite runs one transaction at a time, so a second connection cannot probe a lock" }, async () => {
+  const d = await freshDb();
+  const u = (await repo.upsertUserByEmail(d, { email: "lock@example.com" })).id;
+  let blocked = false;
+  await repo.changeFacts(d, u, async (facts) => {
+    // The first save's row is not yet committed, so a second connection cannot see it to lock it. Its own
+    // insert of the same key has to wait for the first transaction, and gives up at the lock timeout.
+    await d.withUser(u, async (tx) => {
+      await tx.query("SET LOCAL lock_timeout = '200ms'");
+      await tx.query("INSERT INTO fact_bases (user_id, facts) VALUES ($1, '{}'::jsonb) ON CONFLICT (user_id) DO NOTHING", [u]);
+    }).catch((e) => { blocked = e.code === "55P03"; });
+    return facts;
+  });
+  assert.ok(blocked, "the Fact Base row was not locked");
 });

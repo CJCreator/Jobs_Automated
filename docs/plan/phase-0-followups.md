@@ -81,3 +81,11 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-2 review | `deleteBody` should say the consent record is deleted too | Copy task at the phase gate (with the "who else handles your data" item) |
 | P0-2 review | Data export (ADR 0004) must include consent rows | Phase 2 data export |
 | P0-2 review | Remove dead strings `en.app.resume.consent` and `consentError` | Next en.ts copy task |
+| P0-8 review | App CI has never run: it needs a pull request to main touching `apps/web`; both Node legs must pass Postgres tests with 0 skipped before P0-8 counts as proven | Phase gate (owner decides whether to open a draft PR) |
+| P0-8 review | Required check or informative: if required, add `merge_group` and replace the `paths` filter with an always-reporting job | Owner decision |
+| P0-8 review | Run `tests/consent.test.mjs` on real Postgres too (same env variables) | Later |
+| P0-8 review | Structural RLS check only finds tables with `user_id`; note it in the "adding a table" guidance | Later |
+| P0-8 review | Still unproven: app served through `pg` end to end, several server processes, Cloud SQL itself | P1-6 / P1-7 |
+| P0-8 review | Optional: second `changeFacts` lock probe on an existing row | Later |
+| P0-8 review | One unexplained PGlite `npm test` failure (name not recorded); capture on recurrence | Watch in CI |
+| P0-12 review | Notice says "Google Cloud (Mumbai region) hosts Rolewright": confirm Cloud Run and Cloud SQL are in asia-south1 before sign-ups open; if region or host differs, change the line and bump NOTICE_VERSION | P1-7 (gate before sign-ups) |

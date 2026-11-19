@@ -1,0 +1,106 @@
+name: App CI
+
+# Informative for now: this is not a required check, so a red run does not block
+# a merge yet. It becomes required once it has run green on main for a while.
+
+# CI for the hosted app (apps/web). The database tests run twice: once on the
+# embedded PGlite, and once on a real Postgres 16 server as the same kind of
+# login the app uses in production (no superuser, no CREATEDB, no BYPASSRLS),
+# with nothing allowed to skip (ADR 0009: row-level security and row locks are
+# proven on real Postgres).
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'packages/engine/**'
+      - '!packages/engine/web/**'
+      - '.github/workflows/app-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/engine/**'
+      - '!packages/engine/web/**'
+      - '.github/workflows/app-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  app:
+    name: app typecheck, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.16', '24']
+    defaults:
+      run:
+        working-directory: apps/web
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-admin-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      # The roles, exactly as README.md "Database roles" creates them. The tests
+      # create and drop their own databases (the admin URL does that), so the
+      # `rolewright` database from the README is not needed here.
+      - name: Create the database roles
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: ci-admin-password
+        run: |
+          psql -v ON_ERROR_STOP=1 postgres <<'SQL'
+          CREATE ROLE rolewright_login LOGIN PASSWORD 'ci-login-password'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+          CREATE ROLE rolewright_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
+          GRANT rolewright_app TO rolewright_login;
+          SQL
+
+      # The fact gate and the PDF renderer live in the engine, which the app
+      # loads from the repository. It has no lockfile, so the install is
+      # `npm install` without scripts (as test.yml does), then the Chromium that
+      # its pinned Playwright version wants, installed with the system libraries.
+      - name: Install engine dependencies
+        run: npm install --ignore-scripts
+        working-directory: packages/engine
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/engine
+
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Tests on the embedded database
+        run: npm test
+      - name: Tests on Postgres 16, as the non-superuser login, nothing skipped
+        run: npm test
+        env:
+          ROLEWRIGHT_TEST_DATABASE_URL: postgres://rolewright_login:ci-login-password@localhost:5432/postgres
+          ROLEWRIGHT_TEST_ADMIN_URL: postgres://postgres:ci-admin-password@localhost:5432/postgres
+          ROLEWRIGHT_REQUIRE_PG: '1'
+      - run: npm run test:flow
+      - run: npm run build
