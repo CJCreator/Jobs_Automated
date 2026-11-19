@@ -3755,7 +3755,7 @@ export function newerThanTarget(local, targetRef) {
  * monorepo (release-please-config.json also releases a `web` component,
  * tagged `web-vX.Y.Z`), and RELEASES_API's `/releases/latest` returns
  * whichever release was created most recently across BOTH components —
- * correct only because release.yml's "Keep the career-ops release marked
+ * correct only because the upstream release.yml (removed in this fork)'s "Keep the career-ops release marked
  * as Latest" step re-asserts it on every push. If that step ever silently
  * stopped running, this would otherwise fetch and install a `web` tag
  * without complaint; the RELEASE_TAG_PREFIX + SEMVER_RE check makes that
@@ -3802,7 +3802,7 @@ export async function resolveTargetRef(argv, env, ctx = {}) {
   // prefix check plus the suffix-anchored SEMVER_RE — neither is a release.
   if (!releaseTagVersion(tagName)) {
     // Almost certainly the sibling `web` component's tag surfacing because
-    // release.yml's Latest-reassignment step didn't run (wrong prefix) — see
+    // the upstream release.yml (removed in this fork)'s Latest-reassignment step didn't run (wrong prefix) — see
     // the doc comment above — or a malformed tag (right prefix, no valid
     // version). Fetching either anyway would silently install the wrong
     // content or crash on a nonexistent ref; naming it here turns that into

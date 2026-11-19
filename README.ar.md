@@ -1,3 +1,5 @@
+> ملاحظة: تصف هذه الترجمة مشروع career-ops الأصلي (upstream) وقد تكون قديمة. ملف README.md الإنجليزي في هذا المستودع هو المرجع لهذا الفورك.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center" dir="rtl">وكيل ذكاء اصطناعي مفتوح المصدر للبحث عن عمل.</p>
@@ -132,18 +134,6 @@ npx @santifer/career-ops init
 [هنا يُكتب الإصلاح](CONTRIBUTING.md). غرفة، لا نادٍ. **لنبنِ معًا.**
 
 <p align="center" dir="rtl"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: عدد أعضاء خادم career-ops مباشرة"></a></p>
-
-## الرعاة
-
-career-ops مجاني للمرشحين، إلى الأبد. هذه الشركات ترعى المشروع:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> الرعاية تشتري ظهورًا موسومًا بوضوح، لا نفوذًا أبدًا: لا مبلغ من المال يغيّر خارطة الطريق أو يضع شيئًا داخل المنتج. الرعاة لا يظهرون أبدًا في التقييمات أو الترتيبات أو التوصيات.
 
 ## ماذا يفعل career-ops من أجلك
 

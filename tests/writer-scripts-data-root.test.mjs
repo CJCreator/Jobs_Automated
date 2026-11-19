@@ -167,6 +167,10 @@ const CLOSURE = {
     // their own lib/ helpers.
     'check-jd-archive.mjs', 'jd-capture.mjs', 'lib/cli-flags.mjs', 'lib/is-main-module.mjs',
     'lib/jd-archive-section.mjs',
+    // lib/services/tracker-service.mjs (the set-status rewrite) is the write
+    // path itself, and followup-seed.mjs is what it pulls in when a row turns
+    // Applied. Without them the child dies at module load (ERR_MODULE_NOT_FOUND).
+    'lib/services/tracker-service.mjs', 'followup-seed.mjs',
     // Runtime assets, not imports: an import scan does not see these and each
     // one only announces itself by crashing the child.
     'tracker-aliases.json',
@@ -183,7 +187,7 @@ function markerFixture(script) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'career-ops-marker-')));
   const codeRoot = join(dir, 'code');
   const dataRoot = join(dir, 'data');
-  for (const sub of ['lib', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
+  for (const sub of ['lib', 'lib/services', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
   mkdirSync(join(dataRoot, 'data'), { recursive: true });
   mkdirSync(join(dataRoot, 'output'), { recursive: true });
 

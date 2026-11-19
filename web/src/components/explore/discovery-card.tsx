@@ -6,7 +6,6 @@ import { cn } from "@/lib/cn";
 import { instrumentSerif } from "@/lib/fonts";
 import { ATS_LABEL, type AtsSource, type DiscoveredOffer } from "@/lib/explore";
 import { CHINA_SOURCES, EMPLOYER_LABEL } from "@/lib/employer-preset.mjs";
-import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
 import { useJobs } from "@/components/jobs/job-store";
 import { useExplore } from "./explore-provider";
 
@@ -89,10 +88,6 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-        <GhostJobBadge
-          probability={unverified ? 62 : 91}
-          tier={unverified ? "MODERATE_CONFIDENCE" : "HIGH_CONFIDENCE"}
-        />
         <span className="rounded border border-border px-1.5 py-0.5 font-medium text-muted">{ATS_LABEL[offer.ats as AtsSource] ?? EMPLOYER_LABEL[offer.ats as keyof typeof EMPLOYER_LABEL] ?? offer.ats}</span>
         {(fresh || employer) && <span className="text-faint">{fresh || "Posting date unknown"}</span>}
         {unverified && (

@@ -1,3 +1,5 @@
+> Lưu ý: Bản dịch này mô tả dự án upstream career-ops và có thể đã lỗi thời. README.md tiếng Anh trong kho này là tài liệu tham chiếu cho bản fork này.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">Agent tìm việc bằng AI mã nguồn mở.</p>
@@ -132,18 +134,6 @@ Việc tuyển dụng sẽ không tự sửa. Những người đang trải qua 
 [Đây là nơi bản sửa được viết ra](CONTRIBUTING.md). Một căn phòng, không phải một câu lạc bộ. **Hãy cùng xây dựng.**
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: số thành viên của máy chủ career-ops theo thời gian thực"></a></p>
-
-## Nhà tài trợ
-
-career-ops miễn phí cho ứng viên, mãi mãi. Các công ty sau tài trợ cho dự án:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> Tài trợ chỉ mua được sự hiển thị có gắn nhãn rõ ràng, không bao giờ mua được ảnh hưởng: không khoản tiền nào thay đổi lộ trình hay đặt bất cứ thứ gì vào sản phẩm. Nhà tài trợ không bao giờ xuất hiện trong đánh giá, xếp hạng hay đề xuất.
 
 ## career-ops làm gì cho bạn
 

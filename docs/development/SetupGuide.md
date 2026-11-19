@@ -26,7 +26,7 @@ flowchart TD
 ### Prerequisites
 - **Node.js**: Version `^22.13.0 || >=23.4.0`.
 - **Git**: Required for updater tracking.
-- **Go (Optional)**: Version 1.22+ if compiling the terminal TUI in `dashboard/`.
+- **Go (Optional)**: Version 1.26.0 or newer, the minimum in `dashboard/go.mod`, if compiling the terminal TUI in `dashboard/`.
 
 ### Installation Steps
 ```bash
@@ -43,7 +43,7 @@ npm run doctor
 # 4. Initialize candidate profile & environment
 cp .env.example .env
 cp config/profile.example.yml config/profile.yml
-cp cv-facts.example.json config/cv-facts.json
+cp config/cv-facts.example.json config/cv-facts.json
 ```
 
 ## Best Practices

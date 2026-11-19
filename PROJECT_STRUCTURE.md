@@ -105,8 +105,8 @@ Over 60 zero-token public ATS API adapters and feed scrapers:
 
 ### Major Supported Providers
 - **Modern Startup ATS**: `ashby.mjs`, `greenhouse.mjs`, `lever.mjs`, `bamboohr.mjs`, `smartrecruiters.mjs`, `teamtailor.mjs`.
-- **Enterprise Platforms**: `workday.mjs`, `taleo.mjs`, `successfactors.mjs`, `ultipro.mjs`, `icims.mjs`, `dayforce.mjs`.
-- **European & Regional Portals**: `join.mjs`, `personio.mjs`, `softgarden.mjs`, `wttj.mjs`, `interamt.mjs`, `solidjobs.mjs`.
+- **Enterprise Platforms**: `workday.mjs`, `taleo.mjs`, `successfactors.mjs`, `ultipro.mjs`, `icims.mjs`. Dayforce is not a provider: it is the root Playwright scanner `scan-dayforce.mjs`.
+- **European & Regional Portals**: `join.mjs`, `personio.mjs`, `softgarden.mjs`, `wttj.mjs`, `solidjobs.mjs`. Interamt is not a provider: it is the root Playwright scanner `scan-interamt.mjs`.
 - **Aggregators & Feeds**: `himalayas.mjs`, `remoteok.mjs`, `weworkremotely.mjs`, `thehub.mjs`, `startup-jobs.mjs`.
 
 ---
@@ -118,7 +118,7 @@ Foundational utilities shared across CLI scripts, evaluators, and the Web UI:
 - `dir-lock.mjs` & `pipeline-lock.mjs`: Advisory cross-platform directory locking with exponential backoff.
 - `pii-interceptor.mjs`: Monkey-patches `globalThis.fetch` to intercept outbound candidate PII.
 - `privacy-guard.mjs`: Regex and pattern engine identifying sensitive credentials, emails, and phone numbers.
-- `path-resolver.mjs`: Precedence engine for Data Root (`CAREER_OPS_ROOT`) and tracker locations.
+- `path-resolver.mjs` (repository root, not `lib/`): Precedence engine for Data Root (`CAREER_OPS_ROOT`) and tracker locations.
 - `story-bank.mjs`: STAR+R story bank parser enforcing provenance markers (#2947).
 - `context-budget.mjs`: Token density and context window optimization utilities.
 - `tracker-addition.mjs`: Formats and validates TSV addition lines for parallel batch workers.
@@ -141,7 +141,7 @@ Next.js 16 local-first web application:
   - `config/`: Profile and portal configuration UI.
 - `src/app/api/`: 30+ REST API route handlers orchestrating core Node scripts.
 - `src/components/ui/`: Primitive UI components (`tabs.tsx`, `drawer.tsx`, `toast.tsx`, `score-gauge.tsx`).
-- `server.mjs`: Custom production web server binding strictly to IPv4 loopback (`127.0.0.1`).
+- `server.mjs`: Launcher for the Next.js web UI (`web/server.mjs`). The default bind is loopback (`127.0.0.1`). `-H`/`--hostname` or `CAREER_OPS_WEB_ALLOWED_HOSTS` widens the bind to other interfaces. The web UI has no authentication, so anyone who can reach a widened bind can use it.
 
 ---
 
@@ -163,7 +163,7 @@ Over 1,000 automated test specifications:
 
 - `tests/helpers.mjs`: Universal test harness providing `pass()`, `fail()`, and child-process sandboxing.
 - `tests/providers/*.test.mjs`: Contract tests for all 60+ ATS scraper modules.
-- `tests/cv-visual/`: Playwright visual snapshot regression specs (`cv-visual.spec.mjs`).
+- `tests/cv-visual/`: Playwright visual snapshot regression specs (`cv-visual.test.mjs`, plus `*.spec.mjs` files alongside it).
 - `tests/data-root-guard.mjs`: Asserts that scripts never write outside the resolved Data Root.
 - `test-all.mjs`: Comprehensive test runner discovering all `tests/**/*.test.mjs` files.
 - `updater-migration-tests.mjs`: Asserts backward compatibility and Data Contract preservation across versions.

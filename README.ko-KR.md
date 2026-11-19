@@ -1,3 +1,5 @@
+> 참고: 이 번역문은 upstream career-ops 프로젝트를 설명하며 최신이 아닐 수 있습니다. 이 저장소의 영문 README.md가 이 포크의 기준입니다.
+
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
 
 <p align="center">오픈 소스 AI 구직 에이전트.</p>
@@ -132,18 +134,6 @@ npx @santifer/career-ops init
 [고치는 코드는 여기서 쓰입니다](CONTRIBUTING.md). 클럽이 아니라 방입니다. **함께 만들어 갑시다.**
 
 <p align="center"><a href="https://discord.gg/8pRpHETxa4"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2F8pRpHETxa4%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=Discord&suffix=%20members&color=5865F2&style=for-the-badge&labelColor=2b3137&logo=discord&logoColor=white" alt="Discord: career-ops 서버의 실시간 멤버 수"></a></p>
-
-## 스폰서
-
-career-ops는 구직자에게 영원히 무료입니다. 다음 기업들이 이 프로젝트를 후원합니다:
-
-<p align="center">
-  <a href="https://serpapi.com/career-ops-org" title="SerpApi"><img src="docs/sponsors/serpapi.svg" alt="SerpApi" height="48"></a>
-</p>
-
-<p align="center"><strong>SerpApi</strong> · Build a portfolio project with live search data. SerpApi gives developers structured JSON/Markdown from Google Search, Maps, Shopping, and other engines through a simple API call.</p>
-
-> 후원이 사는 것은 명확히 표시된 노출이지, 영향력이 아닙니다. 어떤 금액도 로드맵을 바꾸거나 제품 안에 무언가를 넣지 못합니다. 스폰서는 평가, 순위, 추천에 절대 등장하지 않습니다.
 
 ## career-ops가 당신을 위해 하는 일
 

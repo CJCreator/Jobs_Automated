@@ -241,9 +241,6 @@ const COMMENT_LINE = /^\s*(\/\/|\*|\/\*)/;
 const SPARSE_CHECKOUT_SCRIPTS = new Set([
   '.github/scripts/ci-approve.mjs',
   '.github/scripts/depends-on.mjs',
-  '.github/scripts/direction-gate.mjs',
-  '.github/scripts/gfi-handoff.mjs',
-  '.github/scripts/label-bot.mjs',
   '.github/scripts/triage.bundle.mjs',
 ]);
 
@@ -292,16 +289,6 @@ test('no file outside the helper reads the process entry path', () => {
   // already throws on an empty LISTING; this pins the enforced slice of it, so a
   // filter typo cannot quietly take every entrypoint out of scope.
   assert.ok(files.length > 100, `expected the tracked .mjs tree, got ${files.length} files`);
-  // The control for the four-name exclusion above. sponsors.mjs is the one
-  // script in that directory with the whole tree on disk when it runs, so it
-  // can import the helper, and this branch changed it to. Collapse the four
-  // names back into a `.github/` skip and this is what goes red, instead of
-  // the guard quietly dropping the file the branch just fixed. Asserted
-  // unconditionally, the same stance the dead-entry check below takes.
-  assert.ok(
-    files.some((f) => relative(ROOT, f).split('\\').join('/') === '.github/scripts/sponsors.mjs'),
-    'sponsors.mjs runs from a full checkout and must stay inside the enforced set',
-  );
 
   const offenders = [];
   for (const file of files) {

@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 interface OfferState {
   company: string;
   role: string;
-  base: number;
+  base: number | "";
   bonusPercent: number;
   signingBonus: number;
   equityGrant: number;
@@ -32,9 +32,9 @@ export function OfferSimulator() {
   const queryRole = searchParams?.get("role") ?? "";
 
   const [offer, setOffer] = useState<OfferState>({
-    company: queryCompany || "Stripe",
-    role: queryRole || "Staff AI Engineer",
-    base: 220000,
+    company: queryCompany || "",
+    role: queryRole || "",
+    base: "",
     bonusPercent: 15,
     signingBonus: 30000,
     equityGrant: 400000,
@@ -56,20 +56,21 @@ export function OfferSimulator() {
   const [copiedRound, setCopiedRound] = useState<number | null>(null);
 
   // Financial calculations
-  const annualBonus = Math.round(offer.base * (offer.bonusPercent / 100));
+  const base = typeof offer.base === "number" ? offer.base : 0;
+  const annualBonus = Math.round(base * (offer.bonusPercent / 100));
   
   const scenarios = {
     bear: { label: "Bear (-50%)", multiplier: 0.5, desc: "Down-round / market contraction" },
     base: { label: "Base (1.5x)", multiplier: 1.5, desc: "Healthy 15% CAGR steady state" },
     bull: { label: "Bull (3.5x)", multiplier: 3.5, desc: "Category leader outperformance" },
-    ipo: { label: "IPO (10x)", multiplier: 8.5, desc: "10x valuation with 15% dilution" },
+    ipo: { label: "IPO (8.5x)", multiplier: 8.5, desc: "8.5x valuation with 15% dilution" },
   };
 
   const projectedEquity = Math.round(offer.equityGrant * scenarios[scenario].multiplier);
   const annualEquity = Math.round(projectedEquity / 4);
-  const year1TTC = offer.base + annualBonus + offer.signingBonus + annualEquity;
-  const subsequentYearTTC = offer.base + annualBonus + annualEquity;
-  const fourYearTotal = (offer.base * 4) + (annualBonus * 4) + offer.signingBonus + projectedEquity;
+  const year1TTC = base + annualBonus + offer.signingBonus + annualEquity;
+  const subsequentYearTTC = base + annualBonus + annualEquity;
+  const fourYearTotal = (base * 4) + (annualBonus * 4) + offer.signingBonus + projectedEquity;
 
   const handleCopy = (text: string, roundNum: number) => {
     navigator.clipboard.writeText(text);
@@ -78,8 +79,8 @@ export function OfferSimulator() {
   };
 
   const targetTTC = Math.round(year1TTC * 1.15);
-  const targetBase = Math.round(offer.base * 1.10);
-  const targetSignon = Math.round(offer.signingBonus > 0 ? offer.signingBonus * 1.5 : offer.base * 0.10);
+  const targetBase = Math.round(base * 1.10);
+  const targetSignon = Math.round(offer.signingBonus > 0 ? offer.signingBonus * 1.5 : base * 0.10);
   const targetEquity = Math.round(offer.equityGrant * 1.25);
 
   const round1Email = `Subject: Excited about the ${offer.role} offer / Next steps
@@ -99,7 +100,7 @@ I want to be transparent: ${offer.company} is my preferred team to join. If we c
 Could we connect briefly for 10 minutes tomorrow to align on what is possible?
 
 Warm regards,
-Santiago`;
+[Your name]`;
 
   const round2Script = `Round 2 Multi-Lever Trade-Off Protocol:
 1. If Base is Capped: "I understand that internal compensation bands may place constraints on base adjustments. To bridge the remaining gap, could we structure this through a signing bonus of ${offer.currency} ${targetSignon.toLocaleString('en-US')} or an accelerated 6-month compensation review?"
@@ -122,7 +123,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
               <Badge tone="good">Game-Theoretic Engine</Badge>
             </div>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
-              Offer Decompiler & Monte Carlo Exit Simulator
+              Offer Decompiler & Scenario calculator
             </h2>
             <p className="mt-1 text-sm text-muted">
               Model multi-year cash vs. equity trajectories across 4 exit horizons and generate 3-round counter-offer scripts.
@@ -132,7 +133,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
             <div className="text-right">
               <div className="text-xs text-muted">Year 1 Total Comp</div>
               <div className="text-2xl font-bold tabular-nums text-foreground">
-                ${year1TTC.toLocaleString("en-US")}
+                {offer.currency} {year1TTC.toLocaleString("en-US")}
               </div>
             </div>
           </div>
@@ -144,78 +145,84 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
         <div className="space-y-4 lg:col-span-4">
           <div className="rounded-xl border border-border bg-surface p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Briefcase className="size-4 text-brand" />
+              <Briefcase className="size-4 text-brand-text" />
               Offer Parameters
             </h3>
 
             <div className="mt-4 space-y-3.5">
               <div>
-                <label className="text-xs font-medium text-muted">Company & Role</label>
+                <label htmlFor="offer-company" className="text-xs font-medium text-muted">Company & Role</label>
                 <div className="mt-1 grid grid-cols-2 gap-2">
                   <input
+                    id="offer-company"
                     type="text"
                     value={offer.company}
                     onChange={(e) => setOffer({ ...offer, company: e.target.value })}
-                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     placeholder="Company"
                   />
                   <input
                     type="text"
+                    aria-label="Role"
                     value={offer.role}
                     onChange={(e) => setOffer({ ...offer, role: e.target.value })}
-                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     placeholder="Role"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted">Annual Base Salary ($)</label>
+                <label htmlFor="offer-base" className="text-xs font-medium text-muted">Annual Base Salary ($)</label>
                 <input
+                  id="offer-base"
                   type="number"
                   step="5000"
                   value={offer.base}
                   onChange={(e) => setOffer({ ...offer, base: Number(e.target.value) || 0 })}
-                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-muted">Target Bonus (%)</label>
+                  <label htmlFor="offer-bonus" className="text-xs font-medium text-muted">Target Bonus (%)</label>
                   <input
+                    id="offer-bonus"
                     type="number"
                     value={offer.bonusPercent}
                     onChange={(e) => setOffer({ ...offer, bonusPercent: Number(e.target.value) || 0 })}
-                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted">Sign-On Bonus ($)</label>
+                  <label htmlFor="offer-signing" className="text-xs font-medium text-muted">Sign-On Bonus ($)</label>
                   <input
+                    id="offer-signing"
                     type="number"
                     step="5000"
                     value={offer.signingBonus}
                     onChange={(e) => setOffer({ ...offer, signingBonus: Number(e.target.value) || 0 })}
-                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                    className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted">Total Equity Grant ($ / 4 yrs)</label>
+                <label htmlFor="offer-equity" className="text-xs font-medium text-muted">Total Equity Grant ($ / 4 yrs)</label>
                 <input
+                  id="offer-equity"
                   type="number"
                   step="25000"
                   value={offer.equityGrant}
                   onChange={(e) => setOffer({ ...offer, equityGrant: Number(e.target.value) || 0 })}
-                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                  className="mt-1 w-full rounded-md border border-border bg-surface-hover/50 px-2.5 py-1.5 text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 />
               </div>
             </div>
           </div>
 
-          {/* Monte Carlo Scenario Selector */}
+          {/* Scenario selector */}
           <div className="rounded-xl border border-border bg-surface p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <TrendingUp className="size-4 text-emerald-500" />
@@ -231,6 +238,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
                   key={scenKey}
                   type="button"
                   onClick={() => setScenario(scenKey)}
+                  aria-pressed={scenario === scenKey}
                   className={`rounded-lg border p-2.5 text-left transition-all ${
                     scenario === scenKey
                       ? "border-brand bg-brand-soft/30 text-foreground ring-1 ring-brand"
@@ -260,14 +268,14 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone="info">Equity Value: ${projectedEquity.toLocaleString("en-US")}</Badge>
-                <Badge tone="muted">Base + Bonus: ${(offer.base * 4 + annualBonus * 4 + offer.signingBonus).toLocaleString("en-US")}</Badge>
+                <Badge tone="muted">Base + Bonus: ${(base * 4 + annualBonus * 4 + offer.signingBonus).toLocaleString("en-US")}</Badge>
               </div>
             </div>
 
             {/* 4-Year Bar Breakdown */}
             <div className="mt-6 space-y-4">
               {[1, 2, 3, 4].map((year) => {
-                const yrBase = offer.base;
+                const yrBase = base;
                 const yrBonus = annualBonus;
                 const yrSignon = year === 1 ? offer.signingBonus : 0;
                 const yrEq = annualEquity;
@@ -333,7 +341,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
           <div className="rounded-xl border border-border bg-surface p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-brand" />
+                <Sparkles className="size-4 text-brand-text" />
                 <h3 className="text-base font-semibold text-foreground">
                   3-Round Game-Theoretic Counter Strategy
                 </h3>
@@ -352,6 +360,7 @@ If you can formalize the agreement at [Agreed Terms], send over the revised agre
                   key={tab.r}
                   type="button"
                   onClick={() => setActiveRound(tab.r)}
+                  aria-pressed={activeRound === tab.r}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     activeRound === tab.r
                       ? "bg-brand text-brand-foreground"

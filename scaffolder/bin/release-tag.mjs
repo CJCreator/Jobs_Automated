@@ -7,7 +7,7 @@
 //
 // This repository also releases a `web` component, tagged `web-vX.Y.Z`, and
 // /releases/latest returns whichever release is marked Latest across both.
-// release.yml re-marks the career-ops release on every run, but between the
+// the upstream release.yml (removed in this fork) re-marks the career-ops release on every run, but between the
 // two releases being created, or if that step stops running, the answer is a
 // web tag. Only an exact `career-ops-vX.Y.Z` counts as a release here, the same
 // rule as RELEASE_TAG_RE in update-system.mjs (not imported: the npm package

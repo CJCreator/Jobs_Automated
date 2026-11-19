@@ -42,8 +42,14 @@ flowchart TD
 
 ## Examples
 ```bash
-# Match candidate STAR stories to specific requirements
-node match-star.mjs --role "Staff Backend Engineer"
+# Match STAR stories to a behavioural question (the question is positional)
+node match-star.mjs "Tell me about a time you led a project under pressure"
+
+# Also use a job description file, and return the top 2 matches
+node match-star.mjs "Describe a conflict you resolved" --jd jds/acme.md --top 2
+
+# List every story with its tags
+node match-star.mjs --list
 ```
 
 ## Future Enhancements

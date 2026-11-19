@@ -213,7 +213,6 @@ const KNOWN_WITHOUT_HELP = new Set([
   // sync-pdf-flags.mjs) are user-facing and were FIXED in this PR rather than
   // listed, because listing them is what turns this into a description of
   // nothing.
-  '.github/scripts/sponsors.mjs',
   'web/scripts/scheduled-jobs-runner.mjs',
 ]);
 

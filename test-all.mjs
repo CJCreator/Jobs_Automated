@@ -2676,7 +2676,7 @@ const exactAllowedFiles = new Set([
   'README.id.md',
   // GitHub Sponsors funding target + Codex plugin manifest (#4131) — same
   // maintainer-credit shape as the .claude-plugin/.github/plugin ones above.
-  'funding.json', '.codex-plugin/plugin.json',
+  '.codex-plugin/plugin.json',
   // The OpenAI plugin directory listing names its developer, like the
   // claude-directory manifest that '.claude-plugin/plugin.json' above covers.
   'openai-directory/plugin.json',
@@ -19645,112 +19645,6 @@ try {
   fail(`formatRunFailure clipping check: ${e.message}`);
 }
 
-// ── FUNDING MANIFEST INTEGRITY (funding.json, fundingjson.org v1.1.0) ──
-// The manifest is CRAWLED by a directory that re-reads it on its own schedule,
-// so a break here degrades silently: the listing goes stale or drops, and the
-// first signal is an email that never arrives. SYSTEM_PATHS coverage only
-// guarantees the file SHIPS; nothing until now checked that it still parses or
-// that its required fields survived an edit.
-//
-// The dated-metric rule is the project's own, not the schema's: every count in
-// a description carries the date it was counted, because a bare "68,000 stars"
-// is stale the week after it's written and a funder reading it cannot tell.
-
-console.log('\n72. Funding manifest integrity (funding.json)');
-
-try {
-  const fundingRaw = readFile('funding.json');
-  let funding = null;
-  try {
-    funding = JSON.parse(fundingRaw);
-    pass('funding.json parses as JSON');
-  } catch (e) {
-    fail(`funding.json does not parse: ${e.message}`);
-  }
-
-  if (funding) {
-    if (funding.version === 'v1.1.0') {
-      pass('funding.json declares schema version v1.1.0');
-    } else {
-      fail(`funding.json version is ${JSON.stringify(funding.version)}, expected "v1.1.0"`);
-    }
-
-    const entity = funding.entity || {};
-    const entityMissing = ['type', 'role', 'name', 'email', 'webpageUrl']
-      .filter((k) => !entity[k]);
-    if (entityMissing.length === 0 && entity.webpageUrl?.url && entity.webpageUrl?.wellKnown) {
-      pass('funding.json entity carries every required field, webpageUrl + wellKnown included');
-    } else {
-      fail(`funding.json entity incomplete: missing ${entityMissing.join(', ') || 'webpageUrl.url/wellKnown'}`);
-    }
-
-    const projects = Array.isArray(funding.projects) ? funding.projects : [];
-    const badProject = projects.find((pr) => !pr.guid || !pr.name || !pr.description
-      || !pr.webpageUrl?.url || !pr.webpageUrl?.wellKnown || !pr.repositoryUrl?.url
-      || !Array.isArray(pr.licenses) || pr.licenses.length === 0);
-    if (projects.length > 0 && !badProject) {
-      pass(`funding.json lists ${projects.length} project(s), each with guid, urls, wellKnown and a license`);
-    } else {
-      fail(`funding.json projects invalid: ${projects.length === 0 ? 'none listed' : `${badProject.guid || '(no guid)'} incomplete`}`);
-    }
-
-    // A plan pointing at a channel guid that no longer exists is the shape an
-    // edit produces: the channel gets renamed, the plan keeps the old id, and
-    // the directory renders a funding option with nowhere to send money.
-    const channels = Array.isArray(funding.funding?.channels) ? funding.funding.channels : [];
-    const plans = Array.isArray(funding.funding?.plans) ? funding.funding.plans : [];
-    const channelIds = new Set(channels.map((c) => c.guid));
-    const orphanPlan = plans.find((pl) => (pl.channels || []).some((c) => !channelIds.has(c)));
-    if (channels.length > 0 && plans.length > 0 && !orphanPlan) {
-      pass(`funding.json has ${channels.length} channel(s) and ${plans.length} plan(s), every plan channel resolvable`);
-    } else if (!channels.length || !plans.length) {
-      fail('funding.json must declare at least one funding channel and one plan');
-    } else {
-      fail(`funding.json plan "${orphanPlan.guid}" references a channel guid that no channel declares`);
-    }
-
-    // Dated metrics: any description quoting a count must say when it was counted.
-    const METRIC_RE = /\d[\d,.]*\+?\s*(?:GitHub\s+)?(?:stars|forks|contributors|merged pull requests|pull requests|community members|installs)/i;
-    const COUNTED_RE = /counted\s+\d{1,2}\s+\w{3,}\s+\d{4}/i;
-    const descriptions = [
-      ['entity', entity.description || ''],
-      ...projects.map((pr) => [`project ${pr.guid}`, pr.description || '']),
-      // Plans are read by funders too: a six-month plan quoting "72,400+ stars"
-      // with no date went stale the same way an entity description would.
-      ...plans.map((pl) => [`plan ${pl.guid}`, pl.description || '']),
-    ];
-    const undated = descriptions.filter(([, text]) => METRIC_RE.test(text) && !COUNTED_RE.test(text));
-    if (undated.length === 0) {
-      pass('every funding.json description that quotes a count also states when it was counted');
-    } else {
-      fail(`funding.json ${undated.map(([w]) => w).join(', ')}: quotes a metric with no "counted <date>"`);
-    }
-
-    // A repository wellKnown is the proof the directory asks for: it fetches that
-    // file and looks for the manifest URL in it. The repo moved to the org on
-    // 31-Aug and the listing kept flagging it as unproven until this file existed,
-    // so the check is that the file ships AND names the manifest's own URL.
-    const repoProofs = projects.filter((pr) => pr.repositoryUrl?.wellKnown);
-    if (repoProofs.length > 0) {
-      const WELL_KNOWN = '.well-known/funding-manifest-urls';
-      const MANIFEST_URL = 'https://github.com/career-ops-hq/career-ops/raw/main/funding.json';
-      let proof = null;
-      try { proof = readFile(WELL_KNOWN); } catch { proof = null; }
-      const listed = proof ? proof.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
-      const pointsHere = repoProofs.every((pr) => pr.repositoryUrl.wellKnown.endsWith(`/${WELL_KNOWN}`));
-      if (proof !== null && listed.includes(MANIFEST_URL) && pointsHere) {
-        pass(`${WELL_KNOWN} ships and lists ${MANIFEST_URL}, and repositoryUrl.wellKnown points at it`);
-      } else {
-        fail(proof === null ? `repositoryUrl.wellKnown is set but ${WELL_KNOWN} is missing`
-          : !pointsHere ? `repositoryUrl.wellKnown does not point at ${WELL_KNOWN}`
-          : `${WELL_KNOWN} does not list ${MANIFEST_URL}`);
-      }
-    }
-  }
-} catch (e) {
-  fail(`funding manifest integrity check: ${e.message}`);
-}
-
 console.log('\n73. Gemini evaluator and encoding');
 
 let geminiTmp = null;
@@ -19873,26 +19767,6 @@ try {
 
 // JD-archive validator wiring + read-only boundary (#2789) moved to
 // tests/jd-archive-wiring.test.mjs (#3935) — discovered automatically below.
-
-console.log('\n76. README sponsors section is generated from .github/sponsors.json');
-try {
-  // The Sponsors section of README.md (heading, intro, per-sponsor rows,
-  // independence note, placement between the community section and the value
-  // proposition) and the per-sponsor rows of every README.<lang>.md are
-  // rendered by .github/scripts/sponsors.mjs; a hand edit on either side is
-  // drift that the next --write would silently undo, so the two are pinned
-  // together here. The script also refuses a logo that is not a file inside
-  // docs/sponsors/ (no hotlinking), a non-https sponsor URL, and a sponsor URL
-  // carrying tracking parameters.
-  const r = spawnSync(process.execPath, [join(ROOT, '.github', 'scripts', 'sponsors.mjs'), '--check'], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status === 0) {
-    pass('README.md and every README.<lang>.md match .github/sponsors.json');
-  } else {
-    fail(`README sponsors drifted or invalid: ${String(r.stderr || r.stdout).trim().split('\n')[0]}`);
-  }
-} catch (e) {
-  fail(`sponsors check: ${e.message}`);
-}
 
 // ── INLINE SECTIONS: END ────────────────────────────────────────
 

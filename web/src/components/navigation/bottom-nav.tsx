@@ -34,10 +34,11 @@ export function BottomNav() {
           <Link
             key={href}
             href={href}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium transition-colors",
               active
-                ? "text-brand"
+                ? "text-brand-text"
                 : "text-muted hover:text-foreground"
             )}
           >
@@ -51,10 +52,10 @@ export function BottomNav() {
       <button
         type="button"
         onClick={handleOpenAssistant}
-        className="flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium text-muted transition-colors hover:text-foreground focus:outline-none"
+        className="flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         aria-label="Open AI Assistant"
       >
-        <Sparkles className="size-5 text-brand" />
+        <Sparkles className="size-5 text-brand-text" />
         <span>Ask AI</span>
       </button>
 
@@ -62,7 +63,7 @@ export function BottomNav() {
       <button
         type="button"
         onClick={handleOpenMenu}
-        className="flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium text-muted transition-colors hover:text-foreground focus:outline-none"
+        className="flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         aria-label="Open Menu"
       >
         <Menu className="size-5" />

@@ -5,9 +5,12 @@ PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
 PRAGMA foreign_keys = ON;
 
--- Applications Table: Mirrors data/applications.md rows
+-- Applications Table: Mirrors data/applications.md rows.
+-- row_id is the surrogate primary key. `id` holds the tracker # for lookups only:
+-- it is not unique (duplicate or renumbered rows must not break the sync).
 CREATE TABLE IF NOT EXISTS applications (
-  id INTEGER PRIMARY KEY,
+  row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER NOT NULL,
   date_applied TEXT,
   company TEXT NOT NULL,
   role TEXT NOT NULL,
@@ -25,6 +28,7 @@ CREATE TABLE IF NOT EXISTS applications (
   updated_at TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_applications_id ON applications(id);
 CREATE INDEX IF NOT EXISTS idx_applications_company ON applications(company);
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_applications_score ON applications(score_numeric);

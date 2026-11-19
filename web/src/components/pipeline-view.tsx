@@ -6,7 +6,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText, LayoutList, Columns3, TrendingUp } from "lucide-react";
 import type { Application, InboxJob } from "@/lib/career-ops";
 import { Badge } from "@/components/ui/badge";
-import { GhostJobBadge } from "@/components/jobs/ghost-job-badge";
 import { KanbanBoard } from "@/components/pipeline/kanban-board";
 import { CompanyLogo } from "@/components/company-logo";
 import { CANONICAL_STATES, scoreNum, scoreTone } from "@/lib/format";
@@ -711,10 +710,6 @@ export function PipelineView({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Badge tone={scoreTone(r.score)}>{r.score || "—"}</Badge>
-                      <GhostJobBadge
-                        probability={r.status?.toLowerCase().includes("skip") || r.status?.toLowerCase().includes("reject") ? 42 : 94}
-                        tier={r.status?.toLowerCase().includes("skip") ? "ELEVATED_GHOST_RISK" : "HIGH_CONFIDENCE"}
-                      />
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-muted">

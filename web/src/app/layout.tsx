@@ -11,7 +11,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "career-ops — official web experience",
   description: "The official, local-first web experience for career-ops.",
-  manifest: "/manifest.json",
   // Home-screen / standalone (iOS): let our theme-color flow up to the status bar
   // + Dynamic Island; safe-area insets handle the layout.
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "career-ops" },
@@ -30,7 +29,10 @@ export const viewport: Viewport = {
 // match — so Safari's status bar / URL bar unify with the header instead of a
 // jarring light seam. Matches --bg (light #f7f6f3 / dark #0a0a0a).
 const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('career-ops:theme');var s=t==='light'||t==='dark'?t:null;var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',d?'#0a0a0a':'#f7f6f3');}catch(e){document.documentElement.classList.add('dark');}})();`;
-const SW_SCRIPT = `if(typeof window!=='undefined'&&'serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}`;
+// One-time cleanup: the service worker and manifest were removed because the old
+// worker cached page HTML. Drop any worker a browser still has and any
+// "career-ops*" cache so existing visitors stop serving stale pages.
+const SW_CLEANUP_SCRIPT = `(function(){try{if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});}if('caches' in window){caches.keys().then(function(ks){ks.forEach(function(k){if(k.indexOf('career-ops')===0){caches.delete(k);}});}).catch(function(){});}}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   await connection();
@@ -43,7 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-        <script dangerouslySetInnerHTML={{ __html: SW_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SW_CLEANUP_SCRIPT }} />
         <RouteProgressHost />
         <ThemeProvider>
           <ToastProvider>

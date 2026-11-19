@@ -57,9 +57,9 @@ function fakeArchiveCodeRoot() {
   // scratch prefix, so that nothing walking the repo meanwhile takes these
   // copies for part of it.
   const codeRoot = mkdtempSync(join(ROOT, `${SCRATCH_PREFIX}set-status-archive-`));
-  for (const sub of ['lib', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
+  for (const sub of ['lib', 'lib/services', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
   for (const file of [
-    'set-status.mjs', 'path-resolver.mjs', 'tracker-utils.mjs', 'pipeline-lock.mjs',
+    'set-status.mjs', 'lib/services/tracker-service.mjs', 'path-resolver.mjs', 'tracker-utils.mjs', 'pipeline-lock.mjs',
     'tracker-parse.mjs', 'lib/local-today.mjs', 'role-matcher.mjs',
     'session-activity.mjs', 'lib/is-main-module.mjs', 'check-jd-archive.mjs',
     'jd-capture.mjs', 'lib/cli-flags.mjs', 'lib/jd-archive-section.mjs', 'templates/states.yml',

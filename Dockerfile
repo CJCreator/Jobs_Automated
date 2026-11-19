@@ -7,7 +7,7 @@ FROM mcr.microsoft.com/playwright:v1.64.1-jammy
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=development \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PATH=/usr/local/go/bin:$PATH
 
@@ -38,10 +38,17 @@ RUN set -eux; \
 
 WORKDIR /app
 
+# Run as the image's non-root user (pwuser, shipped by the Playwright images).
+# /app is chowned first so the in-image npm install below and the named
+# node_modules volume are writable by that user.
+RUN chown pwuser:pwuser /app
+USER pwuser
+
 # Prime npm deps in a layer so rebuilds stay fast.
+# package-lock.json is tracked and not in .dockerignore, so npm ci pins exact versions.
 # Pin playwright to the version that matches the base image's bundled chromium.
-COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund \
+COPY --chown=pwuser:pwuser package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund \
  && npm install --no-audit --no-fund --save-exact playwright@1.64.1
 
 # The rest of the project is bind-mounted at runtime via docker compose,
