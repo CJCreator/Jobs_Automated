@@ -12,7 +12,7 @@ import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import { getDb } from "@/lib/db/index.mjs";
 import * as repo from "@/lib/db/repo.mjs";
-import { assertSafeEnv } from "@/lib/server/env-guard.mjs";
+import { assertSafeEnv, devLoginEnabled, strictEnv } from "@/lib/server/env-guard.mjs";
 
 declare module "next-auth" {
   interface Session {
@@ -25,8 +25,7 @@ declare module "next-auth" {
 // fails here, before it can answer anything. Skipped during `next build`.
 assertSafeEnv(process.env);
 
-const isProduction = process.env.NODE_ENV === "production";
-const devLogin = process.env.ROLEWRIGHT_DEV_LOGIN === "1";
+const devLogin = devLoginEnabled(process.env);
 
 const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const emailEnabled = Boolean(process.env.AUTH_RESEND_KEY && process.env.EMAIL_FROM);
@@ -150,7 +149,7 @@ const config: NextAuthConfig = {
   // Credentials sign-in only works with JWT sessions, and an adapter would
   // otherwise switch the default to database sessions.
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_S },
-  secret: process.env.AUTH_SECRET || (isProduction ? undefined : DEV_ONLY_SECRET),
+  secret: process.env.AUTH_SECRET || (strictEnv(process.env) ? undefined : DEV_ONLY_SECRET),
   pages: { signIn: "/sign-in", error: "/sign-in" },
   callbacks: {
     signIn({ account, profile }) {

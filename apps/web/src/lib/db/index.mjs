@@ -12,6 +12,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { SCHEMA_SQL } from "./schema.mjs";
+import { UnsafeEnvironmentError, isDeployed } from "../server/env-guard.mjs";
 
 const APP_ROLE = "rolewright_app";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -127,6 +128,27 @@ export async function createDb({ dataDir, connectionString } = {}) {
 }
 
 const KEY = Symbol.for("rolewright.db");
+const WARNED = Symbol.for("rolewright.db.embeddedWarned");
+
+/**
+ * Refuse the embedded database on a deployed host; say so once when a
+ * production-mode server that is not deployed uses it.
+ * @param {Record<string, string | undefined>} env
+ * @param {string} dataDir the embedded database directory that would be used
+ * @param {(message: string) => void} [warn]
+ */
+export function assertDbEnv(env, dataDir, warn = console.warn) {
+  if ((env.DATABASE_URL ?? "").trim()) return;
+  if (isDeployed(env)) {
+    throw new UnsafeEnvironmentError(
+      "DATABASE_URL is not set on a deployed host, so Rolewright will not open the embedded database. Set DATABASE_URL to your Postgres connection string and restart.",
+    );
+  }
+  if (env.NODE_ENV === "production" && !globalThis[WARNED]) {
+    globalThis[WARNED] = true;
+    warn(`DATABASE_URL is not set: using the embedded database in ${dataDir}. That is for development and single-machine trials only.`);
+  }
+}
 
 /**
  * The process-wide database. Held on globalThis so Next.js dev hot-reload does
@@ -140,6 +162,7 @@ export function getDb() {
     const dataDir = process.env.ROLEWRIGHT_DATA_DIR
       ? path.resolve(process.env.ROLEWRIGHT_DATA_DIR)
       : path.join(process.cwd(), ".data", "pglite");
+    assertDbEnv(process.env, dataDir);
     const opening = url ? createDb({ connectionString: url }) : createDb({ dataDir });
     globalThis[KEY] = opening;
     // A failed start must not be cached forever.
