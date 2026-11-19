@@ -58,6 +58,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         {any ? <p className="text-muted">{t.intro}</p> : null}
       </div>
 
+      <Link href="/privacy" className="inline-block min-h-8 py-1 text-brand underline underline-offset-4">
+        {en.notice.signInPrivacyLink}
+      </Link>
+
       {failed ? (
         <Notice tone="danger" role="alert" title={t.failedTitle}>
           {t.failedBody}
