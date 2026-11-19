@@ -696,7 +696,11 @@ Steps:
       route wrapper returns 500 internal and logs a cause label; the worker's own error text is never
       forwarded (pdf.js errors can quote file content);
     - fix the "mid-read expiry" test: budget about 400 ms (30 ms expires before pdf.js loads) and confirm
-      pdf_too_complex.
+      pdf_too_complex;
+    - make the existing text-bomb test robust under a loaded parallel `npm test` (it took 2,384 ms against
+      its 2,000 ms limit at load average 12): assert on the worker's refusal reason and on the watchdog's
+      memory reading rather than process RSS and tight wall-clock bounds; run the full `npm test` three
+      times and report all three.
  2. Worker: hoist `const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")` to module top
     level, above the try.
  3. Parent: poll worker.getHeapStatistics() about every 100 ms (guard typeof === "function"; engines allow
