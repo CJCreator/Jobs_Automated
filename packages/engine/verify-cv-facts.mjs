@@ -1025,7 +1025,7 @@ const AT_JOB_LEAD_RE = new RegExp([
 const NOT_TRAILING_WORK_VERBS = new Set(`${NOT_WORK_VERBS}|looked|glanced|stared|gazed|arrived|aimed|stopped|marvelled|marveled|wondered|laughed|smiled|hinted|pointed|balked|clamoured|clamored|learned|discovered|applied|loved|liked|enjoyed|excited|thrilled|delighted|interested|inspired|motivated|impressed|intrigued|fascinated|attracted|experienced|skilled|qualified|seasoned|dedicated|committed|talked|chatted|connected|referred|recommended|encouraged|advertised|posted|listed|opened|respected|researched`.split('|'));
 const TRAILING_IRREGULAR_VERBS = '[Ll]ed|[Bb]uilt|[Rr]an|[Gg]rew|[Ww]rote|[Mm]ade|[Ww]on|[Dd]rove|[Tt]ook|[Cc]ut|[Tt]aught|[Ss]pent|[Oo]versaw|[Bb]egan|[Bb]rought|[Ss]old|[Ss]et|[Gg]ot|[Kk]ept|[Hh]eld|[Gg]ave';
 // The words between the verb and "at" stop at a second clause or a job-posting noun.
-const TRAILING_EMPLOYER_RE = new RegExp(`(?:^\\s*(?:[•*+-]\\s+)?|[.;!?]\\s+|\\n[^\\S\\n]*(?:[•*+-][^\\S\\n]+)?|\\b[Ii] |\\b[Ww]e |\\b[Aa]nd |, )([A-Za-z][a-z]{1,20}ed|${TRAILING_IRREGULAR_VERBS})\\b(?:(?!\\b(?:at|I|we|what|which|who|whom|where|how|why|because|would|will|hope|role|position|opening|opportunity|vacancy|posting)\\b)[^.;!?\\n]){0,100}?\\bat (?:The )?(${AT_NAME})(?![\\p{L}\\p{N}])${NOT_ADDRESSED}`, 'gu');
+const TRAILING_EMPLOYER_RE = new RegExp(`(?:^\\s*(?:[•*+-]\\s+)?|[.;!?]\\s+|\\n[^\\S\\n]*(?:[•*+-][^\\S\\n]+)?|\\b[Ii] |\\b[Ww]e |\\b[Aa]nd |, )([A-Za-z][a-z]{1,20}ed|${TRAILING_IRREGULAR_VERBS})\\b(?:(?!\\b(?:at|I|we|what|which|who|whom|where|how|why|because|would|will|am|can|could|may|might|want|wish|look|looking|eager|keen|ready|bring|contribute|join|hope|role|position|opening|opportunity|vacancy|posting)\\b)[^.;!?\\n]){0,100}?\\bat (?:The )?(${AT_NAME})(?![\\p{L}\\p{N}])${NOT_ADDRESSED}`, 'gu');
 // Capitalised words that follow "at" in a title-cased bullet without naming anyone.
 const NOT_AN_EMPLOYER = new Set(['scale', 'speed', 'once', 'least', 'most', 'all', 'times', 'best', 'work', 'home', 'cost', 'risk', 'large', 'first', 'last', 'present']);
 
@@ -1400,8 +1400,14 @@ export function structuredFieldClaims(text) {
     add('organization', match[1], true);
     add('title', match[3], false);
   }
-  const seen = new Set();
-  return claims.filter(({ kind, value }) => !seen.has(`${kind}\n${value}`) && seen.add(`${kind}\n${value}`));
+  // One claim per kind and value; `count` is how many slots stated it.
+  const seen = new Map();
+  for (const claim of claims) {
+    const key = `${claim.kind}\n${claim.value}`;
+    if (seen.has(key)) seen.get(key).count++;
+    else seen.set(key, { ...claim, count: 1 });
+  }
+  return [...seen.values()];
 }
 
 /** Split generated/source documents into bounded statements for attribution checks. */
@@ -2565,7 +2571,7 @@ export function verifyFactsFromText(targetText, {
   // occurrence in a title slot, and the same word elsewhere in the document still blocks.
   const excused = new Map();
   for (const field of fieldClaims.filter(({ blocking, kind }) => !blocking && kind === 'title')) {
-    for (const { value } of builtinClaimWordFacts(field.line, '')) excused.set(value, (excused.get(value) ?? 0) + 1);
+    for (const { value } of builtinClaimWordFacts(field.line, '')) excused.set(value, (excused.get(value) ?? 0) + (field.count ?? 1));
   }
   const claimWordFacts = builtinClaimWordFacts(targetText, sourceText)
     .filter(({ value }) => !allowedFacts.has(value))

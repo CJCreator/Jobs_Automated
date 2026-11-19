@@ -65,10 +65,16 @@ for (const text of [
   'Inspired by the mission at Stripe, I managed vendor contracts.',
   'I managed vendor contracts, and loved what was built at Stripe.',
   'I managed vendor contracts and I would love to do the same at Stripe.',
+  'I managed vendor contracts and want to grow at Stripe.',
+  'I managed vendor contracts and am keen to contribute at Stripe.',
+  'I managed vendor contracts and look forward to doing so at Stripe.',
+  'I reduced close time by 30% and can bring that rigour to the team at Stripe.',
 ]) {
   passes(`a sentence about the target company: ${text}`, text);
 }
 blocks('a bullet with a second job clause still blocks', 'Managed vendor contracts and budgets at Acme Corp', { facts: ['employer:acme corp'] });
+blocks('a second employer still blocks (Wipro)', 'Managed vendor contracts at Wipro', { facts: ['employer:wipro'] });
+blocks('a second employer still blocks (Globex)', 'Reduced close time by 30% at Globex', { facts: ['employer:globex'] });
 blocks('a team count before the employer', 'Led a team of 4 at Acme Corp', { facts: ['employer:acme corp'] });
 
 // 3. An adjective between the magnitude and the noun is not a second claim.
@@ -114,4 +120,15 @@ for (const role of ['Senior Finance Manager', 'Finance Manager', 'Senior Analyst
   const r = verifyFactsFromText(html, { sourceText: SOURCE_V.replace('Senior Analyst', 'Analyst') });
   if (r.verdict !== 'block') pass(`a cover letter for the role "${role}" is not blocked by its title`);
   else fail(`role title ${role} blocked: ${JSON.stringify(r.unsupportedFacts)}`);
+}
+
+// Round 2: two job slots with the same unsourced title are both excused; a bullet is not.
+{
+  const two = `<div class="job-company">Infosys</div><div class="job-role">Director</div><div class="job-company">Infosys</div><div class="job-role">Director</div>`;
+  const alone = run(two, SOURCE_V);
+  if (alone.verdict === 'warn' && !alone.unsupportedFacts.some(f => f.value === 'director')) pass('two job slots with the same unsourced title warn');
+  else fail(`two same-title slots: ${JSON.stringify(alone)}`);
+  const withBullet = run(`${two}<ul><li>Managed vendor contracts as director of the unit</li></ul>`, SOURCE_V);
+  if (withBullet.unsupportedFacts.some(f => f.value === 'director')) pass('the same pair plus the word in a bullet blocks');
+  else fail(`pair plus bullet: ${JSON.stringify(withBullet)}`);
 }
