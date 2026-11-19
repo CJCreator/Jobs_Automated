@@ -97,7 +97,32 @@ const SUPPORTED = [
   [`${SOURCE_V}\nCertified Scrum Master`, ["Certified Scrum Master managing vendor contracts", "Scrum Master certification"]],
   [SOURCE, ["Senior analyst who managed a team of 4 analysts"]],
   [`${SOURCE_V}\nExpert`, ["Expert in SQL and Power BI"]],
+  [`${SOURCE_V}\nPh.D. Physics`, ["PhD in Physics"]],
+  [`${SOURCE_V}\nworld class team`, ["Built a world-class team for vendor contracts"]],
 ];
+
+// Dotted abbreviations and hyphen/space variants are the same claim word.
+const VARIANTS = [
+  "Ph.D. in finance who managed vendor contracts",
+  "ph.d in finance",
+  "M.B.A. graduate managing vendor contracts",
+  "C.E.O. of vendor contracts",
+  "world class analyst managing vendor contracts",
+  "Best in class vendor contracts",
+  "thought-leader in vendor contracts",
+  "single handedly managed vendor contracts",
+  "singlehandedly managed vendor contracts",
+  "top performing analyst managing vendor contracts",
+  "industry leading vendor contracts",
+  "nation-wide vendor contracts",
+];
+for (const text of VARIANTS) {
+  test(`blocks variant spelling: ${text}`, () => {
+    assert.equal(strict(text, SOURCE_V).verdict, "block");
+    assert.equal(strict(text.toLowerCase(), SOURCE_V).verdict, "block");
+    assert.equal(gated(text, SOURCE_V).verdict, "block");
+  });
+}
 for (const [facts, lines] of SUPPORTED) {
   for (const text of lines) {
     test(`passes when the facts support the word: ${text}`, () => {

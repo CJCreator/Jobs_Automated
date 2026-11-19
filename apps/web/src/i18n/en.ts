@@ -306,7 +306,7 @@ export const en = {
       },
       actionFailed: "That did not work. Try again.",
       // P0-1a
-      exportBlockedLine: (n: number) => `Line ${n}`,
+      exportBlockedLine: (n: number) => `Suggestion ${n}`,
       exportBlockedWords: "Not in your facts:",
       exportBlockedGo: "Go to this suggestion",
       exportBlockedGeneral: "Other problems:",

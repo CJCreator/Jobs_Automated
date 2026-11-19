@@ -27,10 +27,11 @@ function download(blob: Blob, filename: string) {
 }
 
 /** Refused issues grouped by the suggestion they came from; those with no suggestion share one group. */
-function groupIssues(issues: CheckIssue[]) {
+function groupIssues(issues: CheckIssue[], known: { id: string }[]) {
   const groups: { sid: string | null; line: string; issues: CheckIssue[] }[] = [];
   for (const issue of issues) {
-    const sid = issue.sid ?? null;
+    // A suggestion this page does not list cannot be numbered or scrolled to.
+    const sid = issue.sid && known.some((s) => s.id === issue.sid) ? issue.sid : null;
     let group = groups.find((g) => g.sid === sid);
     if (!group) {
       group = { sid, line: issue.line ?? "", issues: [] };
@@ -239,7 +240,7 @@ export function ReviewView({ id }: { id: string }) {
           {exportProblem.issues.length > 0 ? (
             <>
               <p className="mt-1">{t.exportBlockedBody}</p>
-              {groupIssues(exportProblem.issues).map((group) =>
+              {groupIssues(exportProblem.issues, tailoring.suggestions).map((group) =>
                 group.sid ? (
                   <div key={group.sid} className="mt-3 space-y-1" data-testid="export-blocked-line">
                     <p className="font-medium">

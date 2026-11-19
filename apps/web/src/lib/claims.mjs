@@ -390,8 +390,8 @@ const CLAIM_FAMILIES = {
     ["topper"],
     ["scholarship", "scholarships"],
     ["fellowship", "fellowships"],
-    ["mba"],
-    ["phd", "doctorate"],
+    ["mba", "m.b.a"],
+    ["phd", "ph.d", "doctorate"],
     ["diploma"],
     ["postgraduate"],
   ],
@@ -401,8 +401,8 @@ const CLAIM_FAMILIES = {
     ["director", "directors"],
     ["head of"],
     ["chief"],
-    ["ceo"], ["cfo"], ["cto"], ["coo"], ["cio"], ["cmo"],
-    ["vp", "vice president"],
+    ["ceo", "c.e.o"], ["cfo", "c.f.o"], ["cto", "c.t.o"], ["coo", "c.o.o"], ["cio", "c.i.o"], ["cmo", "c.m.o"],
+    ["vp", "v.p", "vice president"],
     ["president"],
     ["manager", "managers"],
     ["executive", "executives"],
@@ -413,12 +413,12 @@ const CLAIM_FAMILIES = {
     ["worldwide"],
     ["international", "internationally"],
     ["multinational"],
-    ["national", "nationally", "nationwide"],
+    ["national", "nationally", "nationwide", "nation-wide"],
     ["regional", "regionally"],
     ["enterprise"],
     ["entire"],
     ["sole", "solely"],
-    ["single-handedly"],
+    ["single-handedly", "singlehandedly"],
   ],
   expertise: [
     ["expert", "experts"],
@@ -438,11 +438,24 @@ for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
 }
 // Longest first so "vice president" is read before "president".
 CLAIM_FORMS.sort((a, b) => b.form.length - a.form.length);
-const CLAIM_BY_FORM = new Map(CLAIM_FORMS.map((f) => [f.form, f]));
+// A space and a hyphen are interchangeable inside a form: "world class", "world-class".
+const formPattern = (form) => escapeRegExp(form).replace(/[ -]/g, "[\\s-]+");
+const formKey = (form) => form.toLowerCase().replace(/[\s-]+/g, " ");
+const CLAIM_BY_FORM = new Map(CLAIM_FORMS.map((f) => [formKey(f.form), f]));
 const CLAIM_RE = new RegExp(
-  `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.map((f) => escapeRegExp(f.form).replace(/ /g, "\\s+")).join("|")})(?![\\p{L}\\p{N}])`,
+  `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.map((f) => formPattern(f.form)).join("|")})(?![\\p{L}\\p{N}])`,
   "giu",
 );
+
+/** A predicate: does the confirmed facts' text contain this claim form (space and hyphen alike)? */
+function claimFormInSource(sourceText) {
+  const facts = factTokenSet(sourceText);
+  const cleanFacts = cleanText(sourceText);
+  return (form) =>
+    /[\s-]/.test(form)
+      ? new RegExp(`(?<![\\p{L}\\p{N}])${formPattern(form)}(?![\\p{L}\\p{N}])`, "iu").test(cleanFacts)
+      : facts.has(form);
+}
 
 /**
  * Credential, seniority, scope and expertise words in `text` that the facts
@@ -453,14 +466,13 @@ const CLAIM_RE = new RegExp(
  * @returns {{ kind: string, value: string }[]} value is the word as written
  */
 export function unsupportedClaimWords(text, sourceText) {
-  const facts = factTokenSet(sourceText);
+  const inSource = claimFormInSource(sourceText);
   const out = [];
   for (const match of cleanText(text).matchAll(CLAIM_RE)) {
     const written = match[0].replace(/\s+/g, " ");
-    const entry = CLAIM_BY_FORM.get(written.toLowerCase());
+    const entry = CLAIM_BY_FORM.get(formKey(written));
     if (!entry) continue;
-    const supported = entry.family.some((form) =>
-      /[\s-]/.test(form) ? containsPhrase(sourceText, form) : facts.has(form));
+    const supported = entry.family.some(inSource);
     if (!supported) out.push({ kind: entry.kind, value: written });
   }
   return out;
@@ -509,7 +521,11 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
   }
 
   const facts = factTokenSet(sourceText);
+  const claimInSource = claimFormInSource(sourceText);
   for (const name of unsupportedNames(target, facts)) {
+    // "PhD" is a mixed-case word, so the name check sees it; a dotted "Ph.D." in the facts supports it.
+    const entry = CLAIM_BY_FORM.get(formKey(name));
+    if (entry && entry.family.some(claimInSource)) continue;
     add("name", name, `"${name}" is not mentioned in your confirmed facts.`);
   }
 
