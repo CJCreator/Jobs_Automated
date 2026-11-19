@@ -122,6 +122,10 @@ export interface CheckIssue {
   kind: string;
   value: string;
   message: string;
+  /** Set on export-blocked issues: the suggestion, the resume line, and the exact exported text. */
+  sid?: string | null;
+  ref?: string | null;
+  line?: string;
 }
 
 export interface Check {

@@ -26,6 +26,27 @@ function download(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** Refused issues grouped by the suggestion they came from; those with no suggestion share one group. */
+function groupIssues(issues: CheckIssue[], known: { id: string }[]) {
+  const groups: { sid: string | null; line: string; issues: CheckIssue[] }[] = [];
+  for (const issue of issues) {
+    // A suggestion this page does not list cannot be numbered or scrolled to.
+    const sid = issue.sid && known.some((s) => s.id === issue.sid) ? issue.sid : null;
+    let group = groups.find((g) => g.sid === sid);
+    if (!group) {
+      group = { sid, line: issue.line ?? "", issues: [] };
+      groups.push(group);
+    }
+    group.issues.push(issue);
+  }
+  return groups;
+}
+
+/** The suggestion's 1-based place in the list, as its card is numbered. */
+function lineNumber(suggestions: { id: string }[], sid: string) {
+  return suggestions.findIndex((s) => s.id === sid) + 1;
+}
+
 export function ReviewView({ id }: { id: string }) {
   const [tailoring, setTailoring] = useState<Tailoring | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -98,6 +119,16 @@ export function ReviewView({ id }: { id: string }) {
     [id],
   );
 
+  /** Scroll to a suggestion's card and move focus to it. */
+  const goToSuggestion = (sid: string) => {
+    setHighlightId(sid);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`sug-${sid}`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.focus({ preventScroll: true });
+    });
+  };
+
   const onExport = async () => {
     if (!tailoring) return;
     setExporting(true);
@@ -118,14 +149,7 @@ export function ReviewView({ id }: { id: string }) {
             s.decision === "accepted" &&
             (s.check.verdict === "block" || values.some((v) => s.finalText.toLowerCase().includes(v))),
         );
-        if (first) {
-          setHighlightId(first.id);
-          requestAnimationFrame(() => {
-            const el = document.getElementById(`sug-${first.id}`);
-            el?.scrollIntoView({ block: "center", behavior: "smooth" });
-            el?.focus({ preventScroll: true });
-          });
-        }
+        if (first) goToSuggestion(first.id);
       } else {
         const message = e instanceof ApiError ? e.message : t.actionFailed;
         setExportProblem({ message, issues: [] });
@@ -216,11 +240,35 @@ export function ReviewView({ id }: { id: string }) {
           {exportProblem.issues.length > 0 ? (
             <>
               <p className="mt-1">{t.exportBlockedBody}</p>
-              <ul className="list-disc ps-5">
-                {exportProblem.issues.map((i) => (
-                  <li key={`${i.kind}-${i.value}`}>{i.message}</li>
-                ))}
-              </ul>
+              {groupIssues(exportProblem.issues, tailoring.suggestions).map((group) =>
+                group.sid ? (
+                  <div key={group.sid} className="mt-3 space-y-1" data-testid="export-blocked-line">
+                    <p className="font-medium">
+                      {t.exportBlockedLine(lineNumber(tailoring.suggestions, group.sid))}
+                      {group.line ? <span className="font-normal">{`: ${group.line}`}</span> : null}
+                    </p>
+                    <p>
+                      {t.exportBlockedWords} <strong>{group.issues.map((i) => i.value).join(", ")}</strong>
+                    </p>
+                    <button
+                      type="button"
+                      className="min-h-8 py-1 text-brand underline underline-offset-4"
+                      onClick={() => goToSuggestion(group.sid as string)}
+                    >
+                      {t.exportBlockedGo}
+                    </button>
+                  </div>
+                ) : (
+                  <div key="general" className="mt-3">
+                    <p className="font-medium">{t.exportBlockedGeneral}</p>
+                    <ul className="list-disc ps-5">
+                      {group.issues.map((i) => (
+                        <li key={`${i.kind}-${i.value}`}>{i.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ),
+              )}
             </>
           ) : null}
         </Notice>

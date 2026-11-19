@@ -305,6 +305,11 @@ export const en = {
         exportFailed: "The export did not finish.",
       },
       actionFailed: "That did not work. Try again.",
+      // P0-1a
+      exportBlockedLine: (n: number) => `Suggestion ${n}`,
+      exportBlockedWords: "Not in your facts:",
+      exportBlockedGo: "Go to this suggestion",
+      exportBlockedGeneral: "Other problems:",
     },
     privacy: {
       title: "Privacy",
