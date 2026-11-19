@@ -3,7 +3,7 @@ import { signOut } from "@/auth";
 import { DeleteAccount } from "@/components/delete-account";
 import { PrivacyNotice } from "@/components/privacy-notice";
 
-export const metadata: Metadata = { title: "Privacy" };
+export const metadata: Metadata = { title: "Privacy notice" };
 export const dynamic = "force-dynamic";
 
 async function signOutAction() {

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { strictEnv } from "@/lib/server/env-guard.mjs";
 
 // A user's AI key lives in page memory, so an injected inline script is the
 // main way to steal one. Pages therefore get a fresh nonce on every
@@ -10,8 +11,6 @@ import { NextResponse, type NextRequest } from "next/server";
 // API routes are not matched (see the matcher): they return JSON or a PDF, and
 // next.config.mjs gives them a policy that allows nothing.
 
-const isDev = process.env.NODE_ENV !== "production";
-
 function newNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   let binary = "";
@@ -20,6 +19,10 @@ function newNonce(): string {
 }
 
 export function proxy(request: NextRequest) {
+  // Development allowances ('unsafe-eval' for hot reload, ws: for its socket)
+  // are off on a deployed host whatever NODE_ENV says (ADR 0006). Read per
+  // request so the host's environment decides, not the build's.
+  const isDev = !strictEnv(process.env);
   const nonce = newNonce();
   const csp = [
     "default-src 'self'",
