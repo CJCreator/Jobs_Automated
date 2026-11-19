@@ -36,7 +36,16 @@ advisor writes brief
        third failure -> advisor re-briefs or splits the task
 ```
 
-At most 4 workers run at once. Two tasks in the same wave never edit the same file; the "Touches" column below is how the advisor checks that.
+At most 4 workers run at once. Two tasks in the same wave never edit the same file; the "Touches" column below is how the advisor checks that. One exception: `apps/web/src/i18n/en.ts` holds every user-facing string, so it is **append-only** in a wave: a task adds new keys under a comment naming its task ID and never edits existing keys. Only P0-3 (privacy page) and P0-4 (retention line) edit existing keys, and they run in different waves. The orchestrator merges in order and resolves append conflicts.
+
+### How the advisor is invoked
+
+The advisor is a fresh agent each time (Agent tool, `model: fable`, a read-only agent type such as `Plan`). It sees only what the prompt gives it, so every call passes:
+
+- **Planning:** this file, the ADRs it cites, the review findings, and the relevant file listing.
+- **Review:** the brief, the full diff (`git diff <base>..<task-branch>`), the worker's report with its test output, and the checklist below.
+
+It answers with a verdict (`approve` or `changes`) and numbered findings.
 
 ## Brief template (the advisor fills one per task)
 
@@ -74,12 +83,15 @@ The advisor approves a diff only when every line holds:
 
 No public sign-ups until every Phase 0 task is merged and the phase is approved.
 
+**Step 0: the advisor revises this plan.** The task graph and the rows below are the orchestrator's draft. Before any worker starts, the advisor reads the draft against the code and the reviews, then corrects the tasks, files and waves and writes the briefs. The owner sees the revised graph at the start of Phase 0.
+
 ### Task graph
 
 ```
-Wave A (parallel)    P0-1  P0-3  P0-5  P0-6  P0-7
-Wave B (parallel)    P0-2 (after P0-3)    P0-4 (after P0-3)    P0-9
-Wave C               P0-8 (after P0-2, P0-4)
+Wave A (max 4)       P0-1  P0-5  P0-6  P0-7
+Wave B (parallel)    P0-3  P0-10 (after P0-1)  P0-9a
+Wave C (parallel)    P0-2 (after P0-3)    P0-4 (after P0-3)
+Wave D (parallel)    P0-8 (after P0-2, P0-4)    P0-9b (after P0-2)
 Exit                 advisor phase review -> owner gate
 ```
 
@@ -88,13 +100,15 @@ Exit                 advisor phase review -> owner gate
 | ID | Task | Worker | Touches | Done when | From |
 |---|---|---|---|---|---|
 | P0-1 | **Fact gate: block and explain.** Close the reproduced bypasses ("Global", "Certified", "Expert", invented employers such as "at Acme Corp", unit-bearing figures such as "14M evaluations per month"). Credentials, seniority and scope words, capitalised names, tools and numbers in a changed line must appear in confirmed facts. Return each failing line with the offending words; the UI lists them and links to edit the line or confirm a fact. Run the forbidden-phrase checks even without `config/cv-facts.json`. | Sonnet | `apps/web/src/lib/claims.mjs`, `packages/engine/verify-cv-facts.mjs`, the export route, the tailoring review view, tests | One regression test per reproduced bypass, written first and seen failing; honest rewordings in the fixture set still pass; export refuses and the reason is shown | Launch review P0-1, claims audit, ADR 0005 |
-| P0-3 | **Notice before collection.** Move the privacy page out of the signed-in layout; link it from the landing and sign-in pages. Name the AI provider transfer for both the resume and the job description. Add the grievance contact from config (`ROLEWRIGHT_GRIEVANCE_NAME`, `ROLEWRIGHT_GRIEVANCE_EMAIL`), with a visible "not yet set" marker in non-production. Version the notice text (`NOTICE_VERSION`). | Haiku | `src/app` privacy route and layouts, `src/i18n/en.ts`, env docs | The page renders signed out; links are present; the grievance value comes from config | Launch review P0-4, P0-5, P2-18 |
+| P0-3 | **Notice before collection.** Sonnet moves the route and its links (it touches the auth layout and `src/proxy.ts`); Haiku then writes the notice copy. Move the privacy page out of the signed-in layout; link it from the landing and sign-in pages. Name the AI provider transfer for both the resume and the job description. Add the grievance contact from config (`ROLEWRIGHT_GRIEVANCE_NAME`, `ROLEWRIGHT_GRIEVANCE_EMAIL`), with a visible "not yet set" marker in non-production. Version the notice text (`NOTICE_VERSION`). | Sonnet (route), Haiku (copy) | `src/app/app/privacy`, a new public privacy route, `src/app/app/layout.tsx`, `src/app/page.tsx`, `src/proxy.ts`, `src/i18n/en.ts` (privacy keys), env docs | The page renders signed out; links are present; the grievance value comes from config | Launch review P0-4, P0-5, P2-18 |
 | P0-5 | **Session-only key.** Replace `localStorage` in `src/lib/client/llm-key.ts` with an in-memory store that clears on reload. | Sonnet | `src/lib/client/llm-key.ts`, its callers, `tests/integration` | `test:flow` asserts nothing is in `localStorage`, `sessionStorage` or IndexedDB after key entry; existing key-hygiene checks still pass | ADR 0003, launch review P2-14 |
 | P0-6 | **PDF expansion cap.** Stop parsing once extracted text exceeds a cap (default 200,000 characters) or a page count, before the whole file is decoded; return a clear 413 error. | Sonnet | `src/lib/server/pdf-text.mjs`, the upload route, tests | The reproduced 175 KB file is rejected in under 1 s with bounded memory; normal resumes are unaffected | Launch review P1-6 |
-| P0-7 | **Production safety switches.** Refuse to start in a deployed environment without `DATABASE_URL` and `AUTH_SECRET`; no silent fallback to the embedded database. Dev sign-in only when the host is `localhost` and an explicit flag is set, whatever `NODE_ENV` says. | Sonnet | `src/lib/server/env-guard.mjs`, `src/lib/db/index.mjs`, tests | Unit tests cover every combination; `test:prod` still passes | Launch review P1-7, P1-12 |
+| P0-7 | **Production safety switches.** Refuse to start in a deployed environment without `DATABASE_URL` and `AUTH_SECRET`; no silent fallback to the embedded database. Dev sign-in only with an explicit flag and never in a deployed environment, whatever `NODE_ENV` says. "Deployed" is decided from the platform, not from the request's Host header (a client sets that header): Cloud Run sets `K_SERVICE`, so dev sign-in is refused whenever it is present, and when `ROLEWRIGHT_DEPLOYED=1` is set. | Sonnet | `src/lib/server/env-guard.mjs`, `src/lib/db/index.mjs`, tests | Unit tests cover every combination; `test:prod` still passes | Launch review P1-7, P1-12 |
 | P0-2 | **Consent record.** A `consents` table (user id, notice version, accepted-at, purpose). The upload route refuses without a consent for the current notice version; a new notice version asks again. | Sonnet | `src/lib/db/schema.mjs`, `repo.mjs`, the resume route, `resume-view.tsx`, tests | Upload without consent returns 403; the record exists after consent; RLS test for the new table | Launch review P0-3, ADR 0004 |
 | P0-4 | **Retention purge for real.** A `POST /api/internal/purge` endpoint that accepts only a Google-signed OIDC token from the configured scheduler service account and runs the 12-month purge. Align the privacy text with what runs. Also delete verification tokens on account deletion. | Sonnet | new internal route, `scripts/purge-inactive.mjs` (shared logic), `src/i18n/en.ts` retention line, tests | Unauthenticated and wrong-audience calls get 401; a seeded idle account is purged; tokens are gone after deletion | Launch review P0-2, P2-17 |
-| P0-9 | **Small hardening.** HSTS header in production; re-uploading a resume keeps already-confirmed facts confirmed when the text still contains them. | Haiku (HSTS), Sonnet (facts) | `next.config` headers, `src/lib/facts.mjs`, tests | Header present in `test:prod`; re-upload test passes | Launch review P2-15, P2-16 |
+| P0-9a | **HSTS.** Strict-Transport-Security header in production. | Haiku | `next.config.mjs`, `tests/integration/prod-smoke.mjs` | Header present in `test:prod` | Launch review P2-15 |
+| P0-9b | **Re-upload keeps confirmations.** Re-uploading a resume keeps already-confirmed facts confirmed when the new text still contains them. Runs after P0-2 because both edit the resume upload route. | Sonnet | `src/app/api/resume/route.ts`, `src/lib/facts.mjs`, tests | Re-upload test passes | Launch review P2-16 |
+| P0-10 | **Extracted facts are checked against the upload.** Each model-extracted fact is compared with the uploaded text; a fact not found there is marked "not in your resume" and cannot be confirmed in bulk. "Confirm all" confirms only facts found in the source and says how many it skipped. | Sonnet | `src/lib/facts.mjs`, `src/components/fact-editor.tsx`, `src/app/api/facts/route.ts`, `src/i18n/en.ts` (append), tests | A fact absent from the upload is flagged and skipped by "Confirm all"; one test per case | Launch review P1-8, ADR 0005 |
 | P0-8 | **Prove isolation on real Postgres.** A CI job with a Postgres service runs the schema, the app connects as a non-owner role, and the skipped negative control in `tests/db.test.mjs` runs: user A cannot read, update or delete user B's rows in every table, and row locks hold under concurrent updates. | Sonnet | `tests/db.test.mjs`, `.github/workflows/web-ci.yml` (or a new app workflow), schema grants | The negative control runs and passes in CI, not skipped | Launch review P1-13 |
 
 ### Phase 0 exit (what the owner sees at the gate)
@@ -110,22 +124,23 @@ Exit                 advisor phase review -> owner gate
 ### Task graph
 
 ```
-Wave A (parallel)    P1-1  P1-3  P1-5  P1-6
-Wave B (parallel)    P1-2 (after P1-1, P1-3)    P1-4 (after P1-1, P1-5)
-Wave C               P1-7 staging deploy (after all) -> advisor phase review -> owner gate
+Wave A (parallel)    P1-3  P1-5  P1-6
+Wave B (parallel)    P1-1 (after P1-3)
+Wave C (parallel)    P1-2 (after P1-1, P1-3)    P1-4 (after P1-1, P1-5)
+Wave D               P1-7 staging deploy (after all, owner-authorised) -> advisor phase review -> owner gate
 ```
 
 ### Tasks
 
 | ID | Task | Worker | Touches | Done when | From |
 |---|---|---|---|---|---|
-| P1-1 | **Launch providers.** Show only Gemini, OpenRouter and Anthropic; OpenAI and Groq stay in code behind `ROLEWRIGHT_EXTRA_PROVIDERS`. The key check (`/api/keys/verify`) gives a specific message for an invalid key, an exhausted quota and a provider outage. Show which model is in use. | Sonnet | `src/lib/llm/providers.mjs`, `src/app/api/providers`, `src/app/api/keys/verify`, the key UI, tests | Provider list test; each error class maps to its message; quota exhaustion says "bring your own key" | ADR 0003 |
-| P1-3 | **Shared rate limits.** Move the in-process limiter to Postgres (a `rate_events` table or a counter with a window), so limits hold across Cloud Run instances. Add limits for sign-in, export and the key check. | Sonnet | `src/lib/server/rate-limit.ts`, schema, auth and export routes, tests | Two app processes share one limit in the integration test; 429 carries `Retry-After` | Launch review P1-10, P1-11 |
+| P1-1 | **Launch providers.** Show only Gemini, OpenRouter and Anthropic; OpenAI and Groq stay in code behind `ROLEWRIGHT_EXTRA_PROVIDERS`. The key check (`/api/keys/verify`) gives a specific message for an invalid key, an exhausted quota and a provider outage, and applies the key-check limit that P1-3 provides (P1-1 owns this route). Show which model is in use. | Sonnet | `src/lib/llm/providers.mjs`, `src/app/api/providers`, `src/app/api/keys/verify`, the key UI, tests | Provider list test; each error class maps to its message; quota exhaustion says "bring your own key" | ADR 0003 |
+| P1-3 | **Shared rate limits.** Move the in-process limiter to Postgres (a `rate_events` table or a counter with a window), so limits hold across Cloud Run instances. Add a `keyCheck` bucket and limits for sign-in and export; P1-1 wires the key-check limit into its route. | Sonnet | `src/lib/server/rate-limit.ts`, schema, auth and export routes, tests (not `/api/keys/verify`) | Two app processes share one limit in the integration test; 429 carries `Retry-After` | Launch review P1-10, P1-11 |
 | P1-5 | **Port `keyword-match`.** Port `packages/engine/keyword-match.mjs` into `apps/web/src/lib` with a parity test that runs both on the same fixtures and compares output; show keyword coverage before and after tailoring. The engine script stays until the port is approved. | Sonnet | new `src/lib/keyword-match.mjs`, parity test, tailoring view | Parity test passes on every fixture; coverage shows in the UI | ADR 0012, ADR 0016 |
 | P1-6 | **Google Cloud setup as code.** A production Dockerfile for `apps/web` (Node 22, Chromium, the engine copied in), a scripted setup (Terraform or `gcloud` scripts, the advisor picks one in the brief) for Cloud Run, Cloud SQL (private IP, backups), Secret Manager, Cloud Scheduler and the purge service account, in `asia-south1`, for `staging` and `production`. A deploy workflow on manual dispatch. | Sonnet | `apps/web/Dockerfile`, `infra/`, `.github/workflows/deploy.yml`, `docs/` runbook | The image builds and serves `/` and a PDF export locally against Postgres; the scripts plan cleanly against an empty project | ADR 0009 |
 | P1-2 | **Free trial.** Our Gemini and OpenRouter keys from Secret Manager, used only when the user has no key, only for verified accounts. A per-account counter of 5 tailorings, incremented atomically in the same transaction as the tailoring; a per-IP daily cap behind it. The UI shows tailorings left and asks for a key at zero. | Sonnet | `src/lib/llm/index.mjs`, schema, tailorings route, the key UI, tests | Six concurrent requests from a fresh account produce exactly 5 trial tailorings; unverified accounts get no trial; server keys never reach the client or logs | ADR 0003 |
 | P1-4 | **Provider parity runs.** A script that runs the fixture resumes and job descriptions through each enabled provider (and each trial model) and records fact-gate pass rate and keyword coverage to `docs/reviews/provider-parity.md`. A provider stays hidden until its run is recorded and the owner accepts it. | Sonnet (script), Haiku (report) | `apps/web/scripts/provider-parity.mjs`, fixtures, the report | Runs offline against the mock provider in CI; the owner runs it once with real keys | ADR 0003 |
-| P1-7 | **Staging deploy and smoke.** Deploy to staging; run `test:prod` against the staging URL; confirm the purge job fires from Cloud Scheduler; confirm request logs do not contain `x-llm-key`. | Sonnet | none in code; a runbook entry | Smoke passes on staging; log check recorded | ADR 0009 |
+| P1-7 | **Staging deploy and smoke.** Workers have no GCP credentials, so the owner runs the deploy (or authorises the deploy workflow) and the orchestrator runs the checks. Deploy to staging; run `test:prod` against the staging URL; confirm the purge job fires from Cloud Scheduler; confirm request logs do not contain `x-llm-key`. | Sonnet | none in code; a runbook entry | Smoke passes on staging; log check recorded | ADR 0009 |
 
 ### Phase 1 exit
 
@@ -141,6 +156,20 @@ Wave C               P1-7 staging deploy (after all) -> advisor phase review -> 
 | Before P1-2 | A Gemini API key and an OpenRouter key for the trial, put straight into Secret Manager (never in chat or the repository) |
 | Before launch | The grievance officer's name and email; a legal review of the privacy notice |
 | Before P1-4 real run | Your own keys for each launch provider, used locally for the parity run |
+| P1-7 | Run the staging deploy, or approve the deploy workflow run |
+
+## Deferred on purpose (not in Phases 0 or 1)
+
+The phase-exit reviews must not read as full coverage of the launch review. These stay open:
+
+- Erasure below account level: deleting one resume, job or tailoring (launch review P1-9).
+- Session revocation; sign-in uses a 7-day sliding JWT (launch review P1-10).
+- Data export and analytics (Phase 2).
+
+## Assumptions the owner has not been asked about
+
+- At most 4 workers at once, 2 review rounds per task (ADR 0017).
+- Separate `staging` and `production` GCP projects, which means two Cloud SQL instances billed every month. One project with two databases is cheaper; say so before P1-6 if you want that.
 
 ## Risks the plan carries
 
