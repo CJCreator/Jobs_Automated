@@ -213,6 +213,11 @@ export const en = {
       toTailoring: "Tailor a resume",
       needBullet: "Confirm a job and at least one of its bullets to start tailoring.",
       leaveWarning: "You have unsaved changes.",
+      // P0-10
+      notInResume: "Not found in your resume",
+      notInResumeHint: "The AI added this and we could not find it in your uploaded file. Confirm it only if it is true.",
+      confirmAllSkipped: (section: string, skipped: number) =>
+        `Items in ${section} confirmed. ${skipped} ${skipped === 1 ? "item was" : "items were"} skipped because ${skipped === 1 ? "it was" : "they were"} not found in your resume. Check ${skipped === 1 ? "it" : "them"} one at a time.`,
     },
     tailor: {
       title: "Tailor a resume",

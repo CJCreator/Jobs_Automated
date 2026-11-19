@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db/index.mjs";
 import { changeFacts, saveResume } from "@/lib/db/repo.mjs";
+import { reconcileUpload } from "@/lib/fact-source.mjs";
 import { confirmationCounts, normalizeFacts } from "@/lib/facts.mjs";
 import { extractFacts } from "@/lib/llm/index.mjs";
 import { readBodyBytes } from "@/lib/server/body";
@@ -65,13 +66,11 @@ export const POST = route("resume.upload", async (req, { state }) => {
 
   const db = await getDb();
   await saveResume(db, userId, { filename: cleanFilename(file.name), rawText: text });
-  // A new resume replaces the proposal, all unconfirmed, but never what the
-  // user stated themselves or said they cannot confirm. Read and written under
-  // the facts row lock, so a review action at the same moment is not lost.
-  const facts = await changeFacts(db, userId, (existing) => ({
-    ...proposed,
-    extras: existing.extras ?? [],
-    cannotConfirm: existing.cannotConfirm ?? [],
-  }));
+  // A new resume replaces the proposal. Items the upload does not contain are
+  // labelled "model"; items unchanged since the user confirmed them keep their
+  // id and confirmation. What the user stated themselves or said they cannot
+  // confirm is never touched. Read and written under the facts row lock, so a
+  // review action at the same moment is not lost.
+  const facts = await changeFacts(db, userId, (existing) => reconcileUpload(existing, proposed, text));
   return json({ facts, counts: confirmationCounts(facts) });
 });

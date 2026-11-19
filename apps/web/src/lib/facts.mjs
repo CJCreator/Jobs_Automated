@@ -23,7 +23,8 @@ const idMaker = () => {
     return out;
   };
 };
-const src = (v) => (v === "user" ? "user" : "upload");
+// "model": the AI proposed it and the uploaded text does not contain it.
+const src = (v) => (v === "user" || v === "model" ? v : "upload");
 
 /** An empty Fact Base. */
 export function emptyFacts() {

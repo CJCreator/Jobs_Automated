@@ -26,3 +26,25 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | P0-6b (blocks the phase gate) |
 | P0-6 review | Set Cloud Run memory, request timeout and concurrency explicitly; worker typed-array memory is bounded only by the instance limit | P1-6 |
 | P0-6 review | Upload rate limit is per process, so it weakens with more instances | P1-3 |
+| P0-4 review | Purge and `deleteUserData` cascade as the non-superuser role under FORCE RLS | P0-8 |
+| P0-4 review | One real Cloud Scheduler call end to end (also confirms the no-IAM-invoker setup) | P1-7 |
+| P0-4 review | Log-only code to tell "keys unavailable" from a bad token | Later ops task |
+| P0-4 review | Alert when the daily purge stops succeeding | P1-6 |
+| P0-4 review | `getDb()` runs before auth, so a DB outage shows 500 not 401 | Optional, later |
+| P0-4 review | ADR 0004 line 17 still describes the purge as a host-scheduled script | Next ADR edit |
+| P0-4 re-review | Cloud Scheduler job: at least 3 retries, minimum backoff 60 s (outlasts the 45 s key-fetch refusal) | P1-6 |
+| P0-4 re-review | Floor the key cache at 300 s if Google ever omits `max-age` | Optional, later |
+| P0-10 review | Contact: per-field "not found" marker; check phone, location, links against the upload | Later facts task |
+| P0-10 review | Job fields matched anywhere in the text (company from one job, title from another); match within one neighbourhood; add location | Later facts task |
+| P0-10 review | A skill only in a pasted job description counts as found | Known limit of text matching |
+| P0-10 review | User-added items inside sections are dropped on re-upload (only extras survive) | Product decision, later |
+| P0-10 review | A singly confirmed model item is unconfirmed again on every re-upload | Per brief; revisit on feedback |
+| P0-10 review | `uploadHelp` should mention kept confirmations | P0-3b |
+| P0-10 review | One manual run with a real model key to see rewordings flagged | P1-4 |
+| P0-3a review | Merge P0-3b right after P0-5: the public notice says the key is stored in the browser | Merge order |
+| P0-3a review | Align the privacy h1 with "Privacy notice"; grievance vars in the README table | P0-3b |
+| P0-3a review | prod-smoke: scope the privacy-link selector; `/privacy` signed-out 200 with nonce CSP; production has grievance contact set | P0-9a |
+| P0-3a review | Signed-out axe, target-size, skip-link and 360 px checks on `/privacy` | P0-9a or P0-11 |
+| P0-3a review | Retention sentence is public: scheduler must run before real users see it; lawyer review of the notice (ADR 0004) | Phase gate |
+| P0-3a review | Briefs touching landing, sign-in or `/app` pages must list `npm run test:e2e` | Remaining briefs (P0-2, P0-3b, P0-9a) |
+| P0-3a review | Consent record imports `NOTICE_VERSION` from `notice.mjs` | P0-2 |

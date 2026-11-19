@@ -332,6 +332,11 @@ try {
     assert.ok(up.data.counts.total >= 8);
     assert.equal(up.data.facts.experience[0].company, "Infosys");
     state.proposed = up.data.facts;
+    // The faithful PDF contains everything the mock returns, so nothing is flagged.
+    const flagged = [up.data.facts.summary, ...up.data.facts.experience, ...up.data.facts.experience.flatMap((e) => e.bullets), ...up.data.facts.education, ...up.data.facts.skills]
+      .filter((i) => i.source === "model");
+    assert.equal(flagged.length, 0, "no item of the faithful PDF is labelled model");
+    state.flaggedCount = flagged.length;
 
     const fake = await request(state.A, "POST", "/api/resume", {
       form: pdfForm(new TextEncoder().encode("This is a plain text file with a .pdf name, not a real PDF document."), "resume.pdf"),
@@ -340,6 +345,50 @@ try {
     assertError(fake, 415, "not_pdf");
     const noKey = await request(state.A, "POST", "/api/resume", { form: pdfForm(state.fixturePdf) });
     assertError(noKey, 400, "not_allowed");
+  });
+
+  await step("4b. an item the upload lacks is labelled model; a re-upload keeps confirmations and ids", async () => {
+    const allItems = (f) => [f.summary, ...f.experience, ...f.experience.flatMap((e) => e.bullets), ...f.education, ...f.skills];
+    const jar = await signIn("cora.flow@example.com");
+    const first = await request(jar, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() });
+    assert.equal(first.status, 200, JSON.stringify(first.data).slice(0, 300));
+    assert.ok(allItems(first.data.facts).every((i) => i.source !== "model"), "the first upload has no model items");
+
+    const put = await request(jar, "PUT", "/api/facts", { json: { facts: confirmAll(first.data.facts) } });
+    assert.equal(put.status, 200);
+    const again = await request(jar, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() });
+    assert.equal(again.status, 200);
+    assert.equal(again.data.counts.confirmed, put.data.counts.confirmed, "every confirmation survives a re-upload");
+    assert.deepEqual(again.data.facts.experience.map((e) => [e.id, e.confirmed]), put.data.facts.experience.map((e) => [e.id, e.confirmed]));
+    assert.deepEqual(
+      again.data.facts.experience[0].bullets.map((b) => [b.id, b.confirmed]),
+      put.data.facts.experience[0].bullets.map((b) => [b.id, b.confirmed]),
+      "bullet ids and confirmations are unchanged",
+    );
+
+    // A second PDF that lacks one skill the mock still returns.
+    const lacking = await renderPdf(resumeHtml({
+      contact: { ...MOCK_RESUME.contact },
+      summary: MOCK_RESUME.summary,
+      experience: MOCK_RESUME.experience.map((e) => ({ company: e.company, title: e.title, location: e.location, dates: `${e.start} – ${e.end}`, bullets: e.bullets })),
+      education: ["B.Com, Christ University, 2019"],
+      skills: MOCK_RESUME.skills.filter((k) => k !== "Excel"),
+    }));
+    const second = await request(jar, "POST", "/api/resume", { form: pdfForm(lacking), headers: ai() });
+    assert.equal(second.status, 200);
+    const excel = second.data.facts.skills.find((k) => k.name === "Excel");
+    assert.ok(excel, "the mock still returns Excel");
+    assert.equal(excel.source, "model");
+    assert.equal(excel.confirmed, false);
+    assert.ok(second.data.facts.skills.filter((k) => k.name !== "Excel").every((k) => k.source === "upload" && k.confirmed), "the skills the PDF has keep their confirmation");
+    assert.deepEqual(second.data.facts.experience[0].bullets.map((b) => b.id), put.data.facts.experience[0].bullets.map((b) => b.id));
+
+    // The page cannot relabel the model item by sending it back as an upload.
+    const relabel = JSON.parse(JSON.stringify(second.data.facts));
+    relabel.skills.find((k) => k.name === "Excel").source = "upload";
+    const saved = await request(jar, "PUT", "/api/facts", { json: { facts: relabel } });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.data.facts.skills.find((k) => k.name === "Excel").source, "model");
   });
 
   await step("5. tailoring needs confirmed facts; then four suggestions, three of them blocked", async () => {
