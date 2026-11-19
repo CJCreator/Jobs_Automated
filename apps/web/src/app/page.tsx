@@ -10,9 +10,14 @@ export default function LandingPage() {
     <>
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <span className="font-heading text-2xl font-semibold text-brand">{en.product}</span>
-        <Link href="/sign-in" className={buttonClass("secondary")}>
-          {t.signIn}
-        </Link>
+        <nav aria-label="Header" className="flex items-center gap-3">
+          <Link href="/privacy" className="text-brand underline underline-offset-4">
+            {en.notice.privacyLink}
+          </Link>
+          <Link href="/sign-in" className={buttonClass("secondary")}>
+            {t.signIn}
+          </Link>
+        </nav>
       </header>
 
       <main id="main" tabIndex={-1}>
@@ -83,7 +88,12 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-line">
-        <p className="mx-auto w-full max-w-6xl px-4 py-6 text-sm text-muted sm:px-6">{t.footer}</p>
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted sm:px-6">
+          <p>{t.footer}</p>
+          <Link href="/privacy" className="text-brand underline underline-offset-4">
+            {en.notice.privacyLink}
+          </Link>
+        </div>
       </footer>
     </>
   );

@@ -347,6 +347,19 @@ export const en = {
     errorBody: "This page hit an error. Your saved data is safe. Try again, or go back to the home page.",
     noKey: "Add your AI key first.",
   },
+  // P0-3a
+  notice: {
+    pageTitle: "Privacy notice",
+    versionLabel: "Notice version",
+    contactTitle: "Who to contact",
+    contactIntro: "For questions, complaints or requests about your data, contact:",
+    contactUnset: "Grievance contact: not yet set",
+    contactMailLabel: "Email",
+    signInLink: "Sign in",
+    homeLink: "Rolewright home",
+    privacyLink: "Privacy notice",
+    signInPrivacyLink: "Read the privacy notice before you sign in",
+  },
 } as const;
 
 export type Strings = typeof en;
