@@ -34,3 +34,10 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-4 review | ADR 0004 line 17 still describes the purge as a host-scheduled script | Next ADR edit |
 | P0-4 re-review | Cloud Scheduler job: at least 3 retries, minimum backoff 60 s (outlasts the 45 s key-fetch refusal) | P1-6 |
 | P0-4 re-review | Floor the key cache at 300 s if Google ever omits `max-age` | Optional, later |
+| P0-10 review | Contact: per-field "not found" marker; check phone, location, links against the upload | Later facts task |
+| P0-10 review | Job fields matched anywhere in the text (company from one job, title from another); match within one neighbourhood; add location | Later facts task |
+| P0-10 review | A skill only in a pasted job description counts as found | Known limit of text matching |
+| P0-10 review | User-added items inside sections are dropped on re-upload (only extras survive) | Product decision, later |
+| P0-10 review | A singly confirmed model item is unconfirmed again on every re-upload | Per brief; revisit on feedback |
+| P0-10 review | `uploadHelp` should mention kept confirmations | P0-3b |
+| P0-10 review | One manual run with a real model key to see rewordings flagged | P1-4 |
