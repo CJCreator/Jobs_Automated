@@ -582,6 +582,39 @@ try {
     assert.equal((await request(state.A, "GET", "/api/facts")).status, 200);
   });
 
+  await step("13. gate cost: an over-cap fact base is refused at save, and the tailoring routes are rate limited per user", async () => {
+    // Too much confirmed text: refused at save, and what was stored is unchanged.
+    const before = (await request(state.A, "GET", "/api/facts")).data.facts;
+    const huge = JSON.parse(JSON.stringify(before));
+    huge.experience = Array.from({ length: 30 }, (_, j) => ({
+      id: `big-exp-${j}-aaaa`, company: `Company ${j}`, title: "Analyst", confirmed: true,
+      bullets: Array.from({ length: 25 }, (_, k) => ({ id: `big-b-${j}-${k}-aaaa`, text: `Reduced close time ${"x ".repeat(299)}`, confirmed: true })),
+    }));
+    const refused = await request(state.A, "PUT", "/api/facts", { json: { facts: huge } });
+    assertError(refused, 400, "facts_too_large");
+    assert.match(refused.data.error.message, /too long/);
+    assert.deepEqual((await request(state.A, "GET", "/api/facts")).data.facts, before, "nothing was saved");
+
+    // A fresh user so the other steps' counts are not touched. The bucket is shared by the tailoring
+    // GET, the suggestions PATCH and the export, so a plain GET of a missing tailoring spends it.
+    const jar = await signIn("carol@example.com");
+    const missing = "/api/tailorings/00000000-0000-4000-8000-000000000000";
+    let limited = null;
+    for (let i = 0; i < 60 && !limited; i++) {
+      const res = await request(jar, "GET", missing);
+      if (res.status === 429) limited = res;
+      else assertError(res, 404, "not_found");
+    }
+    assert.ok(limited, "the limit answered 429 within 60 requests");
+    assertError(limited, 429, "too_many_requests");
+    assert.ok(Number(limited.headers.get("retry-after")) >= 1, "Retry-After is set");
+    // Another user is not affected.
+    assertError(await request(state.B, "GET", missing), 404, "not_found");
+    // The same bucket covers the other two routes.
+    assertError(await request(jar, "POST", `${missing}/export`), 429, "too_many_requests");
+    assertError(await request(jar, "PATCH", `${missing}/suggestions/x`, { json: { action: "reject" } }), 429, "too_many_requests");
+  });
+
   await step("11. key hygiene (HTTP half): a distinctive key is used on failing and writing requests", async () => {
     const verify = await request(state.B, "POST", "/api/keys/verify", { headers: ai(SENTINEL) });
     assert.equal(verify.data.ok, false);

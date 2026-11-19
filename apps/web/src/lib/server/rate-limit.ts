@@ -17,6 +17,8 @@ function store(): Store {
 export const LIMITS = {
   ai: { max: 20, windowMs: 60_000, message: "Too many AI requests in a short time. Wait a minute and try again." },
   upload: { max: 10, windowMs: 60 * 60_000, message: "Too many uploads in the last hour. Try again later." },
+  // Reading a tailoring, a review action and an export each run the fact gate on every suggestion.
+  tailoring: { max: 40, windowMs: 60_000, message: "Too many requests in a short time. Wait a minute and try again." },
 } as const;
 
 /** Count one request against a limit, or throw a 429 when it is used up. */

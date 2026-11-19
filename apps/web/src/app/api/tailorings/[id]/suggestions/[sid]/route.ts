@@ -3,9 +3,10 @@ import { changeTailoring } from "@/lib/db/repo.mjs";
 import { readJsonObject } from "@/lib/server/body";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { json, route } from "@/lib/server/http";
+import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
 import { notFound, tailoringView } from "@/lib/server/views";
-import { applyAction, freshChecks } from "@/lib/tailoring.mjs";
+import { applyAction, checksAfterAction, gateBudget } from "@/lib/tailoring.mjs";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,7 @@ const optionalString = (v: unknown) => (typeof v === "string" ? v : undefined);
 // set a decision or a check verdict: both are computed here.
 export const PATCH = route<{ id: string; sid: string }>("suggestions.patch", async (req, { params, state }) => {
   const userId = await requireUser(state);
+  takeRateLimit("tailoring", userId);
   const { id, sid } = await params;
   const body = await readJsonObject(req);
   const input = { action: optionalString(body.action), text: body.text, value: body.value };
@@ -26,11 +28,13 @@ export const PATCH = route<{ id: string; sid: string }>("suggestions.patch", asy
   // in one transaction, so two actions at once cannot lose either change.
   // A refused action (409, 400) throws inside and rolls everything back.
   const changed = await changeTailoring(await getDb(), userId, id, ({ tailoring, facts }) => {
-    const ctx = { jdText: tailoring.jdText ?? "", engineGate };
+    // One time budget for the action and the re-check of every suggestion after it.
+    const ctx = { jdText: tailoring.jdText ?? "", engineGate, budget: gateBudget() };
     const result = applyAction(facts, tailoring.suggestions, sid, input, ctx);
     return {
       facts: result.factsChanged ? result.facts : undefined,
-      suggestions: freshChecks(result.facts, result.suggestions, ctx),
+      // Each suggestion is checked once per action; a reject is saved with no check at all.
+      suggestions: checksAfterAction(result, input.action, ctx),
     };
   });
   if (!changed) throw notFound();
