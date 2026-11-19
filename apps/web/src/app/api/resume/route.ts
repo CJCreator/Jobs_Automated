@@ -30,8 +30,10 @@ const cleanFilename = (name: string) => name.replace(/[\u0000-\u001f\u007f]/g, "
 
 export const POST = route("resume.upload", async (req, { state }) => {
   const userId = await requireUser(state);
-  takeRateLimit("upload", userId);
   const llm = readLlmHeaders(req);
+  // Before the body is read and before a rate-limit token is spent: no collection without consent.
+  await requireConsent(userId);
+  takeRateLimit("upload", userId);
 
   const type = req.headers.get("content-type") ?? "";
   if (!type.toLowerCase().startsWith("multipart/form-data")) {
@@ -51,8 +53,6 @@ export const POST = route("resume.upload", async (req, { state }) => {
   if (file.type && !PDF_TYPES.has(file.type.toLowerCase())) throw notPdf();
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!startsWithPdfMagic(bytes)) throw notPdf();
-
-  await requireConsent(userId);
 
   // Never written to disk: the bytes live only in this request.
   const { text } = await pdfText(bytes);

@@ -37,7 +37,7 @@ export function TailorForm() {
     return <ErrorBlock message={facts.error?.message ?? en.common.loadError} retryLabel={en.common.retry} onRetry={facts.reload} />;
   }
 
-  const needConsent = consent.data ? !consent.data.accepted : false;
+  const needConsent = !consent.data?.accepted;
   const hasLines = tailorableLines(facts.data.facts).length > 0;
   const missingKey = !llm;
 
@@ -84,9 +84,11 @@ export function TailorForm() {
     }
     setBusy(true);
     setServerError(null);
+    let consentSaved = !needConsent;
     try {
       if (needConsent) {
         await api<{ accepted: boolean }>("/api/consent", { method: "POST", json: { noticeVersion: NOTICE_VERSION } });
+        consentSaved = true;
         consent.setData({ noticeVersion: NOTICE_VERSION, accepted: true });
       }
       const res = await api<{ id: string }>("/api/tailorings", {
@@ -95,7 +97,9 @@ export function TailorForm() {
       });
       router.push(`/app/tailor/${res.id}`);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : en.common.loadError);
+      // A tab left open across a notice change: ask again.
+      if (err instanceof ApiError && err.code === "consent_required") consent.setData({ noticeVersion: NOTICE_VERSION, accepted: false });
+      setServerError(err instanceof ApiError ? err.message : consentSaved ? en.common.loadError : en.consent.saveFailed);
       setBusy(false);
     }
   };

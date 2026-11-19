@@ -26,6 +26,7 @@ export const GET = route("tailorings.list", async (_req, { state }) => {
 export const POST = route("tailorings.create", async (req, { state }) => {
   const userId = await requireUser(state);
   const llm = readLlmHeaders(req);
+  await requireConsent(userId);
   const body = await readJsonObject(req);
   const title = field(body.title, 200);
   const company = field(body.company, 200);
@@ -34,7 +35,6 @@ export const POST = route("tailorings.create", async (req, { state }) => {
   if (jdText.length < MIN_JD || jdText.length > MAX_JD) {
     throw new HttpError(400, "invalid_jd", "Paste the full job description: between 200 and 20,000 characters.");
   }
-  await requireConsent(userId);
   takeRateLimit("ai", userId);
 
   // Fail closed: without the engine's fact gate nothing is checked, so nothing is made.

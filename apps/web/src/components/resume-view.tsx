@@ -102,9 +102,11 @@ export function ResumeView() {
     setUploading(true);
     setUploadError(null);
     setUploadDone(false);
+    let consentSaved = false;
     try {
       // The server records the agreement and refuses the upload without it.
       await api<{ accepted: boolean }>("/api/consent", { method: "POST", json: { noticeVersion: NOTICE_VERSION } });
+      consentSaved = true;
       const form = new FormData();
       form.append("file", file);
       const res = await api<FactsResponse>("/api/resume", { method: "POST", form });
@@ -116,7 +118,7 @@ export function ResumeView() {
       setAnnouncement(t.done);
       focusAfterUpload.current = "facts-heading";
     } catch (e) {
-      setUploadError(e instanceof ApiError ? e.message : en.common.loadError);
+      setUploadError(e instanceof ApiError ? e.message : consentSaved ? en.common.loadError : en.consent.saveFailed);
       focusAfterUpload.current = "upload-error";
     } finally {
       setUploading(false);

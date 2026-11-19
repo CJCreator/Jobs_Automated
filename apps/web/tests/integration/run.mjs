@@ -329,6 +329,17 @@ try {
     // No consent yet: the upload is refused before any AI call.
     assertError(await request(state.A, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() }), 403, "consent_required");
     assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: false });
+    // Consent comes before the body is read or checked: a bad file or a short job description gets 403, not 415 or 400.
+    assertError(
+      await request(state.A, "POST", "/api/resume", { form: pdfForm(new TextEncoder().encode("not a pdf"), "resume.pdf"), headers: ai() }),
+      403,
+      "consent_required",
+    );
+    assertError(
+      await request(state.A, "POST", "/api/tailorings", { json: { title: "X", company: "Y", jdText: "too short" }, headers: ai() }),
+      403,
+      "consent_required",
+    );
     assertError(await request(state.A, "POST", "/api/consent", { json: { noticeVersion: "1999-01-01.0" } }), 400, "stale_notice");
     assertError(await request(state.A, "POST", "/api/consent", { json: {} }), 400, "stale_notice");
     assertError(await request(null, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } }), 401, "unauthorized");

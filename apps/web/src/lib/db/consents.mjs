@@ -17,7 +17,7 @@ export async function recordConsent(db, userId, { noticeVersion, purpose }) {
 
 export async function hasConsent(db, userId, { noticeVersion, purpose }) {
   const { rows } = await db.withUser(userId, (q) =>
-    q.query("SELECT 1 FROM consents WHERE notice_version = $1 AND purpose = $2", [noticeVersion, purpose]),
+    q.query("SELECT 1 FROM consents WHERE user_id = $1 AND notice_version = $2 AND purpose = $3", [userId, noticeVersion, purpose]),
   );
   return rows.length > 0;
 }
