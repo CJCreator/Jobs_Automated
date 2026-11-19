@@ -443,7 +443,7 @@ Done when:
 ```
 
 ```
-Task: P0-3b Copy pass: make every existing string match the code
+Task: P0-3b Copy pass: make every existing string match the code  (merged wording superseded by the round 1 review: see en.ts; retention is "do not use Rolewright for 12 months", and the scheduled-job sentence returns in P1-7)
 Worker: Haiku
 Goal: No user-facing sentence says something the code no longer does.
 ADRs: 0003, 0004
