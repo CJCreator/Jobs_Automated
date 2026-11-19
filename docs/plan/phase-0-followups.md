@@ -65,3 +65,4 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1b review | "Post Graduate Diploma" vs "Postgraduate Diploma"; review "Executive summary", "Enterprise reporting", "award-winning" false blocks | Later gate task (both twin lists) |
 | P0-1b review | Should an unsourced title in the engine's structured title slot block instead of warn? | Owner decision (ADR 0005) |
 | P0-3b | Retention notice drops "A scheduled job checks for this once a day" until Cloud Scheduler runs the purge (ADR 0004: a promise with no job is a defect) | Restore in P1-7 once the scheduler is seen firing |
+| P0-6d review | If the memory-bomb test flakes again, add a test hook for a smaller external-memory cap (e.g. 32 MB) and drop the elapsed bound; rename the title from "well before" to "before" | Next task touching pdf-text tests |
