@@ -68,3 +68,6 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-6d review | If the memory-bomb test flakes again, add a test hook for a smaller external-memory cap (e.g. 32 MB) and drop the elapsed bound; rename the title from "well before" to "before" | Next task touching pdf-text tests |
 | P0-9a review | HSTS `includeSubDomains`: decide before mapping the app to an apex domain with http-only sibling subdomains; keep `preload` off until the domain layout is settled; record in ADR 0009 | Owner decision at custom-domain time |
 | P0-9a review | Check whether `console.error` + `process.exit(1)` in `instrumentation.ts` can lose the message over a pipe | If step 2b flakes |
+| P0-3b review | Privacy notice names only the AI provider as a recipient; add "Who else handles your data": Resend (email sign-in), Google (sign-in), Google Cloud (hosting) | Before sign-ups open: P0-11 or a copy task at the phase gate (needs a NOTICE_VERSION bump) |
+| P0-3b review | `/app/privacy` tab title still "Privacy" while the h1 says "Privacy notice" | Next task touching that page |
+| P0-3b review | Merge P0-2 before P0-3b: the notice states a consent record is stored | Merge order |
