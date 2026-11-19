@@ -753,6 +753,45 @@ Report: every string changed (old, new), the code reference behind each recipien
 ```
 
 ```
+Task: P0-13 Bound the fact-gate cost
+Worker: Sonnet
+Goal: One signed-in user cannot stall the Node process through the fact gate. Worst-case gate time per GET
+  and per export is under a stated bound (target 1 s total), at the new caps.
+ADRs: 0004, 0005
+Why (advisor's P0-11 review): checkText calls the engine gate synchronously (claims.mjs:537), so a request
+  blocks the whole process. factBaseText can reach about 528,408 chars within normalizeFacts caps (fits the
+  1 MB body cap); the P0-11 worker measured about 5 s per gate call at that size. GET /api/tailorings/[id],
+  the suggestions PATCH and export re-check every suggestion, have no rate limit, and buildSuggestions allows
+  up to about 751 suggestions (30 jobs x 25 bullets, deduped on ref).
+Touches (only these):
+  apps/web/src/lib/facts.mjs
+  apps/web/src/lib/tailoring.mjs
+  apps/web/src/lib/server/rate-limit.ts
+  apps/web/src/app/api/facts/route.ts
+  apps/web/src/app/api/tailorings/[id]/route.ts (and its suggestions and export sub-routes)
+  apps/web/src/i18n/en.ts (append only)
+  apps/web/tests/ (unit and integration tests; not tests/e2e)
+Steps:
+ 1. Measure first: record gate time (verifyFactsFromText via checkText, one 600-char target line) against
+    fact-base size 10k, 50k, 100k, 250k, 528k chars of realistic resume text AND of a hostile shape
+    (digit/punctuation runs split by the field caps). Put the table in the report and pick caps from it.
+ 2. Total-size cap on the fact base: reject at facts save (400, clear message) when factBaseText(facts)
+    exceeds the cap. For stored rows already over the cap, contextFor (tailoring.mjs:50) fails closed: the
+    engine is not run and export is refused with a clear message. Never truncate the gate input.
+ 3. Suggestion-count cap in buildSuggestions (tailoring.mjs:76), with the number justified in the report.
+ 4. Per-user rate limit on the tailoring GET, suggestions PATCH and export: a new LIMITS bucket in
+    rate-limit.ts. (P1-3 later moves limits to a shared store.)
+ 5. If step 1 shows caps alone miss the bound, add a between-suggestions time budget that fails closed.
+Done when:
+  - tests: an over-cap fact base is refused at save and refuses export; worst-case GET and export gate time
+    at the caps is under the stated bound; the new limit returns 429 with Retry-After; existing honest
+    fixtures still pass
+  - cd apps/web && npm run typecheck && npm test && npm run test:flow && npm run build
+  - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=... npm run test:e2e passes in full
+Report: the measurement table, the caps chosen and why, and counts.
+```
+
+```
 Task: P0-7 Deployed-environment safety switches
 Worker: Sonnet
 Goal: On a deployed host the app refuses the development sign-in, the mock AI, the fallback secret and the
