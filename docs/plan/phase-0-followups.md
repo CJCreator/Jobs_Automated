@@ -26,3 +26,9 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | P0-6b (blocks the phase gate) |
 | P0-6 review | Set Cloud Run memory, request timeout and concurrency explicitly; worker typed-array memory is bounded only by the instance limit | P1-6 |
 | P0-6 review | Upload rate limit is per process, so it weakens with more instances | P1-3 |
+| P0-4 review | Purge and `deleteUserData` cascade as the non-superuser role under FORCE RLS | P0-8 |
+| P0-4 review | One real Cloud Scheduler call end to end (also confirms the no-IAM-invoker setup) | P1-7 |
+| P0-4 review | Log-only code to tell "keys unavailable" from a bad token | Later ops task |
+| P0-4 review | Alert when the daily purge stops succeeding | P1-6 |
+| P0-4 review | `getDb()` runs before auth, so a DB outage shows 500 not 401 | Optional, later |
+| P0-4 review | ADR 0004 line 17 still describes the purge as a host-scheduled script | Next ADR edit |
