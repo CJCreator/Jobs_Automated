@@ -66,3 +66,5 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1b review | Should an unsourced title in the engine's structured title slot block instead of warn? | Owner decision (ADR 0005) |
 | P0-3b | Retention notice drops "A scheduled job checks for this once a day" until Cloud Scheduler runs the purge (ADR 0004: a promise with no job is a defect) | Restore in P1-7 once the scheduler is seen firing |
 | P0-6d review | If the memory-bomb test flakes again, add a test hook for a smaller external-memory cap (e.g. 32 MB) and drop the elapsed bound; rename the title from "well before" to "before" | Next task touching pdf-text tests |
+| P0-9a review | HSTS `includeSubDomains`: decide before mapping the app to an apex domain with http-only sibling subdomains; keep `preload` off until the domain layout is settled; record in ADR 0009 | Owner decision at custom-domain time |
+| P0-9a review | Check whether `console.error` + `process.exit(1)` in `instrumentation.ts` can lose the message over a pipe | If step 2b flakes |
