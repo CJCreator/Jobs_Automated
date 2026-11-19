@@ -439,8 +439,8 @@ for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
 // Longest first so "vice president" is read before "president".
 CLAIM_FORMS.sort((a, b) => b.form.length - a.form.length);
 // A space and a hyphen are interchangeable inside a form: "world class", "world-class".
-const formPattern = (form) => escapeRegExp(form).replace(/[ -]/g, "[\\s-]+");
-const formKey = (form) => form.toLowerCase().replace(/[\s-]+/g, " ");
+const formPattern = (form) => escapeRegExp(form).replace(/[ -]/g, "[\\s\\p{Pd}]+");
+const formKey = (form) => form.toLowerCase().replace(/[\s\p{Pd}]+/gu, " ");
 const CLAIM_BY_FORM = new Map(CLAIM_FORMS.map((f) => [formKey(f.form), f]));
 const CLAIM_RE = new RegExp(
   `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.map((f) => formPattern(f.form)).join("|")})(?![\\p{L}\\p{N}])`,
@@ -523,7 +523,7 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
   const facts = factTokenSet(sourceText);
   const claimInSource = claimFormInSource(sourceText);
   for (const name of unsupportedNames(target, facts)) {
-    // "PhD" is a mixed-case word, so the name check sees it; a dotted "Ph.D." in the facts supports it.
+    // Exempt when this is a claim form whose family the facts support ("PhD" is mixed-case, so the name check sees it; "Ph.D." in the facts supports it).
     const entry = CLAIM_BY_FORM.get(formKey(name));
     if (entry && entry.family.some(claimInSource)) continue;
     add("name", name, `"${name}" is not mentioned in your confirmed facts.`);

@@ -115,6 +115,8 @@ const VARIANTS = [
   "top performing analyst managing vendor contracts",
   "industry leading vendor contracts",
   "nation-wide vendor contracts",
+  "world‑class analyst managing vendor contracts",
+  "world–class analyst managing vendor contracts",
 ];
 for (const text of VARIANTS) {
   test(`blocks variant spelling: ${text}`, () => {
