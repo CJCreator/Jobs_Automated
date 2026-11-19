@@ -25,7 +25,8 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 
 After Phase 0 waves A to C (merged `ec9f577`): `npm test` 359 pass, 0 fail, 1 skipped; `test:flow` 16 of 16; `test:e2e` 17 of 17; `test:prod` 15 of 15 on the P0-9a branch (13 original steps plus 2b and 11b). Browser runs need `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 
-`test:prod` step 13 (hydration without CSP violations in Chromium) fails in this environment because it launches Playwright's default Chromium build, which is not installed. It ignores `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. That is an environment issue, not a product failure, but the test should honour the variable.
+After the browser sweep and the merge of P0-8 and P0-12 (P0-11, merged tree): `npm run typecheck` pass; `npm test` 380 tests, 376 pass, 0 fail, 4 skipped (the Postgres suites skip without a database); `npm run test:flow` 16 of 16; `npm run build` pass; `npm run test:e2e` 21 of 21 (17 earlier steps plus g3, p, k and m); `npm run test:prod` 15 of 15, including step 13 with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` set. The e2e steps added: g3 (a refused export lists the failing line and its words; "Go to this suggestion" focuses its card), p (signed-out `/privacy`: linked from `/` and `/sign-in`, axe, target size, skip link first, no sideways scroll at 360), k (tailor form asks for consent from an account with hand-typed facts and none given, then stops asking) and m ("Not found in your resume" badge on a second fixture; "Confirm all" skips it and says so). Step b also checks the legacy `rolewright.llm` item is removed on a page load.
+
 
 ## Known pre-existing engine failures (not caused by the restructure)
 
