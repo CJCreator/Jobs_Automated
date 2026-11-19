@@ -87,8 +87,10 @@ test('absolute local image is validated and inlined', () => {
   assert.match(html, /src="data:image\/png;base64,/);
 });
 
+// The checkout image these tests use was docs/logo.png until the fork removed
+// that upstream asset (ADR 0013); any committed PNG serves.
 test('project-relative image is validated and inlined', () => {
-  const { html } = render(payload('docs/logo.png', 'square'), { profilePhoto: 'docs/logo.png' });
+  const { html } = render(payload('tests/fixtures/avatar-8x8.png', 'square'), { profilePhoto: 'tests/fixtures/avatar-8x8.png' });
   assert.match(html, /class="cv-photo cv-photo--square"/);
   assert.match(html, /src="data:image\/png;base64,/);
 });
@@ -119,10 +121,10 @@ test('a relative photo is read from the data root, where the profile is', () => 
 });
 
 test('the data root wins over the checkout when both have the relative path', () => {
-  // docs/logo.png exists in the checkout; a different image at the same path
-  // in the data root is the one the user meant.
-  assert.ok(existsSync(join(ROOT, 'docs', 'logo.png')), 'premise: the checkout has docs/logo.png');
-  const { result, html } = dataRootPhotoBuild('docs/logo.png', ONE_PIXEL_PNG);
+  // tests/fixtures/avatar-8x8.png exists in the checkout; a different image at
+  // the same path in the data root is the one the user meant.
+  assert.ok(existsSync(join(ROOT, 'tests', 'fixtures', 'avatar-8x8.png')), 'premise: the checkout has tests/fixtures/avatar-8x8.png');
+  const { result, html } = dataRootPhotoBuild('tests/fixtures/avatar-8x8.png', ONE_PIXEL_PNG);
   assert.equal(result.status, 0, describeSpawn(result, 'expected a clean build'));
   assert.ok(html.includes(`src="data:image/png;base64,${ONE_PIXEL_PNG.toString('base64')}"`), 'the data-root image is inlined, not the checkout logo');
 });
@@ -147,7 +149,7 @@ test('a payload photo path that config/profile.yml does not name is refused (#50
   writeFileSync(secret, ONE_PIXEL_PNG);
   const cases = [
     ['profile has no photo', undefined],
-    ['profile names a different photo', 'docs/logo.png'],
+    ['profile names a different photo', 'tests/fixtures/avatar-8x8.png'],
   ];
   for (const [label, profilePhoto] of cases) {
     const { result, output } = buildWith(payload(secret), profilePhoto);
@@ -158,7 +160,7 @@ test('a payload photo path that config/profile.yml does not name is refused (#50
 });
 
 test('a relative path that climbs out of the project is refused unless the profile names it (#5094)', () => {
-  const { result, output } = buildWith(payload('../../../../etc/hosts.png'), 'docs/logo.png');
+  const { result, output } = buildWith(payload('../../../../etc/hosts.png'), 'tests/fixtures/avatar-8x8.png');
   assert.ok(exitedNonZero(result), describeSpawn(result, 'expected a non-zero exit'));
   assert.match(result.stderr, /does not match candidate\.photo in config\/profile\.yml/);
   assert.equal(existsSync(output), false);

@@ -130,20 +130,6 @@ All UI components adhere to the core design tokens: warm off-white (`#f7f6f3`) a
       * **Tab 3: STAR+R Interview Pack**: Story mappings matched to this specific role.
   * **Quick Actions**: One-click copy for emails, download tailored PDF, and direct ATS application link.
 
-### 4.4. 8-Agent Autonomous Enclave (`agents/*`)
-
-* **Master Supervisor (`agents/supervisor.mjs`)**: Orchestrates end-to-end evaluation, tailoring, tracking, and interview preparation workflows.
-* **Specialized Autonomous Agents**:
-  1. `JobDiscoveryAgent`: Reverse-ATS radar traversing public ATS datasets.
-  2. `AtsScoringAgent`: 5-dimension deterministic fit gate executing Blocks A-G.
-  3. `ResumeOptimizationAgent`: AST fact-verifier ensuring zero-fabrication tailored CVs.
-  4. `CoverLetterAgent`: Synthesizes 3-paragraph executive narrative grounded in proof points.
-  5. `RecruiterResearchAgent`: Company health, panel profiles, and culture intelligence.
-  6. `InterviewCoachAgent`: STAR story matching and interview briefing dossiers.
-  7. `SalaryNegotiationAgent`: Compensation decompilation and collaborative counter-offer scripts.
-  8. `ApplicationTrackingAgent`: Atomic ledger updates and SQLite index synchronization.
-* **Blackboard Coordination**: File-backed event stream in `data/agent-events.jsonl`, queried via `/api/agents/events` and displayed on the dashboard via `AgentStatusHud`.
-
 ### 4.5. Offer Negotiation & Monte Carlo Simulator (`/negotiation`)
 
 * **Route**: `/negotiation`

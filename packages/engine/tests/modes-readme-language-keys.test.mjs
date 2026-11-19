@@ -40,5 +40,6 @@ for (const rel of readmes) {
     else pass(`${rel}: the language: snippet sets output:`);
   }
 }
-if (snippets >= 15) pass(`checked ${snippets} language: snippets`);
+// Only modes/hi ships a market README now (ADR 0013 at the repository root).
+if (snippets >= 1) pass(`checked ${snippets} language: snippets`);
 else fail(`found only ${snippets} language: snippets in modes/*/README.md — the scan is matching less than it should`);

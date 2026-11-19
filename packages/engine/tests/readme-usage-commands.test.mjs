@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const README = readFileSync(join(ROOT, 'README.md'), 'utf-8').replace(/\r\n/g, '\n');
-const SKILL = readFileSync(join(ROOT, '.agents', 'skills', 'career-ops', 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
+const SKILL = readFileSync(join(ROOT, '.agents', 'skills', 'rolewright', 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
 
 const usage = README.split('\n## Usage\n')[1]?.split('\n## ')[0] ?? '';
 /** Router inputs → mode, e.g. `inbox` → `agent-inbox`, `eu-swe` → `regional/eu-swe`. */

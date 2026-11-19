@@ -23,7 +23,7 @@ function check(condition, message) {
 }
 
 check(parseOutputLanguage('language:\n  output: de\n') === 'de', 'reads language.output');
-check(parseOutputLanguage('language:\n  modes_dir: modes/de\n') === 'en', 'defaults to en when output is absent');
+check(parseOutputLanguage('language:\n  modes_dir: modes/hi\n') === 'en', 'defaults to en when output is absent');
 check(parseOutputLanguage('language: [invalid') === 'en', 'defaults to en for malformed YAML');
 check(parseOutputLanguage('language:\n  output: 42\n') === 'en', 'rejects non-string output values');
 check(parseOutputLanguage('language:\n  output: " zh-CN "\n') === 'zh-CN', 'trims a configured language tag');
@@ -78,7 +78,9 @@ const modesDir = join(ROOT, 'modes');
 const rel = (path) => relative(ROOT, path).split(sep).join('/');
 const sharedFiles = listTree(modesDir, { match: /_shared\.md$/ })
   .filter((path) => /^modes\/(?:[\w-]+\/)?_shared\.md$/.test(rel(path)));
-check(sharedFiles.length >= 20, `found every market's _shared.md (${sharedFiles.length})`);
+// Rolewright keeps the English modes and the India market (modes/hi); the
+// other market sets were removed (ADR 0013 at the repository root).
+check(sharedFiles.length >= 2, `found every market's _shared.md (${sharedFiles.length})`);
 for (const path of sharedFiles) {
   check(readFileSync(path, 'utf-8').includes('{language.output}'), `${rel(path)} writes human-facing content in {language.output}`);
 }
@@ -105,7 +107,7 @@ check(
 // gemini-eval.mjs resolves modes_dir (a market vocabulary directory) against
 // CODE_ROOT — the script's OWN directory, i.e. this checkout — never against
 // the sandboxed data root. So these fixtures point modes_dir at REAL market
-// directories already committed in this repo (modes/de, modes/zh — both fully
+// directories already committed in this repo (modes/hi, modes/zh — both fully
 // translated, per AGENTS.md) rather than fabricating fake ones; only
 // config/profile.yml, cv.md and modes/_profile.md need to live in the sandbox,
 // via CAREER_OPS_ROOT (getCareerOpsRoot() in path-resolver.mjs honors it).
@@ -147,62 +149,34 @@ function runGeminiEval(modesDirYaml) {
   }
 }
 
-// Array input with two declared markets (modes/de, modes/zh): neither
-// _shared.md nor the primary market's evaluation-mode file (angebot.md) logs
-// a "not found" warning (console.warn → stderr), and the token budget is
-// strictly larger than the single-market run below — proof the SECOND
-// market's _shared.md content was actually folded into context, not merely
-// that the run didn't crash.
-const twoMarket = runGeminiEval('  modes_dir:\n    - modes/de\n    - modes/zh');
-check(
-  !twoMarket.stderr.includes('modes/de/_shared.md not found') && !twoMarket.stderr.includes('modes/de/angebot.md not found'),
-  'gemini-eval.mjs resolves the primary market in a 2-market modes_dir array',
-);
-check(
-  !twoMarket.stderr.includes('modes/zh/_shared.md not found'),
-  "gemini-eval.mjs also resolves the secondary market's _shared.md in a 2-market array",
-);
+// The two-market fold (two localized markets declared at once) needs two
+// shipped market sets; only modes/hi remains, so that case is no longer
+// testable against the shipped tree.
 
 // Array input with exactly one declared market behaves like the plain-string
 // shape: the same primary-market resolution, no missing-file warnings.
-const oneMarketArray = runGeminiEval('  modes_dir:\n    - modes/de');
+const oneMarketArray = runGeminiEval('  modes_dir:\n    - modes/hi');
 check(
-  !oneMarketArray.stderr.includes('modes/de/_shared.md not found') && !oneMarketArray.stderr.includes('modes/de/angebot.md not found'),
+  !oneMarketArray.stderr.includes('modes/hi/_shared.md not found') && !oneMarketArray.stderr.includes('modes/hi/naukri.md not found'),
   'gemini-eval.mjs treats a one-element modes_dir array like a plain string',
 );
-// A bare `>` here would pass even if the fold silently broke: the two-market
-// fixture's config/profile.yml has an extra `- modes/zh` line, and profile.yml
-// is itself a counted context file, so the two-market budget is strictly
-// larger by that config line alone (~3 tokens), independent of whether zh's
-// _shared.md (~2000 tokens) was ever actually read. Require a margin well
-// past that confound — same pattern as the "not silently promoted" check
-// below — so a regression to first-entry-only folding actually reddens this
-// (Scott-Emberson, PR #3798 review, mutation-tested: gutting the fold still
-// passed a bare `>` at two(de,zh)=5322 vs one(de)=5319).
-check(
-  Number.isFinite(twoMarket.tokenBudget)
-    && Number.isFinite(oneMarketArray.tokenBudget)
-    && twoMarket.tokenBudget - oneMarketArray.tokenBudget > 1000,
-  "a 2nd declared market's _shared.md is actually folded into context (token budget grows vs. a single market)",
-);
-
 // The plain-string shape (unchanged from before #3793) resolves identically
 // to a one-element array — same primary market, same token budget.
-const oneMarketString = runGeminiEval('  modes_dir: modes/de');
+const oneMarketString = runGeminiEval('  modes_dir: modes/hi');
 check(
   oneMarketString.tokenBudget === oneMarketArray.tokenBudget,
   'a plain string modes_dir and a one-element modes_dir array produce the same context',
 );
 
-const arabicMarket = runGeminiEval('  modes_dir: modes/ar');
+const hindiMarket = runGeminiEval('  modes_dir: modes/hi');
 check(
-  arabicMarket.evalModeFile === 'modes/ar/fursah.md' && Number.isFinite(arabicMarket.tokenBudget),
-  'gemini-eval.mjs resolves the Arabic fursah evaluation mode',
+  hindiMarket.evalModeFile === 'modes/hi/naukri.md' && Number.isFinite(hindiMarket.tokenBudget),
+  'gemini-eval.mjs resolves the India naukri evaluation mode',
 );
 
 // Absent modes_dir keeps the historical default (modes/, oferta.md) — a
-// different token budget than the modes/de config above proves the default
-// files, not modes/de's, were actually read.
+// different token budget than the modes/hi config above proves the default
+// files, not modes/hi's, were actually read.
 const noMarket = runGeminiEval('  output: en');
 check(
   Number.isFinite(noMarket.tokenBudget) && noMarket.tokenBudget !== oneMarketArray.tokenBudget,
@@ -212,16 +186,16 @@ check(
 // Regression (CodeRabbit, PR #3798): the FIRST declared market is primary.
 // When it cannot be resolved at all (its directory does not exist), the
 // evaluation must fall back to the DEFAULT mode (modes/oferta.md) — it must
-// NEVER silently promote the second declared market (modes/de, perfectly
+// NEVER silently promote the second declared market (modes/hi, perfectly
 // valid here) into the primary slot. Promoting it would evaluate the JD
-// against modes/de's A-F rules without anyone having asked for that.
-const missingPrimary = runGeminiEval('  modes_dir:\n    - modes/does-not-exist-anywhere\n    - modes/de');
+// against modes/hi's A-F rules without anyone having asked for that.
+const missingPrimary = runGeminiEval('  modes_dir:\n    - modes/does-not-exist-anywhere\n    - modes/hi');
 check(
   missingPrimary.stderr.includes('modes_dir "modes/does-not-exist-anywhere" not found'),
   'gemini-eval.mjs reports why the primary market could not be resolved',
 );
 // The missing primary must keep the default evaluation mode while preserving
-// valid secondary shared context from modes/de. Its budget therefore exceeds
+// valid secondary shared context from modes/hi. Its budget therefore exceeds
 // the default-only run, while the separate primary-market assertion above
 // proves the second market was not promoted into the evaluation slot.
 check(
@@ -234,5 +208,5 @@ check(
   Number.isFinite(missingPrimary.tokenBudget)
     && Number.isFinite(oneMarketArray.tokenBudget)
     && Math.abs(missingPrimary.tokenBudget - oneMarketArray.tokenBudget) > 1000,
-  'the second declared market (modes/de) is NOT silently promoted to primary when the first cannot be resolved',
+  'the second declared market (modes/hi) is NOT silently promoted to primary when the first cannot be resolved',
 );

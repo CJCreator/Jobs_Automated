@@ -155,12 +155,11 @@ function assertIdentityBeforeLoad(text) {
   assert.ok(gate < load, `answers are loaded (line ${load + 1}) before the posting identity is confirmed (line ${gate + 1})`);
 }
 
-// apply.md, modes/ja and modes/vi print Step 5 above Step 2, so a file-wide
-// order would pass on the preflight alone: those three are read inside Step 2.
+// apply.md prints Step 5 above Step 2, so a file-wide order would pass on the
+// preflight alone: it is read inside Step 2. (modes/ja and modes/vi had the same
+// layout; non-India market sets were removed, ADR 0013.)
 const searchStep = {
   'modes/apply.md': '## Step 2 — ',
-  'modes/ja/oubo.md': '## Step 2 -- ',
-  'modes/vi/ung-tuyen.md': '## Bước 2 — ',
 };
 const searchText = (file, text) => (searchStep[file] ? step(text, searchStep[file]) : text);
 
@@ -182,13 +181,12 @@ ok('apply.md: the workflow LOAD line waits for the posting identity', () => asse
 // apply.md, modes/ja and modes/vi have a PREFLIGHT line in the overview. In vi
 // it still asked for "company/role match", which stops a retitled posting that
 // Step 3 would adapt; the line names the posting identity instead.
-for (const file of ['modes/apply.md', 'modes/ja/oubo.md', 'modes/vi/ung-tuyen.md']) {
+// (modes/ja and modes/vi were also checked here; non-India market sets were removed, ADR 0013.)
+for (const file of ['modes/apply.md']) {
   ok(`${file}: the workflow PREFLIGHT line checks the posting identity, not the role`, () => {
     const line = read(file).split('\n').find(l => /^5\.\s+PREFLIGHT/.test(l));
     assert.ok(line, 'no PREFLIGHT line in the workflow overview');
     assert.ok(line.includes(`**${IDENTITY}**`), `the PREFLIGHT line does not check the posting identity: ${line}`);
-    // vi spells out where a retitled posting goes, since its old line stopped it.
-    if (file === 'modes/vi/ung-tuyen.md') assert.ok(line.includes('chức danh đổi thì sang Bước 3'), 'the PREFLIGHT line does not send a changed title to Step 3');
   });
 }
 
@@ -197,8 +195,6 @@ for (const file of ['modes/apply.md', 'modes/ja/oubo.md', 'modes/vi/ung-tuyen.md
 // the other posting's answers in context, so Step 2 reads the header alone.
 const headerFirst = {
   'modes/apply.md': { item: /^3\. If there is a match/, reads: 'read only the header of each matching report', loads: /→ load the full report/ },
-  'modes/ja/oubo.md': { item: /^3\. Match があれば/, reads: 'header（company、role、`**URL:**`）だけを読み', loads: /full report を load$/ },
-  'modes/vi/ung-tuyen.md': { item: /^3\. Nếu khớp/, reads: 'chỉ đọc phần đầu của từng báo cáo khớp', loads: /→ nạp báo cáo đầy đủ/ },
 };
 for (const [file, expect] of Object.entries(headerFirst)) {
   ok(`${file}: Step 2 reads only report headers until the posting is confirmed`, () => {
@@ -213,8 +209,6 @@ for (const [file, expect] of Object.entries(headerFirst)) {
 // below the preflight, so the unsaved path has to be restated where it is read.
 const generationSteps = {
   'modes/apply.md': ['## Step 6 — ', '## Step 7 — '],
-  'modes/ja/oubo.md': ['## Step 6 -- ', '## Step 7 -- '],
-  'modes/vi/ung-tuyen.md': ['## Bước 6 — ', '## Bước 7 — '],
 };
 for (const [file, headings] of Object.entries(generationSteps)) {
   ok(`${file}: the question and generation steps skip the report on an unsaved draft`, () => {
@@ -235,9 +229,10 @@ const isRolePrompt = (l) => l.includes('[X]') && l.includes('[Y]') && /^\s*-\s/.
 const localized = modeFiles.filter(f => read(f).split('\n').some(isRolePrompt));
 
 ok('the localized apply modes are found', () => {
-  // 19 locales at the time of writing; a recognizer that silently stops
-  // matching would pass everything below.
-  assert.ok(localized.length >= 19, `only ${localized.length} localized apply modes recognized: ${localized.join(', ')}`);
+  // Only modes/hi remains: non-India market sets were removed (ADR 0013). A
+  // recognizer that silently stops matching would pass everything below.
+  assert.ok(localized.includes('modes/hi/aavedan.md'), `modes/hi/aavedan.md not recognized: ${localized.join(', ')}`);
+  assert.ok(localized.length >= 1, `only ${localized.length} localized apply modes recognized: ${localized.join(', ')}`);
 });
 
 /** The `## ` steps between the role change and post-apply whose lists read `## Application Answers`. */
@@ -292,107 +287,13 @@ for (const file of localized) {
   });
 }
 
-ok('modes/sg/apply.md defers to the canonical write rule', () => {
-  assert.ok(read('modes/sg/apply.md').includes(WRITE_RULE));
-});
-
-ok('modes/nl/solliciteren.md keeps no exact-title guard of its own', () => {
-  // The Dutch rule refused an adapted answer set even for a retitled posting,
-  // the one case where the answers do belong in the report.
-  const nl = read('modes/nl/solliciteren.md');
-  assert.ok(!/exact overeenkomen/.test(nl), 'still requires an exact company-and-role match');
-  assert.ok(!/niet in het oude rapport op/.test(nl), 'still refuses to save adapted answers to the report');
-});
-
-ok('modes/nl/solliciteren.md finds the report by employer, not by title', () => {
-  // Searching on company + title missed a retitled posting's report before the
-  // URL check could find it, and the auto-pipeline then made a duplicate.
-  const nl = read('modes/nl/solliciteren.md');
-  assert.ok(!/combinatie van bedrijfsnaam en functietitel/.test(nl), 'still searches reports by company and title together');
-  assert.match(nl, /vacature-URL of het requisition-ID/);
-  assert.match(nl, /functietitel alleen om rapporten te beperken/);
-});
-
-// These modes are checked in their own words: each clause below is one branch of
-// the decision, matched in order inside the line or paragraph that holds it.
-const inOrder = (text, parts, what) => {
-  let at = 0;
-  for (const part of parts) {
-    const next = text.indexOf(part, at);
-    assert.ok(next !== -1, `${what}: missing or out of order: "${part}"`);
-    at = next + part.length;
-  }
-};
-
-const zhModes = {
-  'modes/zh/apply.md': {
-    // The upload reminder: only for a confirmed report of this posting; on the
-    // unsaved path or with no report, say none was selected and recommend none.
-    reminder: ['仅当已确认报告对应当前可见的职位时', '上传为该职位定制的简历 PDF', '**Draft without saving**', '没有与当前职位对应的报告', '尚未选定匹配的定制简历', '不要推荐为其他职位定制的简历'],
-    everyForm: '即使职位名称没有变化、且只有一份报告与该公司匹配，也要对每个表单做这项检查',
-    recheck: '以及在下面每一次写入（状态和回答）之前，都要再次确认',
-  },
-  'modes/zh-TW/apply.md': {
-    reminder: ['僅當已確認報告對應目前看到的職缺時', '上傳為該職缺客製的履歷 PDF', '**Draft without saving**', '沒有與目前職缺對應的報告', '尚未選定相符的客製履歷', '不要推薦為其他職缺客製的履歷'],
-    everyForm: '即使職缺名稱沒有變動、且只有一份報告與該公司相符，也要對每個表單做這項檢查',
-    recheck: '以及在下面每一次寫入（狀態和回答）之前，都要再次確認',
-  },
-};
-
-for (const [file, expect] of Object.entries(zhModes)) {
-  const text = read(file);
-  const lines = text.split('\n');
-
-  ok(`${file}: the output template recommends a tailored CV only for this posting`, () => {
-    // The template told the candidate to upload "the previously tailored CV"
-    // even on an unsaved draft for another posting, whose CV Step 3 sets aside.
-    const reminder = lines.find(l => /^- \[/.test(l) && l.includes('PDF'));
-    assert.ok(reminder, 'no CV upload reminder in the output template');
-    inOrder(reminder, expect.reminder, 'the CV upload reminder');
-  });
-
-  ok(`${file}: the identity check runs on every form, not only on a changed title`, () => {
-    // A single same-employer report for a sibling posting with the same title
-    // would otherwise be used without any check.
-    const roleChange = sectionAt(lines, lines.findIndex(isRolePrompt));
-    assert.ok(roleChange.includes(expect.everyForm), 'the role-change step does not run the check on every form');
-  });
-
-  ok(`${file}: the generation step drafts without the report on an unsaved draft`, () => {
-    // Its item 1 builds on the report's blocks rather than its answers, so the
-    // check for answer-reading steps does not reach it.
-    const generate = sectionAt(lines, lines.findIndex(l => /^## 步[骤驟] 5 /.test(l)));
-    assert.ok(generate.includes('**Draft without saving**'), 'the generation step has no unsaved-draft exclusion');
-  });
-
-  ok(`${file}: the post-apply step rechecks the posting before each write`, () => {
-    const postApply = sectionAt(lines, lines.findIndex(l => l.includes('set-status.mjs') && l.includes('Applied')));
-    assert.ok(postApply.includes(expect.recheck), 'the post-apply step checks only once before both writes');
-  });
-}
-
-ok('modes/nl/solliciteren.md asks before rejecting a report on a URL mismatch alone', () => {
-  // An application form often sits on another ATS host than the posting. With no
-  // requisition ID, the URL alone cannot reject the employer's report: the
-  // canonical identity lets the candidate confirm it. The question belongs to
-  // that branch of Stap 2, and the confirmation makes the match validated.
-  const lines = read('modes/nl/solliciteren.md').split('\n');
-  const branch = lines.find(l => /^3\. Bevestig de match/.test(l));
-  assert.ok(branch, 'no Stap 2 confirmation item');
-  inOrder(branch, ['Wijkt de URL af', 'is er geen requisition-ID', 'vraag de kandidaat dan of het rapport van deze werkgever bij dit formulier hoort', 'voordat je het als ongevalideerd behandelt', 'bevestigt de kandidaat dat, dan is het een gevalideerde match'], 'Stap 2 item 3');
-  assert.ok(lines.some(l => /^6\. Alleen indien er GEEN gevalideerde match is/.test(l)), 'the auto-pipeline is no longer limited to an unvalidated match');
-});
-
-ok('modes/nl/solliciteren.md rechecks the posting before each post-apply write', () => {
-  const lines = read('modes/nl/solliciteren.md').split('\n');
-  const postApply = sectionAt(lines, lines.findIndex(l => l.includes('set-status.mjs') && l.includes('Applied')));
-  assert.ok(postApply.includes('en opnieuw vlak voor elke schrijfstap hieronder (status en antwoorden)'), 'the post-apply step checks only once before both writes');
-});
+// modes/sg, modes/nl, modes/zh and modes/zh-TW had their own checks here; non-India
+// market sets were removed (ADR 0013).
 
 // The output template opens with "Based on: Report #NNN | Score | Archetype".
 // An unsaved draft has no report, so each template says what replaces it. The
 // report-number placeholder is the part no translation changes.
-for (const file of ['modes/apply.md', 'modes/sg/apply.md', ...localized]) {
+for (const file of ['modes/apply.md', ...localized]) {
   ok(`${file}: the output header drops the report on an unsaved draft`, () => {
     const lines = read(file).split('\n');
     const at = lines.findIndex(l => /#(NNN|\{###\})/.test(l));

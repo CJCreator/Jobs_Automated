@@ -73,5 +73,8 @@ for (const mode of MODES) {
 test('the update check stays silent in an unattended run', () => {
   const agents = read('AGENTS.md');
   const check = agents.slice(agents.indexOf('## Update Check'), agents.indexOf('\n## ', agents.indexOf('## Update Check') + 1));
-  assert.match(check, /unattended run[^.]*say nothing/i);
+  // This fork disables upstream updates (ADR 0013): the check is never run and
+  // no update is ever offered, which keeps unattended runs silent a fortiori.
+  assert.match(check, /Do not run the update check at session start/);
+  assert.match(check, /never offer an upstream update/);
 });

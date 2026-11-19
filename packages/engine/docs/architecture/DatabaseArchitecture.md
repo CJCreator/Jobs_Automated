@@ -30,7 +30,6 @@ via node:sqlite")]
 
     subgraph Consumers ["Readers & Analytics"]
         WebReader["Web API / Analytics"]
-        TUIReader["Go Dashboard"]
         FunnelEngine["funnel-velocity.mjs"]
     end
 
@@ -38,7 +37,6 @@ via node:sqlite")]
     TSVLedger --> SyncEngine
     SyncEngine -->|Auto-Rebuilds on Hash Change| SQLiteDB
     SQLiteDB --> WebReader
-    MDTable --> TUIReader
     TSVLedger --> FunnelEngine
 ```
 

@@ -521,7 +521,6 @@ export const SYSTEM_PATHS = [
   'opencode.example.json',
   'seed-fixture.mjs',
   'test-fixtures/',
-  'upgrade-tests.mjs',
 ];
 
 // Frozen after the literal, not with `Object.freeze([...])` around it, so the

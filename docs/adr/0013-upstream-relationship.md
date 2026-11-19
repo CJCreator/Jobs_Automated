@@ -19,3 +19,4 @@ career-ops is MIT-licensed. Its trademark policy allows forks and "based on care
 
 - Upstream security fixes do not arrive automatically. Someone checks upstream releases periodically.
 - Engine prose (modes, docs) still says "career-ops" in many places. It is renamed where users see it; internal mentions can stay.
+- The engine's outbound identity still names career-ops: the HTTP User-Agent (`packages/engine/user-agent.mjs`, `career-ops/1.0` with upstream's repository as the contact URL) and the OpenRouter `X-Title` header (`openrouter-runner.mjs`). That is acceptable while only the owner runs the engine. It must change to a Rolewright identity with our own contact URL before job discovery (ADR 0001) makes requests to job boards on users' behalf.

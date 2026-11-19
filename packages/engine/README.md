@@ -12,6 +12,10 @@ The engine behind [Rolewright](../../README.md): the fact gate, PDF renderer and
 3. **Deterministic Fact Grounding**: Generative AI is strictly bounded by `verify-cv-facts.mjs`. It will never invent metrics, skills, or employment history.
 4. **Human-in-the-Loop (HITL)**: career-ops prepares, scores, filters, and drafts. You review, verify, and click Submit. It never spams applications.
 
+| Guarantee | Rule |
+|---|---|
+| Human in the loop | It prepares, scores and drafts; you review and press Submit. It never submits an application for you. <!-- hitl: absolute guarantee. Do not add a hedge such as usually, by default, unless or automatically to this row. --> |
+
 ---
 
 ## Executive Feature Matrix

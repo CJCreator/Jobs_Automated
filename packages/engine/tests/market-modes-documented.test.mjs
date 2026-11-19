@@ -59,7 +59,8 @@ test('every evaluation and apply mode the table names exists on disk', () => {
   // The mode NAMES are what a user types and what the agent looks for. A row
   // with the right directory and a wrong filename is still a dead route.
   const rows = [...AGENTS.matchAll(/\|\s*`modes\/([a-zA-Z-]+)\/`\s*\|\s*`([a-z-]+)`\s*\/\s*`([a-z-]+)`\s*\|/g)];
-  assert.ok(rows.length >= 18, `only ${rows.length} market rows parsed — the table format changed`);
+  // One row per shipped set (only modes/hi since non-India markets were removed, ADR 0013).
+  assert.ok(rows.length >= 1 && rows.length >= shippedSets().length, `only ${rows.length} market rows parsed — the table format changed`);
   const missing = [];
   for (const [, dir, evalMode, applyMode] of rows) {
     for (const mode of [evalMode, applyMode]) {

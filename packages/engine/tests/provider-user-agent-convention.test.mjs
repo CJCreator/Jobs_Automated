@@ -83,6 +83,6 @@ test('no provider hardcodes a User-Agent literal', () => {
 
 test('the shared User-Agent identifies career-ops and carries a contact URL', async () => {
   const { DEFAULT_USER_AGENT } = await import(pathToFileURL(join(ROOT, 'user-agent.mjs')).href);
-  assert.match(DEFAULT_USER_AGENT, /rolewright/, 'the default UA names the product');
+  assert.match(DEFAULT_USER_AGENT, /career-ops/, 'the default UA names the product');
   assert.match(DEFAULT_USER_AGENT, /\+https?:\/\//, 'the default UA carries a URL a site owner can follow');
 });

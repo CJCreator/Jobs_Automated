@@ -71,12 +71,3 @@ Scripts maintain data consistency:
 | `fix-report-links.mjs` | Rewrites Report cells that link to a missing file to `—` (previewable, backed up) |
 | `cv-sync-check.mjs` | Validates setup consistency |
 
-## Dashboard TUI
-
-The `dashboard/` directory contains a standalone Go TUI application that visualizes the pipeline:
-
-- Filter tabs: All, Evaluated, Interview, Assessment, Responded, Applied, Top ≥4, Skip, Rejected, Discarded
-- Sort modes: Score, Date, Company, Status, Location, Pay, Last contact, Posted
-- Grouped/flat view
-- Lazy-loaded report previews
-- Inline status picker

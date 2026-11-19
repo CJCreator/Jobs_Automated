@@ -75,7 +75,7 @@
 // block scalar). Both are the safe direction: a false red is read and resolved
 // by whoever wrote the workflow, and the remedy is a step of its own. A false
 // green is the bug this file prevents.
-import { readdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import * as yaml from 'js-yaml';
 import { pass, fail, ROOT } from './helpers.mjs';
@@ -150,7 +150,11 @@ if (rootOk) {
     // treated as "no invocations": that reading would fail a workflow-run suite
     // for the wrong reason and send the reader looking for a missing
     // registration that was never missing.
-    const WORKFLOWS = join(ROOT, '.github', 'workflows');
+    // In the Rolewright monorepo the engine lives in packages/engine and the
+    // workflows stay at the repository root (ADR 0002), two levels up.
+    const WORKFLOWS = existsSync(join(ROOT, '.github', 'workflows'))
+      ? join(ROOT, '.github', 'workflows')
+      : join(ROOT, '..', '..', '.github', 'workflows');
     const runScripts = [];
     let workflowsRead = 0;
     let workflowErr = null;

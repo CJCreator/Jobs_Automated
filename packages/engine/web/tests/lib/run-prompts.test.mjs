@@ -414,16 +414,16 @@ test("buildPrompt: checkout-owned files are anchored to codeRoot, user files sta
   // The worker's cwd is the data root. Modes and scripts only exist in the checkout.
   const codeRoot = "/opt/career-ops";
   const pdf = buildPrompt({ kind: "pdf", ...ARGS, codeRoot });
-  assert.match(pdf, /"\/opt\/rolewright\/modes\/pdf\.md"/);
+  assert.match(pdf, /"\/opt\/career-ops\/modes\/pdf\.md"/);
   const cover = buildPrompt({ kind: "cover", ...ARGS, ...COVER_ARGS, codeRoot });
-  assert.match(cover, /"\/opt\/rolewright\/modes\/cover\.md"/);
-  assert.match(cover, /"\/opt\/rolewright\/modes\/_writing\.md"/);
+  assert.match(cover, /"\/opt\/career-ops\/modes\/cover\.md"/);
+  assert.match(cover, /"\/opt\/career-ops\/modes\/_writing\.md"/);
   const evaluate = buildPrompt({ kind: "evaluate", ...ARGS, codeRoot });
-  assert.match(evaluate, /"\/opt\/rolewright\/modes\/oferta\.md"/);
+  assert.match(evaluate, /"\/opt\/career-ops\/modes\/oferta\.md"/);
   const portal = buildPrompt({ kind: "fix-portal", ...ARGS, input: "Acme", codeRoot });
-  assert.match(portal, /node '\/opt\/rolewright\/verify-portals\.mjs' --add "Acme"/);
+  assert.match(portal, /node '\/opt\/career-ops\/verify-portals\.mjs' --add "Acme"/);
   // user-layer files are not the checkout's
-  assert.ok(!/opt\/rolewright\/(cv\.md|modes\/_profile\.md)/.test(pdf + cover + evaluate));
+  assert.ok(!/opt\/career-ops\/(cv\.md|modes\/_profile\.md)/.test(pdf + cover + evaluate));
 });
 
 test("buildPrompt: a codeRoot with unusual characters stays absolute, quoted per use", () => {
@@ -465,10 +465,10 @@ test("buildPrompt: a codeRoot that is not a plain path keeps the relative form",
 test("buildPrompt: the pdf prompt anchors the template to the checkout when given its root", () => {
   // The worker's cwd is the data root; on a split layout templates/ is only in the checkout.
   const prompt = buildPrompt({ kind: "pdf", ...ARGS, cvTemplate: "templates/cv-template.mine.html", codeRoot: "/opt/career-ops/" });
-  assert.match(prompt, /"\/opt\/rolewright\/templates\/cv-template\.mine\.html"/);
+  assert.match(prompt, /"\/opt\/career-ops\/templates\/cv-template\.mine\.html"/);
   // An unsafe template still falls back to the base template, anchored the same way
   const bad = buildPrompt({ kind: "pdf", ...ARGS, cvTemplate: "../../etc/passwd", codeRoot: "/opt/career-ops" });
-  assert.match(bad, /"\/opt\/rolewright\/templates\/cv-template\.html"/);
+  assert.match(bad, /"\/opt\/career-ops\/templates\/cv-template\.html"/);
 });
 
 test("buildPrompt: the pdf prompt fills the template the caller resolved", () => {
@@ -598,7 +598,7 @@ test("buildPrompt: a user-layer path needs the user-template directory the route
   const prompt = buildPrompt({ kind: "pdf", ...ARGS, cvTemplate: "data/templates/cv-template.mine.html", codeRoot: "/opt/career-ops" });
 
   assert.ok(!prompt.includes("data/templates/cv-template.mine.html"));
-  assert.match(prompt, /"\/opt\/rolewright\/templates\/cv-template\.html"/, "must fall back to the base template");
+  assert.match(prompt, /"\/opt\/career-ops\/templates\/cv-template\.html"/, "must fall back to the base template");
 });
 
 test("buildPrompt: a data-root path the user layer could not have produced is refused", () => {
@@ -629,7 +629,7 @@ test("buildPrompt: a data-root path the user layer could not have produced is re
   ]) {
     const prompt = buildPrompt({ kind: "pdf", ...ARGS, cvTemplate: bad, userTemplatesDir: USER_TEMPLATES_DIR, codeRoot });
     assert.ok(!prompt.includes(bad), `must not interpolate ${bad}`);
-    assert.match(prompt, /"\/opt\/rolewright\/templates\/cv-template\.html"/, `${bad} must fall back to the base template`);
+    assert.match(prompt, /"\/opt\/career-ops\/templates\/cv-template\.html"/, `${bad} must fall back to the base template`);
   }
 });
 
@@ -641,7 +641,7 @@ test("buildPrompt: a user-template directory that is not a plain relative path o
     const cvTemplate = `${dir}/cv-template.mine.html`;
     const prompt = buildPrompt({ kind: "pdf", ...ARGS, cvTemplate, userTemplatesDir: dir, codeRoot: "/opt/career-ops" });
     assert.ok(!prompt.includes(JSON.stringify(cvTemplate)), `must not interpolate ${cvTemplate} for directory ${JSON.stringify(dir)}`);
-    assert.match(prompt, /"\/opt\/rolewright\/templates\/cv-template\.html"/, "must fall back to the base template");
+    assert.match(prompt, /"\/opt\/career-ops\/templates\/cv-template\.html"/, "must fall back to the base template");
   }
 });
 

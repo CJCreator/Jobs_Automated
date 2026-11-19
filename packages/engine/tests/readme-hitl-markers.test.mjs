@@ -27,7 +27,9 @@ const readmes = readdirSync(ROOT).filter((f) => /^README[\w.-]*\.md$/.test(f)).s
 // The whole family must be present: a marker check over an empty (or
 // mis-globbed) list would pass vacuously, which is exactly the blind-check
 // class this suite exists to avoid.
-if (readmes.length >= 17) pass(`found ${readmes.length} README files (17 expected as of Aug 2026)`);
+// Rolewright keeps only the English README (translations removed, ADR 0013 at
+// the repository root), so one file is the expected family.
+if (readmes.length >= 1) pass(`found ${readmes.length} README file(s) (1 expected since translations were removed)`);
 else fail(`only ${readmes.length} README*.md files found — glob broken or files removed`);
 
 for (const file of readmes) {

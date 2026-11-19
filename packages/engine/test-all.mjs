@@ -2474,7 +2474,8 @@ for (const f of skillEntrypoints) {
 {
   const canonManifest = readFile('.claude-plugin/plugin.json');
   const mirrors = [
-    ['.github/plugin/plugin.json', 'awesome-copilot validator needs it'],
+    // .github/ lives at the repository root in the Rolewright monorepo (ADR 0002).
+    [fileExists('.github/plugin/plugin.json') ? '.github/plugin/plugin.json' : '../../.github/plugin/plugin.json', 'awesome-copilot validator needs it'],
     ['.codex-plugin/plugin.json', 'awesome-ai-plugins resolves the Codex install_url to it'],
   ];
   for (const [mirrorPath, why] of mirrors) {
@@ -7138,7 +7139,7 @@ if (
   /`codex`/.test(canonicalContent ?? '') &&
   /`codex exec/.test(canonicalContent ?? '') &&
   /prompt/i.test(canonicalContent ?? '') &&
-  /\/rolewright/.test(canonicalContent ?? '')
+  /\/career-ops/.test(canonicalContent ?? '')
 ) {
   pass('career-ops skill router documents the Codex invocation model');
 } else {
@@ -7187,9 +7188,9 @@ console.log('\n12a. Skill entrypoint materialization');
 {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'career-ops-skills-'));
   try {
-    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'career-ops');
-    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'career-ops');
-    const opencodeDir = join(fixtureRoot, '.opencode', 'skills', 'career-ops');
+    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'rolewright');
+    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'rolewright');
+    const opencodeDir = join(fixtureRoot, '.opencode', 'skills', 'rolewright');
     mkdirSync(canonicalDir, { recursive: true });
     mkdirSync(claudeDir, { recursive: true });
     mkdirSync(opencodeDir, { recursive: true });
@@ -7271,8 +7272,8 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
 {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'career-ops-ensure-skills-'));
   try {
-    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'career-ops');
-    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'career-ops');
+    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'rolewright');
+    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'rolewright');
     mkdirSync(canonicalDir, { recursive: true });
     mkdirSync(claudeDir, { recursive: true });
 
@@ -7297,7 +7298,7 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
       fail(`unexpected bootstrapped skill entrypoints: ${JSON.stringify(touched)}`);
     }
 
-    const grokSkill = readFileSync(join(fixtureRoot, '.grok', 'skills', 'career-ops', 'SKILL.md'), 'utf-8');
+    const grokSkill = readFileSync(join(fixtureRoot, '.grok', 'skills', 'rolewright', 'SKILL.md'), 'utf-8');
     const claudeSkill = readFileSync(join(claudeDir, 'SKILL.md'), 'utf-8');
     if (grokSkill === fixtureSkill && claudeSkill === fixtureSkill) {
       pass('ensureSkillEntrypoints materializes canonical skill content');
@@ -7382,8 +7383,8 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
 {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'career-ops-skills-unreadable-'));
   try {
-    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'career-ops');
-    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'career-ops');
+    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'rolewright');
+    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'rolewright');
     mkdirSync(canonicalDir, { recursive: true });
     mkdirSync(claudeDir, { recursive: true });
 
@@ -7409,9 +7410,9 @@ console.log('\n12b. Skill entrypoint bootstrap (npx / old releases)');
 {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'career-ops-skills-entry-dir-'));
   try {
-    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'career-ops');
-    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'career-ops');
-    const opencodeDir = join(fixtureRoot, '.opencode', 'skills', 'career-ops');
+    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'rolewright');
+    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'rolewright');
+    const opencodeDir = join(fixtureRoot, '.opencode', 'skills', 'rolewright');
     mkdirSync(canonicalDir, { recursive: true });
     mkdirSync(claudeDir, { recursive: true });
     mkdirSync(opencodeDir, { recursive: true });
@@ -7481,9 +7482,9 @@ console.log('\n12c. Materialized skill index mode');
   });
 
   try {
-    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'career-ops');
-    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'career-ops');
-    const opencodeDir = join(fixtureRoot, '.opencode', 'skills', 'career-ops');
+    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'rolewright');
+    const claudeDir = join(fixtureRoot, '.claude', 'skills', 'rolewright');
+    const opencodeDir = join(fixtureRoot, '.opencode', 'skills', 'rolewright');
     mkdirSync(canonicalDir, { recursive: true });
     mkdirSync(claudeDir, { recursive: true });
     mkdirSync(opencodeDir, { recursive: true });
@@ -7611,7 +7612,7 @@ console.log('\n12c. Materialized skill index mode');
       env: gitEnv,
     }).trim();
 
-    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'career-ops');
+    const canonicalDir = join(fixtureRoot, '.agents', 'skills', 'rolewright');
     mkdirSync(canonicalDir, { recursive: true });
     gitRun(['init']);
     const excludePath = join(fixtureRoot, '.git', 'info', 'exclude');

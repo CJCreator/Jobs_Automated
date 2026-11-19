@@ -24,7 +24,6 @@ These files contain your personal data, customizations, and work product. Update
 | `interview-prep/{company}-{role}.md` | Company-specific interview prep reports (written by `/rolewright interview-prep`) |
 | `interview-prep/sessions/*.md` | Interview sessions — real transcripts + mock sessions (sensitive: real names/companies; gitignored except scaffold). Drives `patterns` Step 1b targeting signal and `interview-redflag` analysis. Scaffold files (`README.md`, `.gitkeep`) are system-owned. |
 | `documents/*` | Your profile intake sources — master CV, LinkedIn export, diplomas, reference letters (PII — gitignored except scaffold; read locally by `intake.mjs`, see `modes/intake.md`). Scaffold files (`README.md`, `.gitkeep`) are system-owned. |
-| `data/.hired-share-state.json` | Hired Wall ask-state (asked/shared/later/never per hire) — the anti-nag memory; never committed, never read by anything but `hired-share.mjs` |
 | `data/.gitkeep` | System-owned empty directory scaffold; the updater writes only this exact file and preserves all user files in `data/` |
 | `data/offers/.gitkeep` | System-owned empty directory scaffold; the updater writes only this exact file and preserves all user files in `data/offers/` |
 | `data/parser-output/.gitkeep` | System-owned empty directory scaffold; the updater writes only this exact file and preserves all user files in `data/parser-output/` |
@@ -172,7 +171,6 @@ These files contain system logic, scripts, templates, and instructions that impr
 | `opencode.example.json` | OpenCode project config template (seed for `opencode.json`; ships Playwright MCP registration) |
 | `batch/batch-prompt.md` | Batch worker prompt |
 | `batch/batch-runner.sh` | Batch orchestrator |
-| `dashboard/*` | Go TUI dashboard |
 | `templates/*` | Base templates |
 | `fonts/*` | Self-hosted fonts |
 | `.claude/skills/*` | Skill definitions (Claude Code) |
@@ -185,7 +183,6 @@ These files contain system logic, scripts, templates, and instructions that impr
 | `DATA_CONTRACT.md` | This file |
 | `writing-samples/README.md` | System-owned onboarding documentation for the writing-samples directory |
 | `seed-fixture.mjs` / `test-fixtures/*` | Upgrade-test fixtures and seeder (system layer; fictional data, never user data) |
-| `upgrade-tests.mjs` | Dynamic upgrade regression harness (PR gate: old install applies the commit under test hermetically) |
 
 ## The Rule
 

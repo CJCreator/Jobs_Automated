@@ -52,7 +52,6 @@ The review process you'll experience here is documented end-to-end in [Agentic m
 
 **Bigger contributions:**
 - New evaluation dimensions or scoring logic
-- Dashboard TUI features (in `dashboard/`)
 - New skill modes (in `modes/`)
 - Script improvements (`.mjs` utilities)
 
@@ -155,8 +154,6 @@ To propose a source (yours or anyone's): [open a source proposal](https://github
 
 - Keep modes language-agnostic when possible (Claude handles both EN and ES)
 - Scripts should handle missing files gracefully (check `existsSync` before `readFileSync`)
-- Dashboard changes require a build (`npm run build:dashboard`) — test with real data before submitting
-- Changes to `dashboard/` or `templates/states.yml` need `go test ./...` run from `dashboard/`: CI runs it on every pull request, and it is the only check that the dashboard accepts every state in `templates/states.yml`; `node test-all.mjs` does not run it
 - Don't commit personal data (cv.md, profile.yml, applications.md, reports/)
 
 ## What we do NOT accept
@@ -181,9 +178,6 @@ node verify-pipeline.mjs     # Health check
 node cv-sync-check.mjs        # Config check
 
 # Dashboard
-npm run build:dashboard       # go build with platform-correct binary name
-npm run serve:dashboard       # launch the TUI against the repo root
-(cd dashboard && go test ./...)  # Go tests; CI runs them next to test-all
 
 # Tests
 node test-all.mjs             # Full suite — run before pushing/opening a PR

@@ -20,7 +20,7 @@ ROLEWRIGHT_DEV_LOGIN=1 ROLEWRIGHT_ALLOW_MOCK_LLM=1 npm run dev
 $env:ROLEWRIGHT_DEV_LOGIN="1"; $env:ROLEWRIGHT_ALLOW_MOCK_LLM="1"; npm run dev
 ```
 
-Open http://localhost:3100. With no `DATABASE_URL`, data is kept in an embedded database at `rolewright/.data/pglite`. To use the fake provider, choose provider `mock` with the key `mock-valid-key`. It deliberately invents figures, tools and employers so you can see the fact check stop them.
+Open http://localhost:3100. With no `DATABASE_URL`, data is kept in an embedded database at `apps/web/.data/pglite`. To use the fake provider, choose provider `mock` with the key `mock-valid-key`. It deliberately invents figures, tools and employers so you can see the fact check stop them.
 
 Both flags are refused when `NODE_ENV` is `production`, and so is a missing `AUTH_SECRET`: the sign-in module throws an error naming every problem when it first loads, and every API route repeats the check. The server process still starts, but every page and route that needs a session answers 500 and the server log names the problem. The check is skipped while `next build` runs (Next sets `NEXT_PHASE=phase-production-build`), so building needs neither the secret nor any flag. The rule lives in `src/lib/server/env-guard.mjs`.
 

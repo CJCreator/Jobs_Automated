@@ -13,7 +13,6 @@ career-ops/
 ├── .agents/                 # Open Agent Skill Standard router (.agents/skills/rolewright/SKILL.md)
 ├── batch/                   # Headless parallel batch processing engine
 ├── config/                  # Candidate configuration templates & schema definitions
-├── dashboard/               # Standalone Go terminal dashboard (Charm Bubbletea)
 ├── data/                    # User Layer: Canonical tracker, status transition ledger, pipeline inbox
 ├── docs/                    # Complete 9-pillar documentation suite
 │   ├── product/             # PRD, Vision, Personas, User Journeys, Competitive Analysis, Roadmap, Specs
@@ -145,18 +144,6 @@ Next.js 16 local-first web application:
 
 ---
 
-## 7. Terminal Dashboard (`dashboard/`)
-
-Go Bubbletea terminal application:
-
-- `main.go`: Bubbletea event loop, view router, and keybinding handlers.
-- `internal/data/`: Zero-dependency Markdown table and status ledger parser.
-- `internal/model/`: Go data structs for applications, metrics, and funnel stages.
-- `internal/ui/screens/`: Screen models for Pipeline, Report Viewer, Progress, and Stats.
-- `internal/theme/`: Lipgloss ANSI styling tokens and color schemes.
-
----
-
 ## 8. Test Suites (`tests/`)
 
 Over 1,000 automated test specifications:
@@ -190,7 +177,7 @@ Over 1,000 automated test specifications:
 │                                                        │
 │ modes/*.md (System Prompts) providers/*.mjs (Scrapers) │
 │ *.mjs (Root CLI Scripts)    lib/*.mjs (Utilities)      │
-│ dashboard/* (Go TUI)        web/* (Next.js 16 Web UI)  │
+│ web/* (legacy local UI)                              │
 │ templates/* (CV Templates)  fonts/* (OFL Fonts)        │
 │ docs/* (Documentation)      tests/* (Test Suites)      │
 └────────────────────────────────────────────────────────┘

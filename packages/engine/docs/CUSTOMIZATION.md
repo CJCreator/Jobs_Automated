@@ -86,10 +86,9 @@ It is a system-layer file (see [DATA_CONTRACT.md](../DATA_CONTRACT.md)), so an u
 A new state is a change to career-ops itself, so open an issue first (see [CONTRIBUTING.md](../CONTRIBUTING.md)). The pull request touches more than `states.yml`, because the dashboard, the web app and the funnel keep their own copies of the list:
 
 1. `templates/states.yml`: the entry (`id`, `label`, `aliases`, `description`, `dashboard_group`, plus `terminal: true` for an end state). A non-terminal state's position in the list is its lifecycle order.
-2. Go dashboard: `NormalizeStatus` and `isCanonicalStatusName` in `dashboard/internal/data/career.go`, the pipeline groups, tabs and colors in `dashboard/internal/ui/screens/pipeline.go`, and the labels in `dashboard/internal/i18n/catalog.go`.
 3. Web app: `web/src/lib/status-alias.mjs`, the status lists in `web/src/lib/format.ts`, `web/src/app/actions/registry.ts` and `web/src/lib/pipeline-navigation.mjs`, and the state lists in the assistant prompt in `web/src/app/api/assistant/route.ts`.
-4. Funnel: where the state sits in the funnel and whether it counts as active, in `funnel-stages.mjs`, `stats.mjs`, `web/src/lib/analytics-metrics.mjs` and the dashboard's funnel in `career.go`.
+4. Funnel: where the state sits in the funnel and whether it counts as active, in `funnel-stages.mjs`, `stats.mjs`, `web/src/lib/analytics-metrics.mjs`.
 5. Prose that lists the states: the Canonical States table in `AGENTS.md`, `modes/tracker.md`, `batch/batch-prompt.md` and `templates/README.md`. `git grep` for an existing label such as `Assessment` finds the rest.
 6. Tests that classify every state: `tests/analytics-state-contract.test.mjs` and `tests/dedup-tracker-status-aliases.test.mjs`.
 
-`node test-all.mjs` and `go test ./...` in `dashboard/` fail on most of the copies above when the new state is missing from them. A new alias for an existing state also needs `NormalizeStatus` and `status-alias.mjs`, which the same tests check.
+`node test-all.mjs` fails on most of the copies above when the new state is missing from them. A new alias for an existing state also needs `NormalizeStatus` and `status-alias.mjs`, which the same tests check.

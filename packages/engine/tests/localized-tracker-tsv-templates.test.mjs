@@ -45,10 +45,12 @@ const ALIASES = JSON.parse(readFileSync(join(ROOT, 'tracker-aliases.json'), 'utf
 // end state than #3702 asked for: one canonical spec instead of a sixth copy
 // that can drift. If a row template ever returns to either file, discovery
 // picks it up again and the full contract below applies to it.
+//
+// The three files #3702 catalogued (modes/ko/gonggo.md, modes/nl/vacature.md,
+// modes/tr/is-ilani.md) were removed with the non-India market sets (ADR 0013).
+// modes/oferta.md now dictates a concrete row and is the remaining tripwire.
 const KNOWN_TEMPLATE_FILES = [
-  'modes/ko/gonggo.md',
-  'modes/nl/vacature.md',
-  'modes/tr/is-ilani.md',
+  'modes/oferta.md',
 ];
 
 // Column labels a header must carry before merge-tracker can resolve a row by

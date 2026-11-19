@@ -2,7 +2,7 @@
 // both the read path and the real headed-addition/status write paths.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detectColumns, isHeaderRow, parseTrackerRow, resolveColumns, resolveTsvColumns } from '../tracker-parse.mjs';
@@ -40,7 +40,12 @@ for (const [mode, date, company, role] of markets) {
   const labels = { num: '#', date, company, role, score: 'Score', status: 'Status', pdf: 'PDF', report: 'Report', location: 'Location', via: 'Via', notes: 'Notes' };
   const shipped = fixture(labels, baseFields);
   check(`${mode}: exact shipped header reads all eight fields`, () => {
-    assert.ok(readFileSync(join(ROOT, 'modes', `${mode}.md`), 'utf8').includes(shipped[0]), 'fixture must match the shipped mode');
+    // These market mode files were removed (ADR 0013 at the repository root),
+    // but trackers written with their headers must still parse, so the parser
+    // checks below still run; the fixture-matches-file check runs only while
+    // the mode file ships.
+    const modeFile = join(ROOT, 'modes', `${mode}.md`);
+    if (existsSync(modeFile)) assert.ok(readFileSync(modeFile, 'utf8').includes(shipped[0]), 'fixture must match the shipped mode');
     assert.ok(isHeaderRow(shipped[0]));
     assertRow(parseTrackerRow(shipped[2], resolveColumns(shipped)), baseFields);
   });

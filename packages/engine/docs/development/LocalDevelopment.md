@@ -7,7 +7,7 @@ Guides developers on day-to-day coding, debugging, running tests, and adding fea
 Covers CLI development, Web UI development, provider authoring, and test execution.
 
 ## Overview
-Developing on career-ops involves working with Node.js ESM modules, Next.js components, or Go TUI models. A tight feedback loop is maintained via automated syntax checkers and fast test filtering.
+Developing on career-ops involves working with Node.js ESM modules, or Next.js components. A tight feedback loop is maintained via automated syntax checkers and fast test filtering.
 
 ## Diagrams
 

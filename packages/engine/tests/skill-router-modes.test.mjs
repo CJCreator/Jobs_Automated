@@ -16,7 +16,7 @@ import { fail, pass, ROOT } from './helpers.mjs';
 
 console.log('\nSkill router covers every documented mode (#4811)');
 
-const skill = readFileSync(join(ROOT, '.agents', 'skills', 'career-ops', 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
+const skill = readFileSync(join(ROOT, '.agents', 'skills', 'rolewright', 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
 const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf-8').replace(/\r\n/g, '\n');
 
 // The "Skill Modes" table in AGENTS.md: the Mode column starts with the
@@ -91,7 +91,7 @@ if (routedModes.length < 20) {
 const menu = skill.split('Show this menu:')[1]?.match(/```\n([\s\S]*?)\n```/)?.[1] ?? '';
 // The first word after `/rolewright` is the input, whatever arguments follow it.
 // `{JD}` is the auto-pipeline line, not a mode name, so it is checked on its own.
-const menuLines = [...menu.matchAll(/^  \/rolewright (\S+)/gm)].map((m) => m[1]);
+const menuLines = [...menu.matchAll(/^  \/career-ops (\S+)/gm)].map((m) => m[1]);
 const menuInputs = menuLines.filter((input) => input !== '{JD}');
 // Rows may carry extra spacing; the two special rows (no arguments, a pasted JD)
 // are the only ones without a backticked input and mode.
@@ -125,7 +125,7 @@ if (menuInputs.length < 20 || routeInputs.size < 20 || unparsedRows.length) {
   }
 }
 
-const oferta = menu.match(/^  \/rolewright oferta .*$/m)?.[0] ?? '';
+const oferta = menu.match(/^  \/career-ops oferta .*$/m)?.[0] ?? '';
 if (/A-H/.test(oferta) && !/A-F/.test(oferta)) {
   pass('discovery menu describes oferta as the A-H evaluation');
 } else {

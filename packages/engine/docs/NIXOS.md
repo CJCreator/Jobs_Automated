@@ -81,7 +81,6 @@ These features need tools that aren't in the dev shell. To use one, run it with 
 
 | Feature | Needs | Example |
 |---------|-------|---------|
-| Go dashboard (`dashboard/`) | `go` | `nix shell nixpkgs#go -c node build-dashboard.mjs` |
 | LaTeX CV modes (`latex`, `latex-tex`) | `tectonic` or `pdflatex` | `nix shell nixpkgs#tectonic`, then run the mode |
 
 The HTML-to-PDF CV path (`generate-pdf.mjs`) needs only the dev shell.

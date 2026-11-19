@@ -63,8 +63,8 @@ test('a checkout with every setup file still reads as ready', () => {
 test('a fresh checkout with a skill-entrypoint stub does not claim tools are ready', () => {
   const dir = checkout({ withSetup: false });
   try {
-    mkdirSync(join(dir, '.claude', 'skills', 'career-ops'), { recursive: true });
-    writeFileSync(join(dir, '.claude', 'skills', 'career-ops', 'SKILL.md'), '../../../.agents/skills/rolewright/SKILL.md\n');
+    mkdirSync(join(dir, '.claude', 'skills', 'rolewright'), { recursive: true });
+    writeFileSync(join(dir, '.claude', 'skills', 'rolewright', 'SKILL.md'), '../../../.agents/skills/rolewright/SKILL.md\n');
     const { status, out } = runDoctor(dir);
     assert.equal(status, 0, out);
     assert.match(out, /Setup is not finished \(4 files missing:/);

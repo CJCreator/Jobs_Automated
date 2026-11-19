@@ -79,7 +79,6 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run star` | `match-star.mjs` | Match a behavioural question to your best STAR story (zero-LLM) |
 | `npm run archive` | `archive-posting.mjs` | Save a live job posting as PDF before it disappears |
 | `npm run prepare:application` | `prepare-application.mjs` | Print an ATS prefill summary (read-only, never POSTs) |
-| `npm run build:dashboard` | `build-dashboard.mjs` | Build the Go TUI dashboard binary cross-platform |
 | `npm run manifesto` | `manifesto.mjs` | Print the manifesto couplet and open the signing page in a browser |
 | `node upgrade-tests.mjs --pr-gate` | `upgrade-tests.mjs` | Upgrade an install seeded from the newest old release to this commit and prove user data survived (CI gate; `--canary` proves the gate can fail) |
 | `node linkedin-join.mjs` | `linkedin-join.mjs` | Warm-intro finder — join a LinkedIn `Connections.csv` export against tracker + `portals.yml` companies to answer "do I know anyone here?" (offline, zero-token, read-only; see [LINKEDIN_JOIN.md](LINKEDIN_JOIN.md)) |
@@ -1680,20 +1679,6 @@ open the apply URL, and submit yourself. See
 
 ```bash
 npm run prepare:application -- --url https://boards.greenhouse.io/acme/jobs/123
-```
-
----
-
-## build:dashboard
-
-Cross-platform build wrapper for the Go TUI dashboard: picks the
-platform-correct output name (`career-dashboard.exe` on Windows, else
-`career-dashboard`), since a bare `go build -o` writes an extension-less
-binary on Windows. Requires Go 1.26+.
-
-```bash
-npm run build:dashboard
-npm run serve:dashboard    # or run the TUI directly without building
 ```
 
 ---

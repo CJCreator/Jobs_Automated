@@ -4,7 +4,7 @@
 Provides end-to-end instructions for installing and configuring career-ops on a local machine.
 
 ## Scope
-Covers prerequisites, Node.js installation, Playwright browser setup, Go TUI compilation, and initial configuration.
+Covers prerequisites, Node.js installation, Playwright browser setup, and initial configuration.
 
 ## Overview
 career-ops runs locally on your workstation. It requires Node.js 22.13+, Playwright Chromium (for PDF generation and web extraction), and optionally Go (for the terminal dashboard).
@@ -26,7 +26,6 @@ flowchart TD
 ### Prerequisites
 - **Node.js**: Version `^22.13.0 || >=23.4.0`.
 - **Git**: Required for updater tracking.
-- **Go (Optional)**: Version 1.22+ if compiling the terminal TUI in `dashboard/`.
 
 ### Installation Steps
 ```bash

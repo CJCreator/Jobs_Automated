@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const MODES = join(ROOT, 'modes');
 const README = readFileSync(join(MODES, 'README.md'), 'utf-8').replace(/\r\n/g, '\n');
-const SKILL = readFileSync(join(ROOT, '.agents', 'skills', 'career-ops', 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
+const SKILL = readFileSync(join(ROOT, '.agents', 'skills', 'rolewright', 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
 
 const catalog = README.split('## Mode catalog')[1]?.split('\n## ')[0] ?? '';
 /** Catalog rows as [file, mode cell]. */

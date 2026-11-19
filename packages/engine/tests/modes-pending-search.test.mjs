@@ -23,11 +23,11 @@ const pipelineModes = [
 ];
 
 test('the pipeline mode and its translations exist', () => {
-  assert.ok(pipelineModes.length >= 19, `found ${pipelineModes.length}`);
+  // English + modes/hi only: non-India market sets were removed (ADR 0013).
+  assert.ok(pipelineModes.includes('pipeline.md') && pipelineModes.includes(join('hi', 'pipeline.md')), `found ${pipelineModes.join(', ')}`);
 });
 
 for (const rel of pipelineModes) {
-  if (rel === join('sg', 'pipeline.md')) continue;
   test(`modes/${rel} finds pending items with the bounded search`, () => {
     assert.ok(readFileSync(join(MODES, rel), 'utf-8').includes(PENDING_SEARCH));
   });

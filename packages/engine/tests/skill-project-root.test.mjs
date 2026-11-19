@@ -17,7 +17,7 @@ const entrypoints = [
   'openai-directory',
   'cursor-directory',
   'antigravity-directory',
-].map(dir => join(dir, 'skills', 'career-ops', 'SKILL.md'));
+].map(dir => join(dir, 'skills', 'rolewright', 'SKILL.md'));
 
 function findProjectRoot(skillPath) {
   let current = dirname(skillPath);
@@ -104,8 +104,8 @@ if (failures.length === 0) {
 }
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'career-ops-materialized-symlink-'));
-const fixtureTarget = join(fixtureRoot, '.agents', 'skills', 'career-ops', 'SKILL.md');
-const fixturePointer = join(fixtureRoot, '.claude', 'skills', 'career-ops', 'SKILL.md');
+const fixtureTarget = join(fixtureRoot, '.agents', 'skills', 'rolewright', 'SKILL.md');
+const fixturePointer = join(fixtureRoot, '.claude', 'skills', 'rolewright', 'SKILL.md');
 const fixtureTargetRelative = '.agents/skills/rolewright/SKILL.md';
 const fixturePointerRelative = '.claude/skills/rolewright/SKILL.md';
 const pointerTarget = '../../../.agents/skills/rolewright/SKILL.md';

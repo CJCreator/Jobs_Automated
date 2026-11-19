@@ -14,10 +14,9 @@ export const FROZEN_EVALUATION_MODES = new Set([
 
 // A known file that stops being discovered (renamed, or its A) block dropped)
 // must fail instead of silently leaving the check. New files are also discovered.
+// Only modes/hi remains: non-India market sets were removed (ADR 0013).
 export const KNOWN_EVALUATION_MODES = [
-  'ar/fursah.md', 'da/oferta.md', 'de/angebot.md', 'es/oferta.md', 'fr/offre.md', 'hi/naukri.md',
-  'id/lowongan.md', 'it/annuncio.md', 'ja/kyujin.md', 'ko/gonggo.md', 'nl/vacature.md', 'pl/oferta.md',
-  'pt/oferta.md', 'ru/oferta.md', 'tr/is-ilani.md', 'ua/oferta.md', 'zh-TW/oferta.md', 'zh/oferta.md',
+  'hi/naukri.md',
 ];
 
 const REQUIRED_HEADINGS = ['A)', 'B)', 'C)', 'D)', 'E)', 'F)', 'G)', 'Risk Summary', 'H)'];

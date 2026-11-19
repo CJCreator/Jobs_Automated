@@ -20,10 +20,8 @@ const requiredGuardrails = [
 // are every modes/<dir>/ that ships a _shared.md, so a new market is graded the
 // day it lands. This hand-kept list used to BE the census, and it had already
 // drifted: modes/vi (#4727) shipped a _shared.md this file never opened.
-const expectedLocalizedModes = [
-  'ar', 'da', 'de', 'es', 'fr', 'hi', 'id', 'it', 'ja',
-  'ko', 'nl', 'pl', 'pt', 'ru', 'sg', 'tr', 'ua', 'vi', 'zh-TW', 'zh',
-];
+// Only modes/hi remains: non-India market sets were removed (ADR 0013).
+const expectedLocalizedModes = ['hi'];
 
 const modeDirs = readdirSync(join(ROOT, 'modes'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -105,7 +103,7 @@ if (sourceNames.length < 6) {
 // #2395: most market sets ship no cover.md, email.md or contacto.md, so their
 // never-send rules reach a localized user only through the English file. The
 // router has to say so, or the fallback holds by accident.
-const router = readFileSync(join(ROOT, '.agents', 'skills', 'career-ops', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
+const router = readFileSync(join(ROOT, '.agents', 'skills', 'rolewright', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
 if (/When it provides no file for the selected mode[^\n]*load the English `modes\/\{mode\}\.md`/.test(router)) {
   pass('router falls back to the English mode file when a market set has none');
 } else {

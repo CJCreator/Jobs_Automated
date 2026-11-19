@@ -244,11 +244,9 @@ test('the letter body is not a source for itself', () => {
 
 test('cover mode tells the agent to pass those answers through as sources', () => {
   const english = readFileSync(join(ROOT, 'modes/cover.md'), 'utf-8');
-  const turkish = readFileSync(join(ROOT, 'modes/tr/cover.md'), 'utf-8');
   assert.match(english, /user_inputs/);
-  assert.match(turkish, /user_inputs/);
   assert.match(english, /verbatim/);
   assert.match(english, /do not\s+add\s+(?:a\s+|that\s+)?plan\s+to\s+cv\.md/i);
   assert.match(english, /Step 6 answer D, verbatim/);
-  assert.match(turkish, /Adım 6 D yanıtı, olduğu gibi/);
+  // modes/tr/cover.md was also checked here; non-India market sets were removed (ADR 0013).
 });

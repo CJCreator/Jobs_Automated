@@ -44,7 +44,6 @@ flowchart TD
 
     subgraph PresentationLayer ["User Presentation Surfaces"]
         WebUI["web/ (Next.js 16 App Router on 127.0.0.1)"]
-        GoTUI["dashboard/ (Charm Bubbletea Go TUI)"]
         CLIs["AI Coding CLIs (Claude, Codex, Antigravity, OpenCode)"]
     end
 
@@ -58,7 +57,6 @@ flowchart TD
     TrackerManager -->|Append Transition Event| Ledger
     TrackerManager -->|Auto-Rebuild on Hash Change| SQLiteDB
     SQLiteDB --> WebUI
-    Tracker --> GoTUI
     CLIs --> CoreEngine
 ```
 
@@ -91,7 +89,7 @@ The fundamental organizing boundary in career-ops is the strict separation betwe
 │ - Agent Prompts: modes/_shared.md, modes/oferta.md, modes/apply.md     │
 │ - Discovery Core: providers/*.mjs, scan.mjs, scan-ats-full.mjs         │
 │ - Deterministic Tools: verify-cv-facts.mjs, generate-pdf.mjs, tracker  │
-│ - Interfaces: dashboard/* (Go TUI), web/* (Next.js 16 Web UI)          │
+│ - Interfaces: web/* (legacy Next.js local UI)                        │
 │ - Lifecycle: update-system.mjs, lib/update-manifest.mjs                │
 └────────────────────────────────────────────────────────────────────────┘
 ```

@@ -54,7 +54,6 @@ flowchart TD
 
     subgraph Interfaces ["User Presentation Surfaces"]
         WebUI["web/ (Next.js 16 App Router on 127.0.0.1)"]
-        GoTUI["dashboard/ (Charm Bubbletea Go TUI)"]
         CLIs["AI Coding CLIs (Claude, Codex, Antigravity, OpenCode)"]
     end
 
@@ -68,14 +67,13 @@ flowchart TD
     TrackerManager -->|Append Transition Event| Ledger
     TrackerManager -->|Auto-Rebuild on Hash Change| SQLiteDB
     SQLiteDB --> WebUI
-    Tracker --> GoTUI
     CLIs --> CoreEngine
     PathResolver --> StorageLayer
 ```
 
 ### 2.1 The Two-Layer Data Contract
 The system strictly enforces the boundary defined in `DATA_CONTRACT.md`:
-- **System Layer (Auto-Updatable)**: Contains the engine code, scrapers, prompts, and templates (`modes/*`, `*.mjs`, `lib/*`, `providers/*`, `dashboard/*`, `web/*`, `templates/*`). Versioned and updated via `update-system.mjs`.
+- **System Layer (Auto-Updatable)**: Contains the engine code, scrapers, prompts, and templates (`modes/*`, `*.mjs`, `lib/*`, `providers/*`, `web/*`, `templates/*`). Versioned and updated via `update-system.mjs`.
 - **User Layer (Never Auto-Updated)**: Contains candidate personal data (`cv.md`, `config/profile.yml`, `modes/_profile.md`, `modes/_custom.md`, `data/*`, `reports/*`, `output/*`, `interview-prep/*`). The updater is strictly forbidden from modifying these files, a constraint continuously asserted by `updater-migration-tests.mjs`.
 
 ### 2.2 Path Resolution Precedence Engine (`path-resolver.mjs`)
@@ -247,6 +245,6 @@ flowchart TD
 ```
 
 1. **Monorepo Structure**: Transition flat root scripts into clean workspace packages (`packages/core`, `packages/scanners`, `packages/renderers`, `packages/cli`) with backward-compatible root shims.
-2. **Shared TypeScript Domain Package (`@career-ops/types`)**: Centralize domain models (`Job`, `Application`, `Report`, `StatusLog`) across Web, CLI, and Go TUI.
+2. **Shared TypeScript Domain Package (`@career-ops/types`)**: Centralize domain models (`Job`, `Application`, `Report`, `StatusLog`) across Web and CLI.
 3. **Autofill Companion Browser Extension**: Provide an open-source, local-first browser extension that communicates with the local Next.js API to prefill ATS application forms.
 4. **Local Audio Mock Interviewer**: WebRTC/Whisper audio agent that quizzes candidates on their actual STAR stories and JD requirements.
