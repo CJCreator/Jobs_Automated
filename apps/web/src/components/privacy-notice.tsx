@@ -48,6 +48,17 @@ export function PrivacyNotice() {
         <p className="max-w-[65ch]">{t.sent}</p>
       </section>
 
+      <section aria-labelledby="recipients-title" className="space-y-2">
+        <h2 id="recipients-title" className={h2}>
+          {t.recipientsTitle}
+        </h2>
+        <ul className="max-w-[65ch] list-disc space-y-1 ps-5">
+          {t.recipients.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </section>
+
       <section aria-labelledby="retention-title" className="space-y-2">
         <h2 id="retention-title" className={h2}>
           {t.retentionTitle}

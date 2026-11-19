@@ -136,9 +136,6 @@ export const en = {
       uploadTitle: "Upload your resume",
       uploadHelp: "PDF only, up to 5 MB. Uploading again re-reads your resume. Facts you already confirmed stay confirmed when the new resume still says the same thing. Additional facts you added and the list of claims you can't confirm are kept.",
       fileLabel: "Resume (PDF)",
-      consent: (provider: string) =>
-        `I understand my resume text will be sent to ${provider}, the AI provider I chose, which may process it outside India.`,
-      consentError: "Tick the box to continue.",
       providerFallback: "your AI provider",
       uploadButton: "Upload and read resume",
       working: "Reading your resume. This can take up to a minute. Please keep this page open.",
@@ -339,12 +336,20 @@ export const en = {
       retentionTitle: "How long we keep it",
       retention: "If you do not use Rolewright for 12 months, your account and all the data in it are deleted.",
       deleteTitle: "Delete my account and data",
-      deleteBody: "This removes your account, resume, facts, job descriptions and suggestions. It cannot be undone. Your AI key is never saved, so there is nothing to remove.",
+      deleteBody: "This removes your account, resume, facts, job descriptions and suggestions. It cannot be undone. Your consent record, which shows when you agreed to this notice, is deleted with the account. Your AI key is never saved, so there is nothing to remove.",
       deleteLabel: "Type DELETE to confirm",
       deleteWord: "DELETE",
       deleteButton: "Delete my account and data",
       deleting: "Deleting your account",
       deleteFailed: "We could not delete your account. Try again.",
+      // P0-12
+      recipientsTitle: "Who else handles your data",
+      recipients: [
+        "Resend: gets your email address, to send you the sign-in link. This happens only if you sign in by email.",
+        "Google: if you sign in with Google, Google confirms who you are and shares your name, email and picture with Rolewright.",
+        "Google Cloud (Mumbai region): hosts Rolewright and stores everything listed under \"What we store\".",
+        "Your AI provider: gets the text described under \"What goes to your AI provider\".",
+      ],
     },
   },
   errors: {
