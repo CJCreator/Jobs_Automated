@@ -41,3 +41,10 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-10 review | A singly confirmed model item is unconfirmed again on every re-upload | Per brief; revisit on feedback |
 | P0-10 review | `uploadHelp` should mention kept confirmations | P0-3b |
 | P0-10 review | One manual run with a real model key to see rewordings flagged | P1-4 |
+| P0-3a review | Merge P0-3b right after P0-5: the public notice says the key is stored in the browser | Merge order |
+| P0-3a review | Align the privacy h1 with "Privacy notice"; grievance vars in the README table | P0-3b |
+| P0-3a review | prod-smoke: scope the privacy-link selector; `/privacy` signed-out 200 with nonce CSP; production has grievance contact set | P0-9a |
+| P0-3a review | Signed-out axe, target-size, skip-link and 360 px checks on `/privacy` | P0-9a or P0-11 |
+| P0-3a review | Retention sentence is public: scheduler must run before real users see it; lawyer review of the notice (ADR 0004) | Phase gate |
+| P0-3a review | Briefs touching landing, sign-in or `/app` pages must list `npm run test:e2e` | Remaining briefs (P0-2, P0-3b, P0-9a) |
+| P0-3a review | Consent record imports `NOTICE_VERSION` from `notice.mjs` | P0-2 |
