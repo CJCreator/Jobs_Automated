@@ -102,7 +102,10 @@ test('the manifest has every field the marketplace requires', () => {
   const { length } = manifest.description ?? '';
   assert.ok(length >= 120 && length <= 160, `description is ${length} characters; the marketplace recommends 120 to 160`);
   assert.ok(manifest.author?.name, 'author.name is required');
-  for (const key of ['homepage', 'repository']) assert.match(manifest[key] ?? '', /^https:\/\//, `${key} must be an https URL`);
+  assert.match(manifest.repository ?? '', /^https:\/\//, 'repository must be an https URL');
+  // homepage pointed at the upstream site and was removed when the plugin was
+  // renamed rolewright; when present it must still be https.
+  if (manifest.homepage !== undefined) assert.match(manifest.homepage, /^https:\/\//, 'homepage must be an https URL');
   if (manifest.author.url !== undefined) assert.match(manifest.author.url, /^https:\/\//, 'author.url must be an https URL');
   assert.equal(manifest.license, 'MIT');
   for (const k of manifest.keywords ?? []) assert.equal(k, k.toLowerCase(), `keyword "${k}" must be lowercase`);
@@ -162,19 +165,10 @@ test('every package launcher is pinned to an exact version, and career-ops to th
   assert.ok(careerOps >= 3, 'the skill (twice) and the README name the pinned init command');
 });
 
-test('every line that carries the release version is marked for release-please', () => {
-  const config = JSON.parse(read('release-please-config.json'));
-  const extra = config.packages['.']['extra-files'];
-  const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
-  assert.ok(extra.some((f) => f.path === 'antigravity-directory/plugin.json' && f.jsonpath === '$.version'),
-    'release-please-config.json does not bump antigravity-directory/plugin.json');
-  for (const rel of ['antigravity-directory/skills/rolewright/SKILL.md', 'antigravity-directory/README.md']) {
-    assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
-    for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
-      assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);
-    }
-  }
-});
+// release-please was removed when this engine was forked into Rolewright (see
+// docs/adr/ at the repository root), so the case that checked its
+// release-please-config.json bump list is gone with it. The version checks
+// above still pin every manifest to package.json.
 
 test('the README says what the plugin runs, sends and fetches, for Antigravity', () => {
   assert.ok(existsSync(join(DIR, 'README.md')), 'the marketplace shows README.md before install');

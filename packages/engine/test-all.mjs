@@ -4757,33 +4757,7 @@ if (
   fail('_shared.md missing canonical company-type compensation reliability framework');
 }
 
-const zhShared = readFile('modes/zh/_shared.md');
-const zhOferta = readFile('modes/zh/oferta.md');
-if (
-  zhShared.includes('## 公司类型与薪资可信度') &&
-  zhShared.includes('成长期创业公司 / 已融资创业公司') &&
-  zhShared.includes('早期初创企业 / 未盈利创业公司') &&
-  zhShared.includes('开源社区 / 教育社区') &&
-  zhShared.includes('实际合同主体 / 用工主体') &&
-  zhShared.includes('薪资可信度默认使用保守的正式等级：`低`') &&
-  zhShared.includes('薪资分析压缩为两行：公司类型和薪资可信度') &&
-  zhShared.includes('浮动 / 条件性现金组成') &&
-  zhOferta.includes('公司类型分类（必填）') &&
-  zhOferta.includes('薪资可信度（必填）') &&
-  zhOferta.includes('没有任何公开薪资数字，也没有“综合薪资”“底薪+提成”“含绩效”“含全勤”“最高可达”等模糊补偿表述') &&
-  zhOferta.includes('JD 未提供薪资 / 补偿信息；跳过薪资组成拆分、详细市场数据表和 HR 核验问题') &&
-  zhOferta.includes('出现“综合薪资”“底薪+提成”“含绩效”“含全勤”“最高可达”“上不封顶”等模糊补偿表述时，进入完整薪资可信度路径') &&
-  zhOferta.includes('公开薪资区间') &&
-  zhOferta.includes('可能的合同固定 base') &&
-  zhOferta.includes('浮动 / 条件性现金组成') &&
-  zhOferta.includes('非现金福利') &&
-  zhOferta.includes('当 JD 明确写出薪资数字，或出现模糊补偿表述时，必须给出 3-6 个 HR 核验问题') &&
-  zhOferta.includes('不要把招聘广告薪资当作真实到手')
-) {
-  pass('Chinese modes include company-type compensation reliability checks');
-} else {
-  fail('Chinese modes missing company-type compensation reliability checks');
-}
+// The Chinese market modes were removed (ADR 0013 at the repository root).
 
 // ── Localized evaluation-mode structural parity (#3669, #3828) ──
 // Localized evaluation modes were frozen at a pre-Block-G shape: no Block G,
@@ -7139,7 +7113,7 @@ if (
   /`codex`/.test(canonicalContent ?? '') &&
   /`codex exec/.test(canonicalContent ?? '') &&
   /prompt/i.test(canonicalContent ?? '') &&
-  /\/career-ops/.test(canonicalContent ?? '')
+  /\/rolewright/.test(canonicalContent ?? '')
 ) {
   pass('career-ops skill router documents the Codex invocation model');
 } else {
@@ -19711,17 +19685,17 @@ try {
   mkdirSync(configDir, { recursive: true });
   mkdirSync(modesDir, { recursive: true });
 
-  // 1. Create a profile.yml setting modes_dir to modes/tr
+  // 1. Create a profile.yml setting modes_dir to modes/hi
   writeFileSync(
     join(configDir, 'profile.yml'),
-    '\uFEFFlanguage:\n  modes_dir: modes/tr\n', // Starts with a UTF-8 BOM
+    '\uFEFFlanguage:\n  modes_dir: modes/hi\n', // Starts with a UTF-8 BOM
     'utf-8'
   );
 
-  // 2. Create localized dummy files in modes/tr/
-  // is-ilani.md contains Turkish/Czech characters: Türkiye, Čeština
+  // 2. Create localized dummy files in modes/hi/
+  // naukri.md contains Turkish/Czech characters: Türkiye, Čeština
   writeFileSync(join(modesDir, '_shared.md'), 'Shared Turkish context', 'utf-8');
-  writeFileSync(join(modesDir, 'is-ilani.md'), 'Türkiye Čeština logic', 'utf-8');
+  writeFileSync(join(modesDir, 'naukri.md'), 'Türkiye Čeština logic', 'utf-8');
 
   // 3. Create other required files
   writeFileSync(join(geminiTmp, 'cv.md'), 'My CV', 'utf-8');
@@ -19758,10 +19732,10 @@ try {
     fail('Gemini evaluator failed to start file loading phase');
   }
 
-  if (stdout.includes('modes/tr/_shared.md not found') || stdout.includes('modes/tr/is-ilani.md not found')) {
+  if (stdout.includes('modes/hi/_shared.md not found') || stdout.includes('modes/hi/naukri.md not found')) {
     fail('Gemini evaluator failed to resolve custom modes directory or filenames');
   } else {
-    pass('Gemini evaluator resolved custom modes directory (modes/tr/) and localized filenames (is-ilani.md)');
+    pass('Gemini evaluator resolved custom modes directory (modes/hi/) and localized filenames (naukri.md)');
   }
 
   if (stderr.includes('API_KEY') || stderr.includes('API key')) {

@@ -104,8 +104,9 @@ if (!existsSync(join(ROOT, 'web', 'src'))) {
   const skeleton = modeFiles.map(f => [f, readFile(f)])
     .filter(([, t]) => t.includes('## H)') && t.includes('## Risk Summary'));
   const names = skeleton.map(([f]) => f);
-  if (names.length < 8 || !names.includes('modes/oferta.md') || !names.includes('modes/tr/is-ilani.md')) {
-    fail(`verdict-lead walk found ${names.length} full-skeleton modes (${names.join(', ')}) — expected ≥8 incl. modes/oferta.md and modes/tr/is-ilani.md; the check would be blind`);
+  // Non-India market modes were removed (ADR 0013 at the repository root).
+  if (names.length < 2 || !names.includes('modes/oferta.md') || !names.includes('modes/hi/naukri.md')) {
+    fail(`verdict-lead walk found ${names.length} full-skeleton modes (${names.join(', ')}) — expected ≥2 incl. modes/oferta.md and modes/hi/naukri.md; the check would be blind`);
   } else {
     const gaps = [];
     for (const [f, t] of skeleton) {

@@ -29,13 +29,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { USER_PATHS } from '../update-system.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const WORKFLOW = '.github/workflows/no-user-data.yml';
+// In the monorepo the engine lives in packages/engine and .github/ stayed at the
+// repository root, so read the real workflow there when the engine has none.
+const GITHUB_BASE = existsSync(join(ROOT, '.github')) ? ROOT : join(ROOT, '..', '..');
 
 /**
  * Build the workflow's own "is this file blocked?" decision.
@@ -49,7 +52,7 @@ const WORKFLOW = '.github/workflows/no-user-data.yml';
  * @returns {(f: string) => boolean} True when the guard would fail the PR over `f`.
  */
 function loadGuard() {
-  const yaml = readFileSync(join(ROOT, WORKFLOW), 'utf-8');
+  const yaml = readFileSync(join(GITHUB_BASE, WORKFLOW), 'utf-8');
   const start = yaml.indexOf('const USER_PATHS = [');
   const end = yaml.indexOf('const bad = files');
   assert.ok(start !== -1, `${WORKFLOW} has no USER_PATHS declaration`);

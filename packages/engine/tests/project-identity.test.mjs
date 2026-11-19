@@ -31,12 +31,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (p) => readFileSync(join(ROOT, p), 'utf-8');
+// .github/ stayed at the repository root when the engine moved to
+// packages/engine; read the real one there when the engine has none.
+const readGithub = (p) => readFileSync(
+  join(existsSync(join(ROOT, '.github')) ? ROOT : join(ROOT, '..', '..'), '.github', p), 'utf-8');
 
 test('every short blurb describes the same project in the same words', () => {
   const pkg = JSON.parse(read('package.json'));
@@ -47,7 +51,7 @@ test('every short blurb describes the same project in the same words', () => {
   const blurbs = [
     ['package.json', pkg.description],
     ['.claude-plugin/plugin.json', JSON.parse(read('.claude-plugin/plugin.json')).description],
-    ['.github/plugin/plugin.json', JSON.parse(read('.github/plugin/plugin.json')).description],
+    ['.github/plugin/plugin.json', JSON.parse(readGithub('plugin/plugin.json')).description],
     // claude-directory/.claude-plugin/plugin.json is left out on purpose: its description is the
     // Claude plugin directory listing, worded for that page (tests/claude-directory-plugin.test.mjs).
     ['.claude-plugin/marketplace.json metadata', marketplace.metadata?.description],
@@ -69,33 +73,6 @@ test('every short blurb describes the same project in the same words', () => {
   }
 });
 
-test("CITATION.cff's url is the project's site, not a personal one", () => {
-  const pkg = JSON.parse(read('package.json'));
-  const citation = read('CITATION.cff');
-
-  const url = citation.match(/^url:\s*"([^"]+)"/m)?.[1];
-  assert.ok(url, 'CITATION.cff must carry a `url:` field');
-  assert.equal(
-    url,
-    pkg.homepage,
-    "CITATION.cff `url` is what Zenodo shows as the software's website: " +
-    'it must be the same place package.json calls home',
-  );
-});
-
-test('the CITATION.cff repository-code field points at this repository', () => {
-  const pkg = JSON.parse(read('package.json'));
-  const citation = read('CITATION.cff');
-
-  const repoCode = citation.match(/^repository-code:\s*"([^"]+)"/m)?.[1];
-  assert.ok(repoCode, 'CITATION.cff must carry a `repository-code:` field');
-
-  // package.json's repository.url may carry a git+ prefix or a .git suffix;
-  // compare the owner/name that both agree on rather than the raw strings.
-  const slug = (u) => u.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1];
-  assert.equal(
-    slug(repoCode),
-    slug(pkg.repository?.url ?? ''),
-    'CITATION.cff repository-code and package.json repository must name the same repo',
-  );
-});
+// CITATION.cff was deleted with the rest of the upstream community files when
+// this engine was forked into Rolewright (see docs/adr/ at the repository root),
+// so the two cases that compared its url and repository-code are gone with it.

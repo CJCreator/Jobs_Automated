@@ -93,9 +93,12 @@ test('the listing text stays inside the directory limits', () => {
   for (const p of ui.defaultPrompt) assert.ok(p.length <= 128, `defaultPrompt over 128 characters: ${p}`);
   assert.equal(new Set(ui.defaultPrompt).size, ui.defaultPrompt.length, 'defaultPrompt entries must not repeat');
 
-  for (const key of ['websiteURL', 'supportURL', 'privacyPolicyURL', 'termsOfServiceURL']) {
+  for (const key of ['supportURL', 'privacyPolicyURL', 'termsOfServiceURL']) {
     assert.match(ui[key] ?? '', /^https:\/\//, `${key} must be an https URL`);
   }
+  // websiteURL pointed at the upstream site and was removed when the plugin was
+  // renamed rolewright; when present it must still be https.
+  if (ui.websiteURL !== undefined) assert.match(ui.websiteURL, /^https:\/\//, 'websiteURL must be an https URL');
   // The privacy link opens the README section that says what leaves the machine.
   assert.ok(ui.privacyPolicyURL.endsWith('/openai-directory/README.md#what-it-runs-sends-and-fetches'));
   assert.match(read('openai-directory/README.md'), /^## What it runs, sends and fetches$/m, 'the privacy anchor is gone from the README');
@@ -147,19 +150,10 @@ test('every package launcher in the files the plugin runs is pinned, and career-
   assert.ok(careerOps >= 3, 'the skill (twice) and the README name the pinned init command');
 });
 
-test('every line that carries the release version is marked for release-please', () => {
-  const config = JSON.parse(read('release-please-config.json'));
-  const extra = config.packages['.']['extra-files'];
-  const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
-  assert.ok(extra.some((f) => f.path === 'openai-directory/plugin.json' && f.jsonpath === '$.version'),
-    'release-please-config.json does not bump openai-directory/plugin.json');
-  for (const rel of ['openai-directory/skills/rolewright/SKILL.md', 'openai-directory/README.md']) {
-    assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
-    for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
-      assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);
-    }
-  }
-});
+// release-please was removed when this engine was forked into Rolewright (see
+// docs/adr/ at the repository root), so the case that checked its
+// release-please-config.json bump list is gone with it. The version checks
+// above still pin every manifest to package.json.
 
 test('the README is long enough and says what the plugin runs, sends and fetches', () => {
   const readme = read('openai-directory/README.md');

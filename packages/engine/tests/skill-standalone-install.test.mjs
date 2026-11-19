@@ -18,9 +18,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SOURCE = join(ROOT, '.agents', 'skills', 'career-ops', 'SKILL.md');
+const SOURCE = join(ROOT, '.agents', 'skills', 'rolewright', 'SKILL.md');
 const ENTRYPOINTS = ['.agents', '.antigravitycli', '.claude', '.grok', '.kimi', '.opencode', '.qwen']
-  .map((dir) => join(ROOT, dir, 'skills', 'career-ops', 'SKILL.md'));
+  .map((dir) => join(ROOT, dir, 'skills', 'rolewright', 'SKILL.md'));
 const HEADING = '### Skill installed without career-ops';
 
 function findProjectRoot(skillPath) {
@@ -43,7 +43,7 @@ function standaloneBranch(text) {
 test('a catalog-style install has only SKILL.md and no PROJECT_ROOT', () => {
   const dir = mkdtempSync(join(tmpdir(), 'co-skill-only-'));
   try {
-    const skillDir = join(dir, '.claude', 'skills', 'career-ops');
+    const skillDir = join(dir, '.claude', 'skills', 'rolewright');
     mkdirSync(skillDir, { recursive: true });
     copyFileSync(SOURCE, join(skillDir, 'SKILL.md'));
     assert.deepEqual(readdirSync(skillDir), ['SKILL.md']);
@@ -67,10 +67,10 @@ test('the standalone branch looks for an install, asks before init and resumes t
   // Pinned to the release (the Claude plugin directory blocks an unpinned npx); release-please bumps it.
   const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   assert.ok(branch.includes(`npx @santifer/career-ops@${version} init`), `standalone branch does not name the init command pinned to ${version}`);
-  assert.doesNotMatch(branch, /npx @santifer\/rolewright init/, 'standalone branch has an unpinned init command');
+  assert.doesNotMatch(branch, /npx @santifer\/career-ops init/, 'standalone branch has an unpinned init command');
   assert.match(branch, /Ask before running it/, 'standalone branch must ask before installing');
   assert.match(branch, /original request/, 'standalone branch must pick the user\'s request back up');
-  assert.match(branch, /https:\/\/github\.com\/career-ops-hq\/rolewright(?![\w-])/, 'standalone branch must link the canonical repo');
+  assert.match(branch, /https:\/\/github\.com\/career-ops-hq\/career-ops(?![\w-])/, 'standalone branch must link the canonical repo');
   assert.doesNotMatch(branch, /github\.com\/santifer\//, 'standalone branch links the old repo path');
 });
 

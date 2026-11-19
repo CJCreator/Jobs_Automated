@@ -46,7 +46,12 @@ test('the manifest names the project, its license and the release version', () =
   // Listing fields. The portal reads the icon only on the first save or submission, so it must be declared, not just present.
   assert.equal(manifest.displayName, 'career-ops');
   assert.equal(join(DIR, manifest.icon ?? ''), join(DIR, '.claude-plugin', 'icon.png'), 'plugin.json must point `icon` at .claude-plugin/icon.png');
-  for (const key of ['homepage', 'documentationUrl', 'supportUrl', 'privacyPolicyUrl']) assert.match(manifest[key] ?? '', /^https:\/\//, `${key} must be an https URL`);
+  for (const key of ['supportUrl', 'privacyPolicyUrl']) assert.match(manifest[key] ?? '', /^https:\/\//, `${key} must be an https URL`);
+  // homepage and documentationUrl pointed at the upstream site and were removed when the
+  // plugin was renamed rolewright; when present they must still be https.
+  for (const key of ['homepage', 'documentationUrl']) {
+    if (manifest[key] !== undefined) assert.match(manifest[key], /^https:\/\//, `${key} must be an https URL`);
+  }
 });
 
 test('every package launcher is pinned to an exact version, and career-ops to this release', () => {
@@ -64,18 +69,10 @@ test('every package launcher is pinned to an exact version, and career-ops to th
   assert.ok(careerOps >= 3, 'the skill (twice) and the README name the pinned init command');
 });
 
-test('every line that carries the release version is marked for release-please', () => {
-  const config = JSON.parse(read('release-please-config.json'));
-  const extra = config.packages['.']['extra-files'];
-  const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
-  assert.ok(extra.some((f) => f.path === 'claude-directory/.claude-plugin/plugin.json' && f.jsonpath === '$.version'));
-  for (const rel of ['claude-directory/skills/rolewright/SKILL.md', 'claude-directory/README.md', '.agents/skills/rolewright/SKILL.md']) {
-    assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
-    for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
-      assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);
-    }
-  }
-});
+// release-please was removed when this engine was forked into Rolewright (see
+// docs/adr/ at the repository root), so the case that checked its
+// release-please-config.json bump list is gone with it. The version checks
+// above still pin every manifest to package.json.
 
 test('the folder stays inside the limits that would hold a version for a reviewer', () => {
   assert.ok(files.length <= 512, `${files.length} files; the directory holds more than 512`);

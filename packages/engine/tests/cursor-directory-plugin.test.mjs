@@ -72,7 +72,10 @@ test('plugin.json is valid and names the project, its license and the release ve
   assert.equal(manifest.version, version, 'cursor-directory/.cursor-plugin/plugin.json version must match package.json');
   assert.equal(manifest.license, 'MIT');
   assert.ok(manifest.description && manifest.author?.name, 'the manifest needs a description and an author');
-  for (const key of ['homepage', 'repository']) assert.match(manifest[key] ?? '', /^https:\/\//, `${key} must be an https URL`);
+  assert.match(manifest.repository ?? '', /^https:\/\//, 'repository must be an https URL');
+  // homepage pointed at the upstream site and was removed when the plugin was
+  // renamed rolewright; when present it must still be https.
+  if (manifest.homepage !== undefined) assert.match(manifest.homepage, /^https:\/\//, 'homepage must be an https URL');
 });
 
 test('every path in the manifest is relative, without "..", and resolves inside the plugin', () => {
@@ -136,19 +139,10 @@ test('every package launcher is pinned to an exact version, and career-ops to th
   assert.ok(careerOps >= 3, 'the skill (twice) and the README name the pinned init command');
 });
 
-test('every line that carries the release version is marked for release-please', () => {
-  const config = JSON.parse(read('release-please-config.json'));
-  const extra = config.packages['.']['extra-files'];
-  const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
-  assert.ok(extra.some((f) => f.path === 'cursor-directory/.cursor-plugin/plugin.json' && f.jsonpath === '$.version'),
-    'release-please-config.json does not bump cursor-directory/.cursor-plugin/plugin.json');
-  for (const rel of ['cursor-directory/skills/rolewright/SKILL.md', 'cursor-directory/README.md']) {
-    assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
-    for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
-      assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);
-    }
-  }
-});
+// release-please was removed when this engine was forked into Rolewright (see
+// docs/adr/ at the repository root), so the case that checked its
+// release-please-config.json bump list is gone with it. The version checks
+// above still pin every manifest to package.json.
 
 test('the README says what the plugin runs, sends and fetches, for Cursor', () => {
   const readme = read('cursor-directory/README.md');

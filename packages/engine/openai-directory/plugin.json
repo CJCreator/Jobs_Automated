@@ -27,6 +27,7 @@
       "interface": {
         "displayName": "career-ops",
         "shortDescription": "AI job search agent",
+        "longDescription": "The Rolewright engine is an open-source AI job search agent (MIT), based on career-ops. It runs on your computer and keeps your CV, profile, reports and application tracker as plain files in a folder you own.\n\nUse it when you are looking for a job and want help to:\n- find new openings at the companies you choose, from their public career pages and job boards;\n- score each job posting against your CV from 1 to 5, with a structured A-H report, before you decide to apply;\n- tailor an ATS-friendly CV (PDF) and a cover letter for a specific posting;\n- prepare for interviews with STAR stories and company research;\n- track your applications and follow-ups.\n\nIt helps you fill in each application; you press Submit.\n\nOn first use it looks for a career-ops folder on your machine. If there is none, it asks before installing one (Node.js required). No account and no telemetry: job listings are fetched from your machine, and the parts of your CV and the job descriptions you work on go to the AI model you use here, as part of the conversation.",
         "developerName": "Santiago Fernández de Valderrama Aparicio",
         "category": "Productivity",
         "capabilities": [

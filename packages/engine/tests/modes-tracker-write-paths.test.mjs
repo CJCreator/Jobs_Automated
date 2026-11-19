@@ -40,7 +40,8 @@ ok('the Tools table is found in the English _shared.md and its localized copies'
   assert.ok(withTable.includes('modes/_shared.md'), 'modes/_shared.md has no Write row');
   // The audit counted 14 localized copies plus three already-corrected ones.
   // A recognizer that silently stops matching would pass everything below.
-  assert.ok(withTable.length >= 18, `only ${withTable.length} Tools tables recognized: ${withTable.join(', ')}`);
+  // Non-India market modes were removed (ADR 0013 at the repository root).
+  assert.ok(withTable.length >= 2, `only ${withTable.length} Tools tables recognized: ${withTable.join(', ')}`);
   for (const f of withTable) assert.ok(toolRow(read(f), 'Edit') !== null, `${f}: Write row found but no Edit row`);
   for (const f of withTable) assert.ok(toolRow(read(f), 'Bash') !== null, `${f}: Write row found but no Bash row`);
 });
@@ -136,7 +137,8 @@ ok('the role-change step is found in the English apply mode and its translations
   assert.ok(applyModes.includes('modes/apply.md'), 'modes/apply.md has no role-change step');
   // English plus 18 locales at the time of writing. A recognizer that silently
   // stops matching would pass everything below.
-  assert.ok(applyModes.length >= 19, `only ${applyModes.length} apply modes recognized: ${applyModes.join(', ')}`);
+  // Non-India market modes were removed (ADR 0013 at the repository root).
+  assert.ok(applyModes.length >= 2, `only ${applyModes.length} apply modes recognized: ${applyModes.join(', ')}`);
 });
 
 for (const file of applyModes) {

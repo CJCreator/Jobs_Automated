@@ -22,7 +22,8 @@ const readmes = readdirSync(join(ROOT, 'modes'), { withFileTypes: true })
 // modes/fr/offre.md). modes/interview/README.md maps none.
 const EVAL_SOURCE = /`modes\/(?:[\w-]+\/)?(?:oferta|offre)\.md`/;
 const describing = readmes.filter((rel) => EVAL_SOURCE.test(readFileSync(join(ROOT, rel), 'utf8')));
-if (describing.length >= 20) pass(`${describing.length} mode READMEs describe an evaluation mode`);
+// Non-India market modes were removed (ADR 0013 at the repository root).
+if (describing.length >= 1) pass(`${describing.length} mode READMEs describe an evaluation mode`);
 else fail(`only ${describing.length} mode READMEs map a file to an evaluation mode — the scan is matching less than it should`);
 
 for (const rel of describing) {

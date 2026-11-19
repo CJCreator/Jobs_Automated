@@ -56,9 +56,4 @@ check('the batch prompt lists the same ids in the same order', () => {
   assert.deepEqual([...rule[1].matchAll(/`([^`]+)`/g)].map(match => match[1]), ids);
 });
 
-check('the dashboard picker offers the same ids in the same order', () => {
-  const pipeline = readFileSync(join(ROOT, 'dashboard', 'internal', 'ui', 'screens', 'pipeline.go'), 'utf8');
-  const block = pipeline.match(/var canonicalDiscardReasons = \[\]string\{([\s\S]*?)\}/);
-  assert.ok(block, 'canonicalDiscardReasons not found in pipeline.go');
-  assert.deepEqual([...block[1].matchAll(/"([^"]+)"/g)].map(match => match[1]), ids);
-});
+// The Go dashboard picker was removed with dashboard/ (owner's decision).

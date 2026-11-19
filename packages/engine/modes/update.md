@@ -126,7 +126,6 @@ If the user says "rollback" or runs `/rolewright update rollback`:
 - Exception: `modes/_profile.md` may be edited **only** in Step 4.7, and **only** after the user explicitly confirms each individual rename/removal. Never batch-edit without per-change consent.
 - User-specific customizations (archetypes, scoring weights, narrative) belong in `modes/_profile.md` or `config/profile.yml`, never in `modes/_shared.md`
 - CLAUDE.md's local additions (everything after the two-line `@AGENTS.md` header) MUST be saved before apply and checked immediately after — on both the success AND failure path (Step 4.2, Step 4.4). Restore them only when they are no longer in CLAUDE.md. `apply` keeps a CLAUDE.md this install changed unless `--force` is given, and appending the saved content to a file that still has it duplicates the additions on every update.
-- After a successful apply, `node hired-share.mjs --status` may report a hire that was never asked about, or one marked "later" more than 30 days ago. That earns **at most ONE** gentle mention of the Hired Wall, then the answer is respected — never a scheduled reminder. Cadence and wording: `AGENTS.md` → "Celebrating a hire (the Hired Wall)".
 - Never trim the staged-but-uncommitted notice or its recovery commands (Step 4.8).
 - If anything goes wrong, tell the user to run `node update-system.mjs rollback`
 - Keep the output concise — users don't want walls of text during an update
