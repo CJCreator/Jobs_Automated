@@ -1,7 +1,7 @@
 # 0003. Bring your own key, session-only, with a free trial
 
-- **Status:** Accepted. The provider list and the trial size are Proposed (see below).
-- **Date:** 2026-11-19
+- **Status:** Accepted
+- **Date:** 2026-11-19 (providers and trial size confirmed the same day)
 - **Decided by:** the owner
 
 ## Context
@@ -10,9 +10,9 @@ Running the AI on our own keys for every user costs money we do not want to spen
 
 ## Decision
 
-- **Users bring their own key, free or paid.** Supported providers: Anthropic, OpenAI, Gemini and OpenRouter. *Proposed:* the owner selected all four; confirm before each is enabled.
+- **Users bring their own key, free or paid.** Supported at launch: Gemini, OpenRouter and Anthropic. The OpenAI and Groq adapters already in `apps/web/src/lib/llm/providers.mjs` stay in the code but are hidden until the owner enables them, each after its parity run.
 - **Session-only.** The key is held in memory for the visit, sent per request over HTTPS in a header, and used for that request only. It is never written to the database, server logs, error messages, analytics, or browser storage. The user re-enters it on each visit.
-- **Free trial on our keys.** A server-side key for Gemini and for OpenRouter free models, used only when the user has no key. No paid spend: the trial is small, then the user brings a key. *Proposed:* 3 tailorings per account, lifetime (the planner's number, not the owner's).
+- **Free trial on our keys.** A server-side key for Gemini and for OpenRouter free models, used only when the user has no key. No paid spend: the trial is small, then the user brings a key. 5 tailorings per verified account, lifetime, counted on the server. A per-IP limit backs the per-account counter.
 - **Quota exhausted** (our free quota or the user's) produces a clear "bring your own key" message, not a generic error.
 - **Provider parity:** before a provider is enabled, the same fixture set runs through it and its fact-gate pass rate and keyword match are recorded.
 

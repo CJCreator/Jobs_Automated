@@ -1,7 +1,8 @@
-# 0009. Hosting
+# 0009. Hosting: Google Cloud, Mumbai region
 
-- **Status:** Proposed (the owner has not decided)
+- **Status:** Accepted
 - **Date:** 2026-11-19
+- **Decided by:** the owner
 
 ## Context
 
@@ -10,20 +11,27 @@ The app needs:
 - Postgres with row-level security (per-user isolation is enforced in the database)
 - a scheduler for the retention purge (ADR 0004)
 - Chromium for PDF export
-- preferably an India region, for latency and to simplify data-protection answers
+- an India region, for latency and to simplify data-protection answers
 
-The code is kept host-neutral until this is decided.
+Options considered: Vercel with managed Postgres (Chromium does not fit a serverless function well), a single VPS (we run patching and backups), and a container platform with managed Postgres.
 
-## Options
+## Decision
 
-| Option | Fits | Watch out for |
-|---|---|---|
-| Vercel + managed Postgres in Mumbai (for example Supabase `ap-south-1`) | Next.js-native, managed database with RLS, cheap to start | Chromium for PDF export in a serverless function is size- and time-limited; may need a separate render service. Cron needs a scheduled function. |
-| A single VPS or container host (for example Railway, Render, a Mumbai VM) with Postgres | Full Chromium, simple cron, one bill | We run patching, backups and scaling ourselves. |
-| Container platform (Cloud Run, Fly.io) + managed Postgres | Chromium in the container, scales to zero | More setup; check the India region and cold starts. |
+Google Cloud, region `asia-south1` (Mumbai), for every component that holds or processes user data:
 
-## Constraints whatever is chosen
+- **App:** Cloud Run, one container image built from `apps/web` with Chromium included for PDF export. The engine (`packages/engine`) is copied into the image for the fact gate and renderer.
+- **Database:** Cloud SQL for PostgreSQL, private IP, automated backups, connected from Cloud Run through the Cloud SQL connector. The app connects as a non-owner role so row-level security applies.
+- **Secrets:** Secret Manager for `AUTH_SECRET`, OAuth credentials, the database password and our free-trial Gemini and OpenRouter keys. Users' keys are never stored (ADR 0003).
+- **Retention purge:** Cloud Scheduler calls a purge endpoint daily, authenticated with an OIDC token from a dedicated service account. The endpoint refuses any other caller.
+- **Environments:** `staging` and `production` as separate projects, each with its own database and secrets.
+
+## Constraints
 
 - Production refuses to start without `DATABASE_URL` and `AUTH_SECRET` (ADR 0004, ADR 0006).
-- The proxy or CDN in front of the app must not log the `x-llm-key` header (ADR 0003).
-- Row-level security and row locks are proven on real Postgres before launch. Today they are tested only on the embedded database.
+- Request logging must not record the `x-llm-key` header (ADR 0003). Cloud Run's request logs do not include request headers by default; the load balancer, if one is added, must keep it that way.
+- Row-level security and row locks are proven on real Postgres before launch.
+
+## Consequences
+
+- PDF export cold starts include Chromium; set a minimum instance count of 1 in production if export latency matters.
+- The code keeps the purge as an HTTP endpoint plus `npm run purge:inactive`, so moving hosts later stays possible.

@@ -1,17 +1,19 @@
-# 0014. Public open source or private repository
+# 0014. Repository stays private until launch
 
-- **Status:** Proposed (the owner has not decided)
+- **Status:** Accepted
 - **Date:** 2026-11-19
+- **Decided by:** the owner
 
 ## Context
 
-The inherited code is MIT, which allows either choice as long as the licence and copyright notice stay with it.
+The inherited code is MIT, which allows either choice as long as the licence and copyright notice stay with it. The fact gate has known, reproduced bypasses (ADR 0005); publishing before they are fixed would publish the hole.
 
-## Options
+## Decision
 
-- **Public, MIT, hosted service is the product.** Trust through transparency, with outside contributions possible. Competitors can self-host the same code. Needs contributor docs and a code of conduct.
-- **Private.** Keep the upstream MIT notice for the inherited code, no contributor docs. Simpler to run, less outside scrutiny of the fact check.
+- The repository stays private until the Phase 1 exit review. The owner revisits open-sourcing then.
+- `LICENSE` and `NOTICE` keep the upstream MIT attribution either way.
+- Until the revisit, the repository keeps neutral, minimal files: `LICENSE`, `NOTICE`, `SECURITY.md`, issue and PR templates with no community process.
 
-## Until decided
+## Consequences
 
-The repository keeps neutral, minimal files: `LICENSE`, `NOTICE`, `SECURITY.md`, issue and PR templates with no community process.
+- Before any future publication: a secrets and personal-data scan of the full history, and contributor docs.

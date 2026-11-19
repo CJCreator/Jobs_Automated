@@ -29,19 +29,21 @@ A hosted web app (ADR 0001) where a job seeker in India uploads their resume, co
 | 7 | Decompressed-size cap before PDF parsing | 0004 | launch review P1-6 |
 | 8 | Production refuses to start without `DATABASE_URL`; dev sign-in refused on every deployed host, not only `NODE_ENV=production` | 0004, 0006 | launch review P1-7, P1-12 |
 | 9 | Prove row-level security and row locks on real Postgres | 0009 | launch review P1-13 |
-| 10 | Pick a host | 0009 | |
+| 10 | Host chosen: Google Cloud, Mumbai | 0009 | |
 
 ### Phase 1: bring your own key and the free trial
 
 - Key entry per visit, validation call, in-memory only (ADR 0003).
-- Trial on our Gemini and OpenRouter keys with a per-account counter and email verification.
+- Launch providers: Gemini, OpenRouter, Anthropic.
+- Trial on our Gemini and OpenRouter keys: 5 tailorings per verified account.
+- Port `keyword-match.mjs` with a parity test and show keyword coverage (moved up from Phase 2).
+- Google Cloud setup as code and a staging deploy.
 - Shared rate limits (the current limiter is per process). Rate-limit sign-in and export.
 - Run the fixture set through each provider and record fact-gate pass rate and keyword coverage before enabling it.
 
 ### Phase 2: the three journeys and the first success measure
 
 - Onboarding path per segment.
-- Port `keyword-match.mjs` with a parity test; show keyword coverage after tailoring (ADR 0012, ADR 0016).
 - Event analytics, no content (ADR 0010).
 - Data export (ADR 0004).
 - Phone-width pass on every screen and the PWA manifest (ADR 0011).
@@ -60,10 +62,13 @@ A hosted web app (ADR 0001) where a job seeker in India uploads their resume, co
 - Email reminders once a free email tier is chosen (ADR 0008).
 - npm workspaces (ADR 0002).
 
+## How it gets built
+
+Phases 0 and 1 are broken into tasks, waves and agent briefs in [`EXECUTION.md`](EXECUTION.md): an advisor plans and reviews, worker agents build, and the owner approves each phase (ADR 0017).
+
 ## Open questions for the owner
 
-1. **Hosting** (ADR 0009). The options and the constraints are in the ADR. PDF export needs Chromium, which rules some serverless setups in or out.
-2. **Public or private repository** (ADR 0014).
-3. **Providers:** confirm all four (Anthropic, OpenAI, Gemini, OpenRouter) for bring-your-own-key (ADR 0003).
-4. **Trial size:** 3 tailorings per account is a placeholder (ADR 0003).
-5. **Legal review** of the privacy notice under DPDP before launch (ADR 0004).
+1. **Grievance contact** for the privacy notice (ADR 0004): a placeholder until launch.
+2. **Legal review** of the privacy notice under DPDP before launch (ADR 0004).
+3. **Open source** is revisited at the Phase 1 exit (ADR 0014).
+4. **OpenAI and Groq**: enable after launch, each after a parity run (ADR 0003).
