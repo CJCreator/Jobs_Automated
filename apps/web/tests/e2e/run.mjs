@@ -263,7 +263,9 @@ async function checkpoint(page, label) {
     } catch (e) {
       axeFindings.length = mark[0];
       sizeFindings.length = mark[1];
-      if (attempt >= 6 || !/context was destroyed|navigation/i.test(String(e))) throw e;
+      const transient = /context was destroyed|navigation|axe is not defined|reading 'run'|Target closed/i.test(String(e));
+      console.log(`     checkpoint "${label}" attempt ${attempt} failed (${String(e).split("\n")[0].slice(0, 120)})${transient && attempt < 6 ? ", retrying" : ""}`);
+      if (attempt >= 6 || !transient) throw e;
       await untilQuiet(page);
     }
   }

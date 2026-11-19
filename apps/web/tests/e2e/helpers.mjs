@@ -23,10 +23,13 @@ export async function runAxe(page, appDir, label, sink) {
     await page.emulateMedia({ colorScheme: scheme });
     // Buttons and links fade their colours over 150 ms; wait so contrast is measured at rest.
     await page.waitForTimeout(450);
-    await page.evaluate(`if (typeof window.axe === "undefined") { ${source} }`);
+    // Inject and run in one evaluate: a reload between two evaluates leaves window.axe undefined.
     const result = await page.evaluate(
-      (tags) => window.axe.run(document, { runOnly: { type: "tag", values: tags } }).then((r) => r.violations),
-      AXE_TAGS,
+      `(async () => {
+        if (typeof window.axe === "undefined") { ${source} }
+        const r = await window.axe.run(document, { runOnly: { type: "tag", values: ${JSON.stringify(AXE_TAGS)} } });
+        return r.violations;
+      })()`,
     );
     for (const v of result) {
       sink.push({
