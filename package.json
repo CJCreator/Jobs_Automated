@@ -1,0 +1,17 @@
+{
+  "name": "rolewright",
+  "private": true,
+  "description": "Rolewright: rework and tailor your resume to a job, with a fact check on every claim. Monorepo root.",
+  "engines": {
+    "node": "^22.13.0 || >=23.4.0"
+  },
+  "scripts": {
+    "app:dev": "npm --prefix apps/web run dev",
+    "app:typecheck": "npm --prefix apps/web run typecheck",
+    "app:test": "npm --prefix apps/web test",
+    "app:flow": "npm --prefix apps/web run test:flow",
+    "app:build": "npm --prefix apps/web run build",
+    "engine:lint": "npm --prefix packages/engine run lint",
+    "engine:test": "cd packages/engine && node test-all.mjs --quick"
+  }
+}

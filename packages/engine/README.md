@@ -1,67 +1,6 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" alt="career-ops" width="250" height="56"></picture></p>
+# Rolewright engine
 
-<p align="center">The open-source AI job search agent.</p>
-
-<p align="center">
-  <a href="README.md">English</a> |
-</p>
-
-<!-- The non-breaking spaces (&nbsp;) and word joiners (&#8288;) below decide where each line wraps on a phone. Keep them when editing. -->
-
-<p align="center"><a href="https://github.com/santifer"><img src="docs/avatar-santifer.png" width="48" height="48" align="middle" alt="Santiago Fernández de Valderrama Aparicio"></a>&nbsp;&nbsp;Created by <a href="https://github.com/santifer"><strong>@santifer</strong></a>, with&nbsp;&nbsp;<a href="https://github.com/career-ops-hq/career-ops#builders"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/builders-stack-dark.svg"><img src="docs/builders-stack-light.svg" alt="" height="32" align="middle"></picture></a>&nbsp;&nbsp;<a href="https://github.com/career-ops-hq/career-ops#builders">700+ contributors</a></p>
-
-<p align="center">
-<strong>Months of sending CVs into&nbsp;silence.</strong><br>
-So I built the filter I&nbsp;needed.
-</p>
-
-<p align="center">
-<strong>740&nbsp;listings&nbsp;evaluated. 68&nbsp;applied. 12&nbsp;interviews.&nbsp;1&nbsp;offer.</strong><br>
-I was its first user. I got the&nbsp;job. Then&nbsp;I&nbsp;open-&#8288;sourced&nbsp;it.
-</p>
-
-<p align="center">
-Paste a job. On your machine, it tells you if it's still&nbsp;open and if it&nbsp;fits.<br>
-It tailors your CV and drafts your&nbsp;answers. <strong>You&nbsp;press&nbsp;Submit.</strong>
-</p>
-
-<p align="center">
-  <img src="docs/demo.gif" alt="The author's own search in the career-ops dashboard: scored listings, a red count of the ones marked do not apply, then a full evaluation report" width="800">
-</p>
-
-<p align="center"><sub>My own search, partway through, with&nbsp;the&nbsp;UI&nbsp;in&nbsp;Spanish.</sub></p>
-
-<p align="center">
-  Companies use AI to filter candidates.<br>
-  <strong>I just gave candidates AI&nbsp;to&nbsp;<em>choose</em>&nbsp;companies.</strong>
-</p>
-
-<p align="center">
-  Six months later, <strong>I left that job.</strong><br>
-  Now we build career-ops, so&nbsp;you&nbsp;can&nbsp;land&nbsp;yours.
-</p>
-
-<p align="center">
-  <a href="HIRED.md"><img src="docs/hired-wall.svg" alt="Hired stories you can open and read" width="800"></a>
-</p>
-
-<p align="center"><sub>Over <strong>110+ engineers, PMs, and architects</strong> landed offers through career-ops. Read their stories in <a href="HIRED.md">HIRED.md</a>.</sub></p>
-
-<p align="center">
-  <a href="https://wired.com.gr/article/to-ai-ergaleio-pou-fernei-epanastasi-ston-tropo-pou-psachnoume-douleia/" rel="noopener noreferrer nofollow"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/press/wired-dark.svg"><img src="docs/press/wired.svg" alt="WIRED" height="32"></picture></a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.businessinsider.com/how-i-built-tool-filter-job-listings-landed-head-ai-2026-4" rel="noopener noreferrer nofollow"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/press/business-insider-dark.svg"><img src="docs/press/business-insider.svg" alt="Business Insider" height="32"></picture></a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://elpais.com/tecnologia/2026-04-20/un-programador-espanol-crea-un-filtro-con-ia-para-encontrar-trabajo-y-lo-libera-gratis.html" rel="noopener noreferrer nofollow"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/press/el-pais-dark.svg"><img src="docs/press/el-pais.svg" alt="EL PAÍS" height="32"></picture></a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://www.genbeta.com/inteligencia-artificial/este-desarrollador-espanol-consiguio-su-puesto-como-jefe-ia-usando-esta-herramienta-codigo-abierto-que-el-mismo-creo" rel="noopener noreferrer nofollow"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/press/genbeta-dark.svg"><img src="docs/press/genbeta.svg" alt="Genbeta" height="32"></picture></a>
-</p>
-
-<p align="center">
-  <a href="https://www.producthunt.com/products/santifer-io?utm_source=badge-featured&utm_medium=badge" rel="noopener noreferrer"><img src="docs/press/producthunt.svg" alt="Featured on Product Hunt" width="206" height="54"></a>
-</p>
-
----
+The engine behind [Rolewright](../../README.md): the fact gate, PDF renderer and resume checks the hosted app calls, plus the career-ops CLI scripts, prompt modes and tests they came from. Based on [career-ops](https://github.com/career-ops-hq/career-ops) (MIT). Upstream updates are disabled in this fork.
 
 ## What is career-ops?
 
@@ -157,15 +96,8 @@ The system will:
 
 ## User Interfaces
 
-### 1. Terminal Dashboard (Go Bubbletea TUI)
-For ultra-fast, keyboard-driven navigation:
-```bash
-npm run serve:dashboard
-```
-Features 10 status filter tabs, 8 sort modes, lazy-loaded report previews, and inline status updates.
-
-### 2. Modern Web UI (Next.js 16 + React 19)
-For visual Kanban boards, Markdown CV editing, and rich analytics:
+### Legacy local web UI (`web/`)
+Kept as reference for the tracker rebuild in `apps/web`, then deleted (see `docs/adr` at the repository root):
 ```bash
 cd web
 npm install
@@ -195,7 +127,6 @@ flowchart TD
         Modes["modes/*.md (AI Prompts & Rubrics)"]
         Scripts["*.mjs (Core CLI Runtime)"]
         Web["web/ (Next.js 16 Web UI)"]
-        TUI["dashboard/ (Go TUI)"]
     end
 
     CoreEngine -->|Reads & Writes| UserLayer
@@ -213,22 +144,17 @@ For full architectural specifications, see:
 
 | Category | Focus | Key Documents |
 | :--- | :--- | :--- |
-| **Product** | Vision, Strategy, Specs | [PRD](docs/product/PRD.md) · [Vision](docs/product/Vision.md) · [Personas](docs/product/UserPersonas.md) · [Roadmap](docs/product/Roadmap.md) · [Competitive Analysis](docs/product/CompetitiveAnalysis.md) · [Feature Specs](docs/product/FeatureSpecifications.md) |
 | **Architecture** | System & Technical Design | [System](docs/architecture/SystemArchitecture.md) · [Frontend](docs/architecture/FrontendArchitecture.md) · [Backend](docs/architecture/BackendArchitecture.md) · [Database](docs/architecture/DatabaseArchitecture.md) · [AI](docs/architecture/AIArchitecture.md) · [Agent](docs/architecture/AgentArchitecture.md) · [Security](docs/architecture/SecurityArchitecture.md) · [Infra](docs/architecture/InfrastructureArchitecture.md) |
 | **Development** | Setup & Standards | [Setup Guide](docs/development/SetupGuide.md) · [Local Dev](docs/development/LocalDevelopment.md) · [Coding Standards](docs/development/CodingStandards.md) · [Branching](docs/development/BranchingStrategy.md) · [Contributing](docs/development/ContributionGuide.md) · [Env Vars](docs/development/EnvironmentVariables.md) · [API Guide](docs/development/APIDevelopmentGuide.md) |
-| **Frontend** | Web UI & Design Tokens | [Design System](docs/frontend/DesignSystem.md) · [Component Library](docs/frontend/ComponentLibrary.md) · [State Management](docs/frontend/StateManagement.md) · [Routing](docs/frontend/RoutingArchitecture.md) · [Dashboard TUI](docs/frontend/DashboardDesign.md) |
+| **Frontend** | Web UI & Design Tokens | [Design System](docs/frontend/DesignSystem.md) · [Component Library](docs/frontend/ComponentLibrary.md) · [State Management](docs/frontend/StateManagement.md) · [Routing](docs/frontend/RoutingArchitecture.md) |
 | **Backend** | Services & API Reference | [API Reference](docs/backend/APIReference.md) · [Service Architecture](docs/backend/ServiceArchitecture.md) · [Database Schema](docs/backend/DatabaseSchema.md) · [Authentication](docs/backend/Authentication.md) |
 | **AI System** | Prompts, Agents & Gates | [Prompt Library](docs/ai/PromptLibrary.md) · [Agent Workflows](docs/ai/AgentWorkflows.md) · [LLM Routing](docs/ai/LLMArchitecture.md) · [Evaluation Rubric](docs/ai/EvaluationFramework.md) · [Local RAG](docs/ai/RAGArchitecture.md) · [Tool Calling](docs/ai/ToolCallingArchitecture.md) |
 | **Testing** | QA Strategy & Test Suites | [Testing Strategy](docs/testing/TestingStrategy.md) · [Unit Testing](docs/testing/UnitTesting.md) · [Integration](docs/testing/IntegrationTesting.md) · [E2E Visual](docs/testing/E2ETesting.md) · [Performance](docs/testing/PerformanceTesting.md) |
 | **Deployment** | DevOps, CI/CD, Scaling | [Deployment Guide](docs/deployment/DeploymentGuide.md) · [CI/CD](docs/deployment/CI-CD.md) · [Monitoring](docs/deployment/Monitoring.md) · [Scaling](docs/deployment/Scaling.md) · [Disaster Recovery](docs/deployment/DisasterRecovery.md) |
-| **Business** | Commercial & Growth | [Monetization](docs/business/Monetization.md) · [Pricing Strategy](docs/business/PricingStrategy.md) · [Growth Loops](docs/business/GrowthLoops.md) · [KPI Framework](docs/business/KPIFramework.md) |
 | **Structure** | Full Repository Map | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) |
 
 ---
 
-## Community & Contributing
+## Credits
 
-`career-ops` is built by over 700+ open-source engineers, career coaches, and job seekers.
-- **Contributing**: Read the [Contribution Guide](docs/development/ContributionGuide.md) and [ADDING_A_PROVIDER.md](providers/ADDING_A_PROVIDER.md).
-- **Security**: Review our SSRF and PII policies in [docs/architecture/SecurityArchitecture.md](docs/architecture/SecurityArchitecture.md) and [SECURITY.md](SECURITY.md).
-- **Licensing**: Open-source under the [MIT License](LICENSE).
+Based on career-ops by Santiago Fernández de Valderrama and its contributors, under the [MIT License](LICENSE). Rolewright is independent and not endorsed by that project.
