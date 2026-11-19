@@ -1015,6 +1015,20 @@ const AT_JOB_LEAD_RE = new RegExp([
   '\\b(?:roles|tenures?|years|months)$',
 ].join('|'), 'u');
 
+// "Managed vendor contracts at Acme Corp": a past work verb that opens its clause,
+// then "at <Name>". The verb has to open the clause (a bullet, a sentence, "I ...",
+// "and ...") so "the work done at Stripe" and "what you built at Stripe" stay unread,
+// and a clause that talks to the company ("your") claims nothing.
+// Verbs of looking, arriving, applying and feeling take "at" without naming a job:
+// "We looked at Kafka", "I applied for the role at Stripe". Tested in lower case,
+// because a capitalised verb opens a bullet.
+const NOT_TRAILING_WORK_VERBS = new Set(`${NOT_WORK_VERBS}|looked|glanced|stared|gazed|arrived|aimed|stopped|marvelled|marveled|wondered|laughed|smiled|hinted|pointed|balked|clamoured|clamored|learned|discovered|applied|loved|liked|enjoyed|excited|thrilled|delighted|interested|inspired|motivated|impressed|intrigued|fascinated|attracted|experienced|skilled|qualified|seasoned|dedicated|committed|talked|chatted|connected|referred|recommended|encouraged|advertised|posted|listed|opened|respected|researched`.split('|'));
+const TRAILING_IRREGULAR_VERBS = '[Ll]ed|[Bb]uilt|[Rr]an|[Gg]rew|[Ww]rote|[Mm]ade|[Ww]on|[Dd]rove|[Tt]ook|[Cc]ut|[Tt]aught|[Ss]pent|[Oo]versaw|[Bb]egan|[Bb]rought|[Ss]old|[Ss]et|[Gg]ot|[Kk]ept|[Hh]eld|[Gg]ave';
+// The words between the verb and "at" stop at a second clause or a job-posting noun.
+const TRAILING_EMPLOYER_RE = new RegExp(`(?:^\\s*(?:[•*+-]\\s+)?|[.;!?]\\s+|\\n[^\\S\\n]*(?:[•*+-][^\\S\\n]+)?|\\b[Ii] |\\b[Ww]e |\\b[Aa]nd |, )([A-Za-z][a-z]{1,20}ed|${TRAILING_IRREGULAR_VERBS})\\b(?:(?!\\b(?:at|I|we|what|which|who|whom|where|how|why|because|would|will|am|can|could|may|might|want|wish|look|looking|eager|keen|ready|bring|contribute|join|hope|role|position|opening|opportunity|vacancy|posting)\\b)[^.;!?\\n]){0,100}?\\bat (?:The )?(${AT_NAME})(?![\\p{L}\\p{N}])${NOT_ADDRESSED}`, 'gu');
+// Capitalised words that follow "at" in a title-cased bullet without naming anyone.
+const NOT_AN_EMPLOYER = new Set(['scale', 'speed', 'once', 'least', 'most', 'all', 'times', 'best', 'work', 'home', 'cost', 'risk', 'large', 'first', 'last', 'present']);
+
 /** Employers named by "at <Name>, I ..." where the sentence states a job there. */
 function atEmployerClaims(text) {
   const clean = stripMarkup(text, { keepLineBreaks: true });
@@ -1028,7 +1042,100 @@ function atEmployerClaims(text) {
     // Without its "'s", so "Macy’s" here matches a cv.md that says "Macy's".
     for (const name of match[1].split(' and ')) claims.push({ kind: 'employer', value: normalizeFact(name.replace(POSSESSIVE_SUFFIX_RE, '')) });
   }
+  for (const match of clean.matchAll(TRAILING_EMPLOYER_RE)) {
+    const name = match[2];
+    if (NOT_TRAILING_WORK_VERBS.has(match[1].toLowerCase()) || NOT_AN_EMPLOYER.has(name.toLowerCase())) continue;
+    claims.push({ kind: 'employer', value: normalizeFact(name.replace(POSSESSIVE_SUFFIX_RE, '')) });
+  }
   return claims;
+}
+
+// Credential, seniority, scope and expertise words. A listed word the source
+// does not contain, in any form of its family, is an unsupported fact whether or
+// not a fact config is loaded. This is the twin of CLAIM_FAMILIES in
+// apps/web/src/lib/claims.mjs: change one list and change the other.
+const CLAIM_FAMILIES = {
+  credential: [
+    ["certified", "certification", "certifications", "certificate", "certificates"],
+    ["chartered"],
+    ["licensed", "licenced"],
+    ["accredited", "accreditation"],
+    ["award", "awards", "awarded"],
+    ["patent", "patents", "patented"],
+    ["medalist", "medallist"],
+    ["topper"],
+    ["scholarship", "scholarships"],
+    ["fellowship", "fellowships"],
+    ["mba", "m.b.a"],
+    ["phd", "ph.d", "doctorate"],
+    ["diploma"],
+    ["postgraduate"],
+  ],
+  seniority: [
+    ["senior", "sr"],
+    ["principal"],
+    ["director", "directors"],
+    ["head of"],
+    ["chief"],
+    ["ceo", "c.e.o"], ["cfo", "c.f.o"], ["cto", "c.t.o"], ["coo", "c.o.o"], ["cio", "c.i.o"], ["cmo", "c.m.o"],
+    ["vp", "v.p", "vice president"],
+    ["president"],
+    ["manager", "managers"],
+    ["executive", "executives"],
+    ["founder", "cofounder", "co-founder"],
+  ],
+  scope: [
+    ["global", "globally"],
+    ["worldwide"],
+    ["international", "internationally"],
+    ["multinational"],
+    ["national", "nationally", "nationwide", "nation-wide"],
+    ["regional", "regionally"],
+    ["enterprise"],
+    ["entire"],
+    ["sole", "solely"],
+    ["single-handedly", "singlehandedly"],
+  ],
+  expertise: [
+    ["expert", "experts"],
+    ["guru"],
+    ["veteran"],
+    ["world-class"],
+    ["thought leader"],
+    ["best-in-class"],
+    ["industry-leading"],
+    ["top-performing"],
+  ],
+};
+
+const CLAIM_FORMS = [];
+for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
+  for (const family of families) for (const form of family) CLAIM_FORMS.push({ kind, form, family });
+}
+// Longest first, so "vice president" is read before "president".
+CLAIM_FORMS.sort((a, b) => b.form.length - a.form.length);
+// A space and a hyphen are interchangeable inside a form: "world class", "world-class".
+const claimFormPattern = (form) => form.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[ -]/g, '[\\s\\p{Pd}]+');
+const claimFormKey = (form) => form.toLowerCase().replace(/[\s\p{Pd}]+/gu, ' ');
+const CLAIM_BY_FORM = new Map(CLAIM_FORMS.map((entry) => [claimFormKey(entry.form), entry]));
+const CLAIM_WORD_RE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.map((entry) => claimFormPattern(entry.form)).join('|')})(?![\\p{L}\\p{N}])`,
+  'giu',
+);
+
+/** Claim words in the target that no form of their family appears next to in the source. */
+function builtinClaimWordFacts(targetText, sourceText) {
+  // The role the letter is for is the job being applied to, not a claim about the candidate.
+  const withoutRoleTitle = String(targetText ?? '').replace(/<div\b[^>]*\bclass="[^"]*\brole-title\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, ' ');
+  const target = stripMarkup(withoutRoleTitle).normalize('NFKC').replace(/\p{Cf}/gu, '');
+  const source = stripMarkup(sourceText).normalize('NFKC').replace(/\p{Cf}/gu, '');
+  const inSource = (form) => new RegExp(`(?<![\\p{L}\\p{N}])${claimFormPattern(form)}(?![\\p{L}\\p{N}])`, 'iu').test(source);
+  const facts = [];
+  for (const match of target.matchAll(CLAIM_WORD_RE)) {
+    const entry = CLAIM_BY_FORM.get(claimFormKey(match[0]));
+    if (entry && !entry.family.some(inSource)) facts.push({ kind: entry.kind, value: normalizeFact(match[0]) });
+  }
+  return facts;
 }
 
 /**
@@ -1293,8 +1400,14 @@ export function structuredFieldClaims(text) {
     add('organization', match[1], true);
     add('title', match[3], false);
   }
-  const seen = new Set();
-  return claims.filter(({ kind, value }) => !seen.has(`${kind}\n${value}`) && seen.add(`${kind}\n${value}`));
+  // One claim per kind and value; `count` is how many slots stated it.
+  const seen = new Map();
+  for (const claim of claims) {
+    const key = `${claim.kind}\n${claim.value}`;
+    if (seen.has(key)) seen.get(key).count++;
+    else seen.set(key, { ...claim, count: 1 });
+  }
+  return [...seen.values()];
 }
 
 /** Split generated/source documents into bounded statements for attribution checks. */
@@ -2015,6 +2128,19 @@ function compactMagnitude(raw) {
   });
 }
 
+// "14M evaluations", "2 million sessions": a number with a magnitude is a count
+// of whatever follows it, even when the noun is not in METRIC_NOUNS. A currency
+// amount ("$2M and ...") is read by SIMPLE_CLAIM_PATTERNS and is skipped here.
+const MAGNITUDE_COUNT_RE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}$€£₹.-])(?<!\b(?:Rs|INR|USD|EUR|GBP)\.?\s?)(\d[\d,.]*(?:[kKmMbB]|\s+(?:${SPELLED_MAGNITUDE_ALT})))(?![\p{L}\p{N}])\s*\+?\s*(\p{L}[\p{L}\p{M}-]*)`,
+  'giu',
+);
+// Words after a magnitude that are not what is counted.
+const MAGNITUDE_NOT_A_NOUN = new Set(`a an and or but the to in of for with at by on from as per plus over
+  across between via into than each every vs versus is are was were has have had
+  usd inr eur gbp rupees rupee dollars dollar euros euro pounds pound crore crores lakh lakhs lac lacs
+  percent pct x k m b mn bn million billion thousand`.split(/\s+/));
+
 /** Extract metric-like claims that require source evidence. */
 export function metricClaims(text, { keepPlanHorizons = false } = {}) {
   const clean = spellNumbers(stripMarkup(text, { keepLineBreaks: true }));
@@ -2022,8 +2148,16 @@ export function metricClaims(text, { keepPlanHorizons = false } = {}) {
   for (const pattern of SIMPLE_CLAIM_PATTERNS) {
     for (const match of clean.matchAll(pattern)) claims.add(canonicalMetric(match[0]));
   }
+  // Where each COUNT_CLAIM_RE number starts: it already binds that number to its
+  // noun, so "2M active users" is not a second claim "2m active".
+  const counted = new Set([...clean.matchAll(COUNT_CLAIM_RE)].map((m) => m.index + m[0].indexOf(m[1])));
   for (const match of countMatches(clean, { keepPlanHorizons })) {
     const noun = match[2].toLowerCase();
+    claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
+  }
+  for (const match of clean.matchAll(MAGNITUDE_COUNT_RE)) {
+    const noun = match[2].toLowerCase();
+    if (MAGNITUDE_NOT_A_NOUN.has(noun) || counted.has(match.index)) continue;
     claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
   }
   return claims;
@@ -2428,7 +2562,26 @@ export function verifyFactsFromText(targetText, {
     ...(languageGap ? [] : adoptionClaims(targetText, sourceText)),
     ...fieldClaims.filter(claim => !claim.blocking).map(({ kind, value, line }) => ({ kind, value, line })),
   ].filter(({ value }) => !allowedFacts.has(value));
-  const unsupportedFacts = [...namedFacts, ...comparedFacts]
+  // Runs with or without a config: the word lists are built in.
+  // A word already inside a more specific unsupported fact ("phd computer
+  // science" as a degree) is not reported twice.
+  const alreadyNamed = [...namedFacts, ...comparedFacts].map(({ value }) => ` ${value} `);
+  // A structured title field only warns by design (cv-title-check.mjs), so the
+  // claim words inside one are left to that warning: one occurrence is excused per
+  // occurrence in a title slot, and the same word elsewhere in the document still blocks.
+  const excused = new Map();
+  for (const field of fieldClaims.filter(({ blocking, kind }) => !blocking && kind === 'title')) {
+    for (const { value } of builtinClaimWordFacts(field.line, '')) excused.set(value, (excused.get(value) ?? 0) + (field.count ?? 1));
+  }
+  const claimWordFacts = builtinClaimWordFacts(targetText, sourceText)
+    .filter(({ value }) => !allowedFacts.has(value))
+    .filter(({ value }) => !alreadyNamed.some((named) => named.includes(` ${value} `)))
+    .filter(({ value }) => {
+      const left = excused.get(value) ?? 0;
+      if (left > 0) { excused.set(value, left - 1); return false; }
+      return true;
+    });
+  const unsupportedFacts = [...namedFacts, ...comparedFacts, ...claimWordFacts]
     .filter((claim, index, claims) => claims.findIndex(other => other.kind === claim.kind && other.value === claim.value) === index);
   const forbidden = config.forbidden_phrases
       .filter(Boolean)
@@ -2677,6 +2830,20 @@ function runSelfTest() {
   equal('and its 2-modifier paraphrase agrees', claimsOf('~5 Cloud Run deployments'), '5 deployments');
   // A number is a hard barrier for the chain, so two counts stay separate.
   equal('two counts in one sentence stay distinct', claimsOf('8 years supporting 40 engineers'), '40 engineers | 8 years');
+
+  // Launch bypasses: a trailing employer, a magnitude count, and built-in claim words.
+  const launchSource = '### Infosys\n**Senior Analyst**\n- Managed vendor contracts\n- Reduced close time by 30%';
+  const launchVerdict = (text, src = launchSource) => verifyFactsFromText(text, { sourceText: src });
+  equal('trailing employer blocks', launchVerdict('Managed vendor contracts at Acme Corp').unsupportedFacts.map(f => `${f.kind}:${f.value}`), ['employer:acme corp']);
+  equal('trailing employer in the source passes', launchVerdict('Managed vendor contracts at Infosys').verdict, 'pass');
+  equal('a letter about the target company stays unread', launchVerdict('I admired the work done at Stripe, and managed vendor contracts.').verdict, 'pass');
+  equal('magnitude count with an unlisted noun', launchVerdict('Processed 14M evaluations per month').invented, ['14m evaluations']);
+  equal('spelled magnitude count', launchVerdict('Processed 14 million evaluations per month').invented, ['14m evaluations']);
+  equal('magnitude count the source states', launchVerdict('Processed 14M evaluations per month', 'Processed 14M evaluations per month').verdict, 'pass');
+  equal('a currency amount is not a magnitude count', launchVerdict('Handled a $2M budget and managed vendor contracts', 'Handled a $2M budget and managed vendor contracts').verdict, 'pass');
+  equal('claim words block in any case', launchVerdict('LED A CERTIFIED EXPERT PROGRAMME').unsupportedFacts.map(f => `${f.kind}:${f.value}`), ['credential:certified', 'expertise:expert']);
+  equal('a claim word the source has passes', launchVerdict('Senior Analyst managing vendor contracts').verdict, 'pass');
+  equal('claim words run with no config loaded', launchVerdict('Managed Global vendor contracts', launchSource).unsupportedFacts.map(f => f.value), ['global']);
 
   // A proposed plan horizon is not a claim about the past (#3655). Time units
   // belong in METRIC_NOUNS, so the stock cover-letter closing was extracted as a
