@@ -93,3 +93,5 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-13 review | POST /api/tailorings sends up to 751 lines to the model then keeps 30 silently; cap lines sent, tell the user, refuse over-cap before the model call | Phase 1 task touching tailorings/route.ts |
 | P0-13 review | Suggestion card shows confirm/cannot-confirm buttons for issues with an empty value (facts_too_large, engine) | Next UI task |
 | P0-13 review | Unit test for the rate limiter (split a pure core out of rate-limit.ts) | P1-3 |
+| P0-11 review | `tests/integration/run.mjs` (and maybe `prod-smoke.mjs`) kill only the parent process, so `next-server` can leak like the e2e harness did; apply the same group-kill fix, prove with two same-port runs | Small harness task, before the phase gate if `test:flow` leaks block runs |
+| P0-11 review | After client-side navigation to `/privacy`, first Tab landed on the Next dev overlay in dev; check where focus lands in the production build (prod-smoke Chromium step) | P1 or next prod-smoke edit |
