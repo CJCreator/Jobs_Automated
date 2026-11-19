@@ -73,3 +73,6 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-3b review | Merge P0-2 before P0-3b: the notice states a consent record is stored | Merge order |
 | P0-9a re-review | Step 2b timeout path: set `child = null` after `killTree(proc)` so `stopServer()` does not wait 15 s | Next prod-smoke edit |
 | P0-9a re-review | Comment that `ROLEWRIGHT_GRIEVANCE_*` in the parent env without the flag fails 11b | Next prod-smoke edit |
+| P0-1b re-review | Engine-only misses from the stop list ("Promoted to a lead role at Acme Corp", "Managed the position reconciliation at Acme Corp"): pass target company and role into the gate (ADR 0015) and drop the stop list; the app strict layer catches them today | Phase 2 cover letters |
+| P0-1b re-review | "Processed 14M evaluations for users" reported as `14m users` | Later gate task |
+| P0-1b re-review | Blank-line linear-time test is wall-clock based; watch it on shared CI | Note |

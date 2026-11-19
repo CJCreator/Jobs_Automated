@@ -35,7 +35,8 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 - `set-status` lock scope and its three suites, `walk-tree`, `writer-scripts-data-root`, `updater-migration-tests.mjs`.
 - `SYSTEM_PATHS` coverage gap, README Codex guidance, `readme-shared-layer` and `readme-usage-commands`.
 - Legacy web UI: the doctor route contract and the PDF write-scope suites (retired with `packages/engine/web`, ADR 0007).
-- `#2346` and "Multiple tracker IDs", which are flaky under parallel load.
+- `#2346`, `#2348` (`set-status.test.mjs`) and "Multiple tracker IDs", which are flaky under parallel load and pass when run alone.
+- `tests/pdf-shared-browser.test.mjs`, flaky when the browser launch is slow under load.
 
 ## Rules for changes
 
