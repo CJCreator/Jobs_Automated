@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import zlib from "node:zlib";
+import { threadId, isMainThread } from "node:worker_threads";
 import { pdfText, PdfTextError } from "../src/lib/server/pdf-text.mjs";
 
 /** Build a PDF with one page per content string. Optionally Flate-compress each stream. */
@@ -59,7 +60,8 @@ test("a PDF bomb is refused with 413 pdf_too_much_text, quickly, without buildin
   const grown = process.memoryUsage().rss - rssBefore;
   console.log(`bomb: ${Math.round(elapsed)} ms, rss +${Math.round(grown / 1048576)} MB, pdf ${bomb.length} bytes`);
   assert.ok(elapsed < 2000, `took ${elapsed} ms`);
-  assert.ok(grown < 200 * 1048576, `rss grew ${grown} bytes`);
+  // The worker thread has its own heap (capped at 128 MB old space); its pages may not be returned yet.
+  assert.ok(grown < 300 * 1048576, `rss grew ${grown} bytes`);
 });
 
 test("a small one-page PDF returns its text", async () => {
@@ -97,4 +99,76 @@ test("a wall-clock budget of zero gives 413 pdf_too_complex", async () => {
     assert.equal(error.code, "pdf_too_complex");
     return true;
   });
+});
+
+// P0-6b: parsing runs in a worker the parent terminates at the deadline.
+const OFF_PAGE = "BT /F1 12 Tf 0.01 TL 5000 700 Td " + `(${"A".repeat(1000)}) Tj T*\n`.repeat(60000) + "ET";
+const Q_Q = "q Q\n".repeat(15_000_000);
+
+/** Run fn while a 20 ms interval ticks on the main thread; return the largest gap. */
+async function withTicker(fn) {
+  let last = performance.now();
+  let maxGap = 0;
+  const ticker = setInterval(() => {
+    const now = performance.now();
+    maxGap = Math.max(maxGap, now - last);
+    last = now;
+  }, 20);
+  const started = performance.now();
+  let result;
+  try {
+    result = await fn().then(() => "ok", (error) => error);
+  } finally {
+    clearInterval(ticker);
+  }
+  return { result, maxGap, elapsed: performance.now() - started };
+}
+
+const noLiveWorkers = () => new Promise((resolve) => setTimeout(resolve, 100)).then(() => {
+  assert.equal(process.getActiveResourcesInfo().filter((r) => r === "MessagePort" || r === "Worker").length, 0);
+});
+
+for (const [name, content] of [["off-page text", OFF_PAGE], ["a q Q operator stream", Q_Q]]) {
+  test(`${name}: 413 pdf_too_complex within budget + 500 ms, main loop keeps ticking`, async () => {
+    const bytes = buildPdf([content], { compress: true });
+    console.log(`${name}: pdf ${bytes.length} bytes`);
+    const budget = 1000;
+    const { result, maxGap, elapsed } = await withTicker(() => pdfText(bytes, { timeBudgetMs: budget }));
+    console.log(`${name}: ${Math.round(elapsed)} ms, max loop gap ${Math.round(maxGap)} ms`);
+    assert.ok(result instanceof PdfTextError, String(result));
+    assert.equal(result.status, 413);
+    assert.equal(result.code, "pdf_too_complex");
+    assert.ok(elapsed < budget + 500, `took ${elapsed} ms`);
+    assert.ok(maxGap < 250, `event loop stalled for ${maxGap} ms`);
+    await noLiveWorkers();
+  });
+}
+
+test("expiry in the middle of a read: 413 pdf_too_complex", async () => {
+  const bytes = buildPdf([textStream("A".repeat(1000), 60000)], { compress: true });
+  await assert.rejects(pdfText(bytes, { timeBudgetMs: 30, maxExpandedChars: 1e9 }), (error) => {
+    assert.ok(error instanceof PdfTextError);
+    assert.equal(error.status, 413);
+    assert.equal(error.code, "pdf_too_complex");
+    return true;
+  });
+  await noLiveWorkers();
+});
+
+test("30 pages of resume text parse within the worker memory cap", async () => {
+  const bytes = buildPdf(Array.from({ length: 30 }, () => textStream("Led a team of five engineers at Acme Corp.", 60)));
+  const { pages, text } = await pdfText(bytes);
+  assert.equal(pages, 30);
+  assert.ok(text.length > 1000);
+});
+
+test("a normal PDF leaves no worker behind and the default budget is 5 s", async () => {
+  const { PDF_TIME_BUDGET_MS } = await import("../src/lib/server/pdf-text.mjs");
+  assert.equal(PDF_TIME_BUDGET_MS, 5000);
+  assert.ok(isMainThread && threadId === 0);
+  const started = performance.now();
+  const { text } = await pdfText(buildPdf([textStream("Shipped the billing rewrite.", 5)]));
+  console.log(`normal PDF: ${Math.round(performance.now() - started)} ms`);
+  assert.ok(text.includes("billing rewrite"));
+  await noLiveWorkers();
 });
