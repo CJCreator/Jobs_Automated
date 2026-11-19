@@ -23,3 +23,6 @@ Items raised in advisor reviews that the reviewed task does not own. Each is ass
 | P0-1a review | Browser test for the grouped export-blocked notice | P0-11 |
 | P0-1a re-review | "ph d" (space, no dots) passes; "Ph. D." blocks only via the name check | Later gate task |
 | P0-1a re-review | "Vice President" vs facts "VP" false-blocks on the name check (one attest click) | Later gate task |
+| P0-6 review | Text cap merged; CPU and decompressed-size bound still open (launch review P1-6, PLAN row 7) | P0-6b (blocks the phase gate) |
+| P0-6 review | Set Cloud Run memory, request timeout and concurrency explicitly; worker typed-array memory is bounded only by the instance limit | P1-6 |
+| P0-6 review | Upload rate limit is per process, so it weakens with more instances | P1-3 |

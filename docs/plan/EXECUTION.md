@@ -91,7 +91,7 @@ The advisor's corrections, waves and full briefs are in [`phase-0-briefs.md`](ph
 
 ```
 Wave A  P0-1a  P0-5   P0-6   P0-7
-Wave B  P0-1b (after P0-1a)   P0-3a   P0-4   P0-10
+Wave B  P0-1b (after P0-1a)   P0-3a   P0-4   P0-10   P0-6b (after P0-6)
 Wave C  P0-2 (after P0-3a, P0-10)   P0-3b (after P0-3a, P0-4, P0-5, P0-10)   P0-9a (after P0-3a, P0-4, P0-7)
 Wave D  P0-8 (after P0-2, P0-4)   P0-11 (after all)
 ```
@@ -105,7 +105,8 @@ Wave D  P0-8 (after P0-2, P0-4)   P0-11 (after all)
 | P0-3b | Haiku | Copy pass: the only editor of existing `en.ts` keys |
 | P0-4 | Sonnet | Purge endpoint with Google OIDC; token deletion |
 | P0-5 | Sonnet | Session-only key (cleared on sign-out too) |
-| P0-6 | Sonnet | PDF expansion cap |
+| P0-6 | Sonnet | PDF expansion cap (text count) |
+| P0-6b | Sonnet | PDF parsing in a worker thread with a hard deadline (added after the P0-6 review) |
 | P0-7 | Sonnet | Deployed-environment safety switches |
 | P0-8 | Sonnet | Isolation and row locks on real Postgres; new `app-ci.yml` |
 | P0-9a | Haiku | HSTS, prod-smoke browser launcher |
@@ -190,3 +191,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 |---|---|---|---|---|
 | P0-7 | `task/P0-7` | approve | 1 | `eb82196` |
 | P0-1a | `task/P0-1a` | approve | 2 | `eee654e` |
+| P0-6 | `task/P0-6` | approve (does not close P1-6; P0-6b added) | 0 | merge on this branch |

@@ -595,7 +595,7 @@ Report: add the e2e result before and after.
 ```
 
 ```
-Task: P0-6 PDF expansion cap
+Task: P0-6 PDF expansion cap  (merged; its fixture recipe is off-page and the cap does not bound CPU or decompressed size: see P0-6b)
 Worker: Sonnet
 Goal: A small PDF that expands to huge text is refused quickly with a 413, before the text is built in
   memory.
@@ -626,6 +626,48 @@ Steps:
 Done when:
   - cd apps/web && npm run typecheck && npm test && npm run test:flow && npm run build
 Report: add the measured time and memory for the bomb before and after.
+```
+
+```
+Task: P0-6b Parse PDFs off the main thread with a hard deadline
+Worker: Sonnet
+Goal: No uploaded PDF can block the server's event loop or exceed the parse deadline. Parsing runs in a
+  worker thread that the parent terminates at the deadline, returning 413 pdf_too_complex.
+ADRs: 0004
+Why: P0-6 caps extracted text, but pdf.js parses on the main thread in Node, so a PDF whose content yields
+  no text items (off-page text, or a "q Q" operator stream) starves the event loop and the timer never
+  fires. Advisor measurements on the P0-6 code: the original P0-6 recipe (165 KB, off-page) returns ok in
+  ~6 s; a 496 KB variant returns only after 17 s at +280 MB; "q Q\n" x 15M (59 KB) returns ok after 5.5 s
+  with a 500 ms budget. A zlib pre-scan is NOT a control (bypassed by /Filter [/ASCIIHexDecode /FlateDecode]).
+  A worker_threads prototype terminated at ~1 s on both bombs with the main loop responsive (lag 5-118 ms);
+  a normal PDF cost 180-215 ms.
+Touches (only these):
+  apps/web/src/lib/server/pdf-text.mjs
+  apps/web/src/lib/server/pdf-text-worker.mjs (new)
+  apps/web/tests/pdf-text.test.mjs
+  apps/web/next.config.mjs (only if file tracing needs the worker file listed)
+Steps:
+ 1. Tests first, seen failing on the current code:
+    - the off-page recipe (tiny page, 12 pt text drawn off the page, about 165 KB) and the "q Q" stream each
+      return 413 pdf_too_complex within budget + 500 ms;
+    - a 20 ms setInterval on the main thread keeps ticking during both (max gap under 250 ms);
+    - mid-read expiry: timeBudgetMs small, maxExpandedChars 1e9, a large text PDF -> 413 pdf_too_complex;
+    - after every test, no worker thread is left alive.
+ 2. Move the existing streaming logic (including MAX_PDF_EXPANDED_CHARS, MAX_PDF_CHARS truncation, page
+    cap) into pdf-text-worker.mjs. The parent spawns a Worker with resourceLimits (maxOldGenerationSizeMb
+    about 256), enforces timeBudgetMs with worker.terminate(), and maps worker errors to the existing
+    PdfTextError codes. Keep the exported signature and return shape.
+ 3. Default timeBudgetMs becomes 5,000 ms (PDF_TIME_BUDGET_MS).
+ 4. Create the timer only after setup succeeds, or put setup inside the try (P0-6 review finding 4).
+ 5. Prove the worker file resolves in the built app: pdf-text.mjs is bundled, so do not rely on
+    import.meta.url self-spawn without checking `next build` output; reference the worker file by a path
+    that survives the build (and list it for output file tracing if needed).
+Done when:
+  - the new tests pass and were seen failing first
+  - apps/web: npm run typecheck && npm test && npm run build
+  - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=... npm run test:flow (its upload step parses a PDF in the dev server)
+  - npm run test:prod upload step passes against the production build (step 13 may still fail until P0-9a)
+Report: as in the common list, plus timings for a normal resume before and after.
 ```
 
 ```
