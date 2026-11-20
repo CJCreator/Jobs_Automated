@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 // information for the user and never changes a suggestion or its check.
 export const GET = route<{ id: string }>("tailorings.coverage", async (_req, { params, state }) => {
   const userId = await requireUser(state);
-  await takeRateLimit("tailoring", userId);
+  await takeRateLimit("coverage", userId);
   const { id } = await params;
   const db = await getDb();
   const tailoring = await getTailoring(db, userId, id);

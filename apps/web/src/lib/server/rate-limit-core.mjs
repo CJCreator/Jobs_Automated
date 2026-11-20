@@ -8,6 +8,7 @@ export const LIMITS = {
   ai: { max: 20, windowMs: MIN, message: "Too many AI requests in a short time. Wait a minute and try again." },
   upload: { max: 10, windowMs: HOUR, message: "Too many uploads in the last hour. Try again later." },
   // Reading a tailoring, a review action and an export each run the fact gate on every suggestion.
+  coverage: { max: 60, windowMs: MIN, message: "Too many requests in a short time. Wait a minute and try again." },
   tailoring: { max: 40, windowMs: MIN, message: "Too many requests in a short time. Wait a minute and try again." },
   keyCheck: { max: 10, windowMs: 10 * MIN, message: "Too many key checks in a short time. Wait a few minutes and try again." },
   export: { max: 20, windowMs: HOUR, message: "Too many exports in the last hour. Try again later." },

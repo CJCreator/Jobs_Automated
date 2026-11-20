@@ -79,14 +79,15 @@ export function ReviewView({ id }: { id: string }) {
     return () => controller.abort();
   }, [id, nonce]);
 
-  // Coverage is information only. It is refetched after every change to the
-  // suggestions and a failure here never blocks the page.
+  // Coverage is information only. It is refetched whenever the accepted lines change and a failure here never blocks the page.
   const [coverage, setCoverage] = useState<Coverage | null>(null);
-  const decisions = useMemo(
-    () => (tailoring?.suggestions ?? []).map((s) => `${s.id}:${s.decision}:${s.finalText}`).join("\n"),
+  const acceptedKey = useMemo(
+    () => (tailoring?.suggestions ?? []).filter((s) => s.decision === "accepted").map((s) => `${s.ref}:${s.finalText}`).join("\n"),
     [tailoring],
   );
   const loaded = tailoring !== null;
+  // A different tailoring never shows the previous one's numbers.
+  useEffect(() => setCoverage(null), [id]);
   useEffect(() => {
     if (!loaded) return;
     const controller = new AbortController();
@@ -96,7 +97,7 @@ export function ReviewView({ id }: { id: string }) {
         if (!controller.signal.aborted) setCoverage(null);
       });
     return () => controller.abort();
-  }, [id, loaded, decisions]);
+  }, [id, loaded, acceptedKey]);
 
   const counts = useMemo(() => {
     const list = tailoring?.suggestions ?? [];

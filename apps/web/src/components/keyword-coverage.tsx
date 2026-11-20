@@ -18,7 +18,7 @@ export function KeywordCoverage({ coverage }: { coverage: Coverage }) {
       </p>
       {coverage.missing.length > 0 ? (
         <details>
-          <summary className="min-h-8 cursor-pointer font-medium">{t.missingToggle(coverage.missing.length)}</summary>
+          <summary className="min-h-8 cursor-pointer font-medium">{t.missingToggle(coverage.missingTotal)}</summary>
           <ul className="mt-2 flex flex-wrap gap-2">
             {coverage.missing.map((k) => (
               <li key={k} className="rounded-md border border-line px-2 py-1 text-sm">

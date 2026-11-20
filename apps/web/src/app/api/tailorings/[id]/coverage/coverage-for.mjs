@@ -8,7 +8,7 @@ import { MAX_KEYWORDS, MAX_TEXT_CHARS, analyzeCoverage, keywordsFromJdText } fro
 export const MAX_MISSING = 30;
 
 /**
- * @returns {{ before: {covered:number,total:number}, after: {covered:number,total:number}, missing: string[] }}
+ * @returns {{ before: {covered:number,total:number}, after: {covered:number,total:number}, missing: string[], missingTotal: number }}
  * @throws {RangeError} when the resume text is over the port's cap.
  */
 export function coverageFor(facts, suggestions, jdText) {
@@ -20,6 +20,7 @@ export function coverageFor(facts, suggestions, jdText) {
   return {
     before: { covered: before.presentCount, total: before.total },
     after: { covered: after.presentCount, total: after.total },
+    missingTotal: after.missing.length,
     missing: after.missing.slice(0, MAX_MISSING),
   };
 }
