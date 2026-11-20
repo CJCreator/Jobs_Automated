@@ -45,6 +45,8 @@ jobs:
       # rely on `.` (no \r) fail in ways the other platforms never see.
       - name: Force LF checkout on Windows
         if: runner.os == 'Windows'
+        # Runs before checkout, so packages/engine (the job default) does not exist yet.
+        working-directory: ${{ github.workspace }}
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
