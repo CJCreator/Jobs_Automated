@@ -1,0 +1,4 @@
+Platform Engineer, Sample Cloud Co
+Wrote IaC with Terraform; ran GCP and AWS workloads on k8s using Helm.
+Monitoring via Grafana and Prometheus. Bash scripting on Linux. Docker images.
+Terraformed everything. Kubernetes operators in Go.

@@ -105,7 +105,7 @@ jobs:
 
             const bad = files
               .filter((f) => f.status !== 'removed')
-              .map((f) => f.filename)
+              .map((f) => f.filename.replace(/^packages\/engine\//, ''))
               .filter((f) => USER_PATHS.some((re) => re.test(f)) && !isScaffold(f));
 
             if (bad.length) {

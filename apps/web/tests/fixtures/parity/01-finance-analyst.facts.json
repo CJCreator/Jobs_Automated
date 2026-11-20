@@ -1,0 +1,81 @@
+{
+  "contact": {
+    "name": "Meera Nair",
+    "email": "01@example.com",
+    "phone": "",
+    "location": "Pune",
+    "links": [],
+    "confirmed": true
+  },
+  "summary": {
+    "text": "Finance analyst with 3 years of experience in reporting and reconciliations.",
+    "confirmed": true
+  },
+  "experience": [
+    {
+      "id": "exp1",
+      "company": "Northwind Services",
+      "title": "Finance Analyst",
+      "location": "Pune",
+      "start": "2021",
+      "end": "2024",
+      "confirmed": true,
+      "bullets": [
+        {
+          "id": "b1",
+          "text": "Prepared monthly management reports in Excel and SQL for 6 business units",
+          "confirmed": true
+        },
+        {
+          "id": "b2",
+          "text": "Reduced reconciliation errors by 20% by building a checklist",
+          "confirmed": true
+        },
+        {
+          "id": "b3",
+          "text": "Supported the statutory audit with schedules and working papers",
+          "confirmed": true
+        },
+        {
+          "id": "b4",
+          "text": "Handled vendor payments of ₹40 lakh a month",
+          "confirmed": true
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "ed1",
+      "degree": "B.Com",
+      "field": "",
+      "school": "Fergusson College",
+      "year": "2021",
+      "confirmed": true
+    }
+  ],
+  "skills": [
+    {
+      "id": "s1",
+      "name": "Excel",
+      "confirmed": true
+    },
+    {
+      "id": "s2",
+      "name": "SQL",
+      "confirmed": true
+    },
+    {
+      "id": "s3",
+      "name": "Tally",
+      "confirmed": true
+    },
+    {
+      "id": "s4",
+      "name": "Power BI",
+      "confirmed": true
+    }
+  ],
+  "extras": [],
+  "cannotConfirm": []
+}

@@ -1,0 +1,11 @@
+{
+  "name": "rolewright",
+  "version": "1.38.0",
+  "description": "Open-source AI job search that runs locally in your AI coding CLI: scan job portals, evaluate listings into a structured A-H report with a 1-5 score, tailor your CV, track applications",
+  "author": {
+    "name": "Rolewright contributors"
+  },
+  "skills": [
+    "./.agents/skills/rolewright"
+  ]
+}

@@ -1,0 +1,4 @@
+Frontend Developer, Demo Labs
+Shipped React and TypeScript apps on Next.js with Tailwind. JS tooling with Jest.
+Wrote GraphQL queries; collaborated with design in Figma. Also used C# and .NET.
+Go-live support for three launches; a+b and [x] were notation in our docs.

@@ -1,0 +1,113 @@
+name: Deploy
+
+# Manual deploy to Google Cloud (ADR 0009): build the image, push it, run the
+# migrate job, then roll the service. Authenticates with workload identity
+# federation (no key file). On pull requests it only checks that the image
+# builds and that the Terraform is well formed; nothing is pushed or applied.
+#
+# Per GitHub environment (staging, production), set these variables (not
+# secrets; none is sensitive) from the Terraform outputs:
+#   GCP_PROJECT_ID, GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_DEPLOYER_SERVICE_ACCOUNT
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        type: choice
+        options:
+          - staging
+          - production
+        required: true
+  pull_request:
+    paths:
+      - 'apps/web/Dockerfile'
+      - 'infra/**'
+      - '.github/workflows/deploy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.environment }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGION: asia-south1
+
+jobs:
+  image-build:
+    name: image builds (no push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: docker build
+        run: docker build -f apps/web/Dockerfile -t rolewright:check .
+
+  terraform-check:
+    name: terraform fmt and validate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.9.8
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  deploy:
+    name: build, migrate, deploy (${{ inputs.environment }})
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      IMAGE: asia-south1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/rolewright/rolewright:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push the image
+        run: |
+          docker build -f apps/web/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Run the migrations with the new image
+        run: |
+          gcloud run jobs update rolewright-migrate \
+            --project "$PROJECT_ID" --region "$REGION" --image "$IMAGE"
+          gcloud run jobs execute rolewright-migrate \
+            --project "$PROJECT_ID" --region "$REGION" --wait
+
+      - name: Deploy the service
+        run: |
+          gcloud run services update rolewright \
+            --project "$PROJECT_ID" --region "$REGION" --image "$IMAGE"

@@ -1,0 +1,5 @@
+Software Engineer, Example Systems Pvt Ltd
+- Built REST APIs in Python and Django backed by Postgres.
+- Deployed containers with Docker on k8s; maintained CI/CD in GitHub Actions.
+- Cached hot paths in Redis, cutting p95 latency.
+Skills: Python, Django, SQL, Linux

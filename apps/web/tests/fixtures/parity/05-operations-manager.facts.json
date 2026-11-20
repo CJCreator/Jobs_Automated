@@ -1,0 +1,86 @@
+{
+  "contact": {
+    "name": "Sunita Deshmukh",
+    "email": "05@example.com",
+    "phone": "",
+    "location": "Nagpur",
+    "links": [],
+    "confirmed": true
+  },
+  "summary": {
+    "text": "Operations manager with 8 years of experience in logistics and warehouse operations.",
+    "confirmed": true
+  },
+  "experience": [
+    {
+      "id": "exp1",
+      "company": "Vidarbha Freight",
+      "title": "Operations Manager",
+      "location": "Nagpur",
+      "start": "2018",
+      "end": "2024",
+      "confirmed": true,
+      "bullets": [
+        {
+          "id": "b1",
+          "text": "Managed daily dispatch for a warehouse with 25 staff",
+          "confirmed": true
+        },
+        {
+          "id": "b2",
+          "text": "Cut late deliveries by 15% by changing the loading schedule",
+          "confirmed": true
+        },
+        {
+          "id": "b3",
+          "text": "Tracked inventory in SAP and reconciled stock every month",
+          "confirmed": true
+        },
+        {
+          "id": "b4",
+          "text": "Trained 10 supervisors on safety procedures",
+          "confirmed": true
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "ed1",
+      "degree": "MBA",
+      "field": "Operations",
+      "school": "RTM Nagpur University",
+      "year": "2016",
+      "confirmed": true
+    }
+  ],
+  "skills": [
+    {
+      "id": "s1",
+      "name": "SAP",
+      "confirmed": true
+    },
+    {
+      "id": "s2",
+      "name": "Inventory management",
+      "confirmed": true
+    },
+    {
+      "id": "s3",
+      "name": "Logistics",
+      "confirmed": true
+    },
+    {
+      "id": "s4",
+      "name": "Excel",
+      "confirmed": true
+    },
+    {
+      "id": "s5",
+      "name": "Team leadership",
+      "confirmed": true
+    }
+  ],
+  "extras": [],
+  "cannotConfirm": []
+}

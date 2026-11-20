@@ -1,0 +1,78 @@
+// tests/project-identity.test.mjs — several files describe this project and only
+// one pair of them was ever compared, so the rest drifted in silence.
+//
+// This test started out asserting over FOUR files, which was wrong: sweeping by
+// content instead of by the filenames I expected found three more short blurbs
+// (.claude-plugin/marketplace.json carries two, and .github/plugin/ mirrors the
+// manifest). The count in a comment is exactly the thing that goes stale, so the
+// assertions below enumerate the places from the files themselves where they can.
+//
+// What was found on 2026-09-04, all three at once:
+//
+//   .claude-plugin/plugin.json  "AI job search command center"
+//                               — "command center" reads as centralized infrastructure,
+//                                 which is the opposite of what this tool is.
+//   package.json  homepage      https://santifer.io
+//   CITATION.cff  url           https://santifer.io
+//                               — both set in the same branding commit, BEFORE
+//                                 career-ops.org existed. Meanwhile the GitHub
+//                                 homepage and the README already say career-ops.org.
+//
+// CITATION.cff's `url` is the field Zenodo and citation tooling copy as the
+// SOFTWARE's website, so a stale value there tells the academic-citation
+// ecosystem the wrong thing about where this project lives.
+//
+// None of it broke anything, which is exactly why it lasted: a description is
+// read by people, not by code, so drift produces no error and no failing test.
+//
+// These assertions compare the files to EACH OTHER, never to an expected string
+// kept in here. A hardcoded blurb would just be a fifth copy to keep in sync,
+// and the bug being fixed is that there were already four.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const read = (p) => readFileSync(join(ROOT, p), 'utf-8');
+// .github/ stayed at the repository root when the engine moved to
+// packages/engine; read the real one there when the engine has none.
+const readGithub = (p) => readFileSync(
+  join(existsSync(join(ROOT, '.github')) ? ROOT : join(ROOT, '..', '..'), '.github', p), 'utf-8');
+
+test('every short blurb describes the same project in the same words', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const marketplace = JSON.parse(read('.claude-plugin/marketplace.json'));
+
+  // package.json is the reference only because npm publishes it; it carries no
+  // more authority than the others. What matters is that they agree.
+  const blurbs = [
+    ['package.json', pkg.description],
+    ['.claude-plugin/plugin.json', JSON.parse(read('.claude-plugin/plugin.json')).description],
+    ['.github/plugin/plugin.json', JSON.parse(readGithub('plugin/plugin.json')).description],
+    // claude-directory/.claude-plugin/plugin.json is left out on purpose: its description is the
+    // Claude plugin directory listing, worded for that page (tests/claude-directory-plugin.test.mjs).
+    ['.claude-plugin/marketplace.json metadata', marketplace.metadata?.description],
+    // Enumerated from the file, not from a count kept here: a marketplace with a
+    // second plugin one day should widen this automatically.
+    ...(marketplace.plugins ?? []).map((pl, i) => [`.claude-plugin/marketplace.json plugins[${i}]`, pl.description]),
+  ];
+
+  for (const [where, blurb] of blurbs) {
+    assert.ok(blurb, `${where} must carry a description`);
+  }
+  for (const [where, blurb] of blurbs.slice(1)) {
+    assert.equal(
+      blurb,
+      pkg.description,
+      `${where} drifted from package.json: these are the same sentence for the same ` +
+      'audience, so if one changes, change them all in the same commit',
+    );
+  }
+});
+
+// CITATION.cff was deleted with the rest of the upstream community files when
+// this engine was forked into Rolewright (see docs/adr/ at the repository root),
+// so the two cases that compared its url and repository-code are gone with it.

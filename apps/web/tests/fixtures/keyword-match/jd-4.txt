@@ -1,0 +1,4 @@
+Frontend Developer
+React, TypeScript, Next.js, Node.js, Tailwind CSS and GraphQL. Must know HTML, CSS
+and JavaScript. Familiarity with Jest, Cypress and Figma. Go-to-market mindset.
+Regex-like terms: C#, .NET, (a+b)*, [x], $1, and node.js/express.

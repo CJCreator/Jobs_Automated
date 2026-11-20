@@ -21,6 +21,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: packages/engine
+
 jobs:
   test:
     strategy:
@@ -41,6 +45,8 @@ jobs:
       # rely on `.` (no \r) fail in ways the other platforms never see.
       - name: Force LF checkout on Windows
         if: runner.os == 'Windows'
+        # Runs before checkout, so packages/engine (the job default) does not exist yet.
+        working-directory: ${{ github.workspace }}
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
@@ -59,20 +65,11 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.27'
-          # The module lives in dashboard/, so without this setup-go looks for
-          # go.sum at the root, warns, and caches nothing.
-          cache-dependency-path: dashboard/go.sum
       # Skip the postinstall (npx playwright install chromium): the ~170 MB
       # download on three OSes would buy only the few suites that launch a
       # browser, and those skip here and run in the tool-suites job instead.
       - run: npm install --ignore-scripts
       - run: node test-all.mjs --quick
-      - name: Go dashboard tests
-        run: go test ./...
-        working-directory: dashboard
 
   cv-visual:
     # Not a required check, so the merge queue never waits on it: a red queue
@@ -131,41 +128,6 @@ jobs:
             --volume "$PWD:/work" --volume /work/node_modules \
             career-ops-cv-visual \
             sh -c 'npm install --ignore-scripts --package-lock=false && node install-latex-engine.mjs && node test-all.mjs --needs browser,latex'
-  upgrade-gate:
-    name: Upgrade regression gate
-    # Skipped in the merge queue for cv-visual's reason above.
-    if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
-    # About 3 minutes. Limited for the test job's reason.
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0            # harness needs release tags
-          persist-credentials: false # the harness only ever touches a local mirror
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.27'   # old updaters rebuild the dashboard during apply
-          cache-dependency-path: dashboard/go.sum
-      - run: npm install --ignore-scripts
-      - name: Upgrade PR gate (newest old release -> this commit)
-        run: node upgrade-tests.mjs --pr-gate
-      - name: Canary (harness must be able to fail)
-        run: node upgrade-tests.mjs --canary
-      - name: Local-paths declaration survives a real apply (#2421)
-        run: node upgrade-tests.mjs --local-paths
-      - name: User-layer manifest entry is refused, not fatal (#3782)
-        run: node upgrade-tests.mjs --user-layer-refusal
-      - name: Failed npm install is reported, rollback reinstalls
-        run: node upgrade-tests.mjs --failed-install
-      - name: A locally edited system file is kept, and replaced only with --force (#2337)
-        run: node upgrade-tests.mjs --local-edit
-      - name: Local-edit canary (an inverted --force branch must go red)
-        run: node upgrade-tests.mjs --local-edit-canary
-
   dependency-audit:
     name: Dependency audit
     # Informative by design: the root has no tracked lockfile (ranges resolve

@@ -1,0 +1,94 @@
+import { getDb } from "@/lib/db/index.mjs";
+import { changeFacts, saveResume } from "@/lib/db/repo.mjs";
+import { reconcileUpload } from "@/lib/fact-source.mjs";
+import { confirmationCounts, normalizeFacts } from "@/lib/facts.mjs";
+import { extractFacts } from "@/lib/llm/index.mjs";
+import { requireConsent } from "@/lib/server/consent";
+import { readBodyBytes } from "@/lib/server/body";
+import { HttpError, json, route } from "@/lib/server/http";
+import { readLlmHeaders, requireTrialAccess, trialHttpError } from "@/lib/server/llm-key";
+import { pdfText } from "@/lib/server/pdf-text.mjs";
+import { takeRateLimit } from "@/lib/server/rate-limit";
+import { requireUser } from "@/lib/server/session";
+import { track } from "@/lib/server/track.mjs";
+import { runWithTrial, withReservation } from "@/lib/server/trial.mjs";
+import { en } from "@/i18n/en";
+
+export const runtime = "nodejs";
+
+const MAX_FILE = 5 * 1024 * 1024;
+// Room for the multipart boundaries and part headers around the file itself.
+const MAX_BODY = MAX_FILE + 64 * 1024;
+const MIN_TEXT = 200;
+const PDF_TYPES = new Set(["application/pdf", "application/x-pdf"]);
+
+const notPdf = () => new HttpError(415, "not_pdf", "That file is not a PDF. Save your resume as a PDF and upload it again.");
+
+function startsWithPdfMagic(bytes: Uint8Array): boolean {
+  const magic = [0x25, 0x50, 0x44, 0x46, 0x2d]; // "%PDF-"
+  return bytes.length >= magic.length && magic.every((b, i) => bytes[i] === b);
+}
+
+const cleanFilename = (name: string) => name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 200) || "resume.pdf";
+
+export const POST = route("resume.upload", async (req, { state }) => {
+  const userId = await requireUser(state);
+  const llm = readLlmHeaders(req, { allowTrial: true });
+  // Before the body is read and before a rate-limit token is spent: no collection without consent.
+  if (llm.trial) await requireTrialAccess(userId, req);
+  else await requireConsent(userId, llm.provider);
+  await takeRateLimit("upload", userId);
+
+  const type = req.headers.get("content-type") ?? "";
+  if (!type.toLowerCase().startsWith("multipart/form-data")) {
+    throw new HttpError(415, "unsupported_type", "Upload your resume as a PDF file.");
+  }
+  // Read with a cap first: parsing a form buffers the whole body, whatever its size.
+  const body = await readBodyBytes(req, MAX_BODY, "That file");
+  let form: FormData;
+  try {
+    form = await new Response(body as Uint8Array<ArrayBuffer>, { headers: { "content-type": type } }).formData();
+  } catch {
+    throw new HttpError(400, "bad_upload", "The upload could not be read. Try again.");
+  }
+  const file = form.get("file");
+  if (!(file instanceof File)) throw new HttpError(400, "no_file", "Choose a PDF file to upload.");
+  if (file.size > MAX_FILE) throw new HttpError(413, "too_large", "That file is larger than 5 MB.");
+  if (file.type && !PDF_TYPES.has(file.type.toLowerCase())) throw notPdf();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!startsWithPdfMagic(bytes)) throw notPdf();
+
+  // Never written to disk: the bytes live only in this request.
+  const { text } = await pdfText(bytes);
+  if (text.replace(/\s+/g, " ").trim().length < MIN_TEXT) {
+    throw new HttpError(
+      422,
+      "no_text",
+      "We could not find enough text in this PDF. It looks like a scanned or image-only file, which is not supported yet. Upload a PDF saved from Word, Google Docs or a similar tool.",
+    );
+  }
+
+  const db = await getDb();
+  const work = async () => {
+    const raw = llm.trial
+      ? (await runWithTrial((c: { provider: string; key: string; model: string }) => extractFacts({ ...c, resumeText: text }))).value
+      : await extractFacts({ provider: llm.provider, key: llm.key, model: llm.model, resumeText: text });
+    const proposed = normalizeFacts(raw, { trustConfirmed: false });
+    await saveResume(db, userId, { filename: cleanFilename(file.name), rawText: text });
+    // A new resume replaces the proposal. Items the upload does not contain are
+    // labelled "model"; items unchanged since the user confirmed them keep their
+    // id and confirmation. What the user stated themselves or said they cannot
+    // confirm is never touched. Read and written under the facts row lock, so a
+    // review action at the same moment is not lost.
+    return changeFacts(db, userId, (existing) => reconcileUpload(existing, proposed, text));
+  };
+  // A trial reading is taken just before the model call and given back if anything fails before the facts are stored.
+  let facts;
+  try {
+    facts = llm.trial ? await withReservation(db, userId, "uploads", work, { usedUpMessage: en.trial.usedUpUploads }) : await work();
+  } catch (err) {
+    throw trialHttpError(err);
+  }
+  await track(userId, "resume_uploaded", { provider: llm.provider });
+  return json({ facts, counts: confirmationCounts(facts) });
+});
