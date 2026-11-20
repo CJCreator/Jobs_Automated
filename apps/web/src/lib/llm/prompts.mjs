@@ -12,7 +12,7 @@ const MAX_RESUME = 60000;
 
 /** Cap the text and remove any copy of the delimiter so it cannot close its own block. */
 function fence(text, tag, max) {
-  const re = new RegExp(`</?\\s*${escapeRegExp(tag)}\\s*>`, "gi");
+  const re = new RegExp(`<\\s*(?:/\\s*)?${escapeRegExp(tag)}\\b[^<>]*>`, "gi");
   let s = String(text ?? "").slice(0, max);
   // Repeat until stable: removing "<res<resume>ume>" once would leave a fresh "<resume>".
   for (let prev = null; prev !== s; ) {
