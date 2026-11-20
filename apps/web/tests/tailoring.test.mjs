@@ -193,12 +193,17 @@ test("attest adds a confirmed, user-stated fact and the blocked suggestion then 
   assert.equal(extra.source, "user");
   assert.equal(extra.statedAt, "2026-11-18");
   assert.equal(facts.extras.length, 0, "the input facts are not mutated");
-  assert.notEqual(out.suggestions[0].check.verdict, "block");
-  // Every suggestion is re-checked against the new facts.
-  assert.notEqual(out.suggestions[1].check.verdict, "block");
+  // P1-20: a bare "12" is not about analysts; the figure now has to be confirmed in context.
+  assert.equal(out.suggestions[0].check.verdict, "block");
+  assert.deepEqual(out.suggestions[0].check.issues.map((i) => i.value), ["12 analysts"]);
+  const stated = applyAction(out.facts, out.suggestions, list[0].id, { action: "attest", value: "12 analysts" }, ctx);
+  assert.equal(stated.facts.extras.length, 2);
+  assert.notEqual(stated.suggestions[0].check.verdict, "block");
+  // Every suggestion is re-checked against the new facts: 12 is confirmed for analysts, not contracts.
+  assert.deepEqual(stated.suggestions[1].check.issues.map((i) => i.value), ["12 vendor"]);
 
   // Once stated, it is no longer an issue, so it cannot be attested a second time.
-  expectError(() => applyAction(out.facts, out.suggestions, list[0].id, { action: "attest", value: "12" }, ctx), 400, "not_an_issue");
+  expectError(() => applyAction(stated.facts, stated.suggestions, list[0].id, { action: "attest", value: "12" }, ctx), 400, "not_an_issue");
 
   // An unconfirmed extra with the same text is confirmed in place, not duplicated.
   const pendingExtra = ashaFacts({ extras: [{ id: "x-twelve", text: "12", confirmed: false }] });
@@ -356,4 +361,41 @@ test("exportBlockers returns the exact exported line as text", () => {
   assert.ok(blockers[0].issues.some((i) => i.value === "entire"));
   // With no engine gate there is no line to show, but the field is still a string.
   assert.equal(exportBlockers(facts, list, {})[0].text, "");
+});
+
+// --- P1-20: attesting each new kind of issue, and issues with no value ---------------
+
+const attestCases = [
+  ["rank", "Ranked 1st among analysts", "Ranked 1st"],
+  ["tenure", "Over a decade of experience in finance", "decade"],
+  ["language", "Fluent in German", "German"],
+  ["credential", "Completed a bachelor's degree in commerce", "bachelor's degree"],
+  ["number context", "Oversaw 4 vendor contracts", "4 vendor"],
+];
+for (const [name, text, value] of attestCases) {
+  test(`attest unblocks a ${name} issue`, () => {
+    const facts = ashaFacts();
+    const { gate } = stubGate();
+    const list = [suggestion(REF.team, text)];
+    const ctx = { engineGate: gate, now: NOW };
+    const before = checkSuggestion(list[0], { ...ctxFor(facts), engineGate: gate });
+    assert.equal(before.check.verdict, "block");
+    assert.ok(before.check.issues.some((i) => i.value.toLowerCase() === value.toLowerCase()), JSON.stringify(before.check.issues));
+    const out = applyAction(facts, list, list[0].id, { action: "attest", value }, ctx);
+    const left = out.suggestions[0].check.issues.map((i) => i.value.toLowerCase());
+    assert.ok(!left.includes(value.toLowerCase()), `${value} should be cleared, left ${JSON.stringify(left)}`);
+  });
+}
+
+test("an issue with an empty value can be neither attested nor marked", () => {
+  const facts = ashaFacts();
+  const gate = () => ({ invented: [], unsupportedFacts: [], forbidden: [], coverage: { reason: "scope-not-checked" } });
+  const list = [suggestion(REF.team, "Managed a team of 4 analysts")];
+  const checked = checkSuggestion(list[0], { ...ctxFor(facts), engineGate: gate });
+  assert.ok(checked.check.issues.some((i) => i.kind === "coverage" && i.value === ""));
+  for (const action of ["attest", "cannot_confirm"]) {
+    for (const value of ["", "  ", undefined]) {
+      expectError(() => applyAction(facts, list, list[0].id, { action, value }, { engineGate: gate }), 400, "invalid_value");
+    }
+  }
 });

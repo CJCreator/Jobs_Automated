@@ -215,7 +215,7 @@ export function SuggestionCard({
                         </Button>
                       </div>
                     </div>
-                  ) : confirming === issue.value ? (
+                  ) : !issue.value ? null /* nothing to confirm: only the message and the edit control remain (facts_too_large, engine, coverage, unreadable) */ : confirming === issue.value ? (
                     <div className="space-y-2 rounded-lg border border-line bg-surface p-3">
                       <p>{t.confirmAttest(issue.value)}</p>
                       <div className="flex flex-wrap gap-2">

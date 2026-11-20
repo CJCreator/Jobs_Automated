@@ -145,4 +145,7 @@ export const HONEST = [
   "Handled budgets of ₹ 2 crore",
   "Handled budgets worth ₹2,00,00,000",
   "Cut month-end close time by 30 per cent using SQL and Power BI",
+  // P1-20
+  "Applied best practices to month-end close reporting using SQL",
+  "Completed the first month-end close review using Power BI",
 ];

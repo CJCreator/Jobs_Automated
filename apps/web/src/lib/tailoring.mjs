@@ -183,7 +183,8 @@ function recheckAll(suggestions, ctx) {
 
 /** The issue on this suggestion, freshly computed, whose value is `value`. */
 function currentIssue(suggestion, ctx, value) {
-  return checkSuggestion(suggestion, ctx).check.issues.find((i) => sameText(i.value, value)) ?? null;
+  // An issue with no value names nothing the user could confirm, so it is never a match.
+  return value ? checkSuggestion(suggestion, ctx).check.issues.find((i) => i.value && sameText(i.value, value)) ?? null : null;
 }
 
 function requireValue(value) {

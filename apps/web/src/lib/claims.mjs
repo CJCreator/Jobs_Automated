@@ -12,7 +12,10 @@
 //   3. every credential, seniority, scope and expertise word ("certified",
 //      "principal", "global", "expert", ...) must appear in the user's confirmed
 //      facts, in any letter case, anywhere in the line;
-//   4. anything the user marked "I can't confirm" is blocked for good.
+//   4. anything the user marked "I can't confirm" is blocked for good;
+//   5. (P1-20) credentials, ranks, tenure and languages are claims too, a
+//      seniority word needs a title line, the summary or an added fact, text in
+//      letters the check cannot read is refused, and an engine coverage gap blocks.
 //
 // It errs towards flagging. A false flag costs the user one click to attest a
 // true fact; a false pass puts an invented claim in front of an employer.
@@ -27,6 +30,8 @@
 // backstop for the rest.
 //
 // Pure functions, no I/O, so `node --test` can import this file directly.
+
+import { unsupportedNumberContexts } from "./number-context.mjs";
 
 const CURRENCY_PREFIX = {
   "₹": "INR", "rs": "INR", "rs.": "INR", "inr": "INR",
@@ -126,6 +131,11 @@ const VAGUE_AMOUNTS = new Set(["hundreds", "thousands", "millions", "billions", 
 /** True for "1,50,000" style grouping, which only ever means rupees. */
 const INDIAN_GROUPING = /^\d{1,2}(?:,\d{2})+,\d{3}$/;
 
+// Plural words after a lakh or crore figure that still mean money.
+const NOT_COUNTED = new Set(`budgets revenues sales savings costs expenses profits loans funds investments deals
+contracts assets receivables payables collections inflows outflows grants earnings returns dues payments orders
+rupees dollars lakhs crores`.split(/\s+/));
+
 /** The numeric matches in already-prepared text. */
 function scanNumbers(prepared) {
   const claims = [];
@@ -144,13 +154,24 @@ function scanNumbers(prepared) {
       || (post && CURRENCY_WORD[post.toLowerCase()]);
     if (currency && unit !== "percent" && unit !== "times") unit = `money:${currency}`;
     if (!unit && !suffix && INDIAN_GROUPING.test(num)) unit = "money:INR";
+    // "2 crore analysts": a lakh or crore figure with no currency, followed by a plural
+    // noun that is not money, counts people or things (20,000,000 of them), not rupees.
+    let rawExtra = "";
+    if (suffix && !currency && /^(?:lakhs?|lacs?|crores?|cr)$/i.test(suffix)) {
+      const next = /^\s+(\p{L}[\p{L}'’]*)/u.exec(prepared.slice(match.index + match[0].length, match.index + match[0].length + 40));
+      const w = next?.[1].toLowerCase();
+      if (w && w.length > 3 && w.endsWith("s") && !w.endsWith("ss") && !NOT_COUNTED.has(w)) {
+        unit = "count";
+        rawExtra = ` ${next[1]}`;
+      }
+    }
     if (!unit) {
       const bare = !suffix && !prefix && /^\d{4}$/.test(num);
       unit = bare && value >= 1900 && value <= 2100 ? "year" : "count";
     }
     // Round away float noise from the scaling (1.5 * 1e5).
     const scaled = Math.round(value * scale * 1000) / 1000;
-    claims.push({ key: `${scaled}|${unit}`, raw: match[0].trim(), start: match.index, end: match.index + match[0].length });
+    claims.push({ key: `${scaled}|${unit}`, raw: match[0].trim() + rawExtra, start: match.index, end: match.index + match[0].length });
   }
   return claims;
 }
@@ -267,15 +288,53 @@ function withoutNumbers(prepared) {
   return out;
 }
 
-/** Lower-cased tokens of the confirmed facts, including the parts of hyphenated and slashed words. */
-export function factTokenSet(sourceText) {
+// Everything derived from the confirmed facts alone is built once per source and
+// kept with the string it came from, so a later call with an equal string (the app
+// rebuilds the fact text for every line it checks) reuses it. One entry is enough:
+// a request checks many lines against one fact base. Cached values are read-only
+// (the token set refuses writes, the rest are never handed out); a caller that needs
+// to add to one copies it, so a per-call addition can never reach the next call. An
+// empty source is cheap and never cached. Other texts (the job description, the
+// original line) use the uncached builders, so they cannot evict the real source.
+let sourceMemo = { text: null, values: new Map() };
+function fromSource(sourceText, key, build) {
+  const text = String(sourceText ?? "");
+  if (!text) return build(text);
+  if (sourceMemo.text !== text) sourceMemo = { text, values: new Map() };
+  const { values } = sourceMemo;
+  if (!values.has(key)) values.set(key, build(text));
+  return values.get(key);
+}
+
+/** A Set that refuses writes, for values shared between calls. */
+class ReadOnlySet extends Set {
+  constructor(items) {
+    super(items);
+    this.frozen = true;
+  }
+  add(value) {
+    if (this.frozen) throw new TypeError("This set is shared and read-only; copy it first.");
+    return super.add(value);
+  }
+  delete() { throw new TypeError("This set is shared and read-only; copy it first."); }
+  clear() { throw new TypeError("This set is shared and read-only; copy it first."); }
+}
+
+const cleanSource = (text) => fromSource(text, "clean", cleanText);
+
+function buildFactTokenSet(text) {
   const set = new Set();
-  for (const { word } of wordTokens(cleanText(sourceText))) {
+  for (const { word } of wordTokens(cleanText(text))) {
     const w = lower(word);
     set.add(w);
     for (const part of w.split(/[.]/)) if (part) set.add(part);
   }
   return set;
+}
+
+/** Lower-cased tokens of the confirmed facts, including the parts of hyphenated and slashed words. Read-only. */
+export function factTokenSet(sourceText) {
+  return fromSource(sourceText, "facts", (text) => new ReadOnlySet(buildFactTokenSet(text)));
 }
 
 /** The facts mention this word, or its plural/singular ("Analyst" for "analysts"). */
@@ -350,8 +409,8 @@ export function unsupportedNames(text, facts) {
  */
 export function borrowedTerms(text, facts, { before = "", jdText = "" } = {}) {
   if (!jdText) return [];
-  const jd = factTokenSet(jdText);
-  const original = factTokenSet(before);
+  const jd = buildFactTokenSet(jdText);
+  const original = buildFactTokenSet(before);
   const out = new Set();
   for (const { word } of wordTokens(cleanText(text))) {
     const w = lower(word);
@@ -372,13 +431,17 @@ function containsPhrase(haystack, phrase) {
   return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, "iu").test(cleanText(haystack));
 }
 
+
 // Claim words: a credential, a seniority, a scope or an expertise the facts must
 // back. Each row is one family; any form of a family in the facts supports every
 // form of it. Words that honest rewordings rely on ("lead", "specialist",
 // "qualified", "graduate", "expertise", "mastery", "proficiency", "experienced",
 // "seasoned", "end-to-end", "cross-functional", "whole", "hands-on", "ownership",
-// "oversight", "governance", "stewardship") are deliberately not here.
-const CLAIM_FAMILIES = {
+// "oversight", "governance", "stewardship", "fluent", "proficient") are deliberately not here.
+//
+// CLAIM_FAMILIES is the twin of CLAIM_FAMILIES in packages/engine/verify-cv-facts.mjs:
+// change one list and change the other. The control is tests/claim-lists-sync.test.mjs.
+export const CLAIM_FAMILIES = {
   credential: [
     ["certified", "certification", "certifications", "certificate", "certificates"],
     ["chartered"],
@@ -387,26 +450,31 @@ const CLAIM_FAMILIES = {
     ["award", "awards", "awarded"],
     ["patent", "patents", "patented"],
     ["medalist", "medallist"],
-    ["topper"],
+    ["topper", "toppers"],
     ["scholarship", "scholarships"],
     ["fellowship", "fellowships"],
     ["mba", "m.b.a"],
-    ["phd", "ph.d", "doctorate"],
-    ["diploma"],
-    ["postgraduate"],
+    ["phd", "ph.d", "ph d", "doctorate"],
+    ["diploma", "diplomas"],
+    ["postgraduate", "post graduate", "post-graduate"],
   ],
   seniority: [
-    ["senior", "sr"],
-    ["principal"],
+    ["senior", "seniors", "sr"],
+    ["seniormost", "senior-most"],
+    ["principal", "principals"],
     ["director", "directors"],
-    ["head of"],
+    ["head of", "heads of"],
     ["chief"],
     ["ceo", "c.e.o"], ["cfo", "c.f.o"], ["cto", "c.t.o"], ["coo", "c.o.o"], ["cio", "c.i.o"], ["cmo", "c.m.o"],
     ["vp", "v.p", "vice president"],
+    ["avp"], ["svp"], ["evp"],
     ["president"],
-    ["manager", "managers"],
+    ["manager", "managers", "mgr"],
+    ["gm", "general manager"],
     ["executive", "executives"],
     ["founder", "cofounder", "co-founder"],
+    ["c-suite"],
+    ["cxo", "cxos"],
   ],
   scope: [
     ["global", "globally"],
@@ -415,15 +483,16 @@ const CLAIM_FAMILIES = {
     ["multinational"],
     ["national", "nationally", "nationwide", "nation-wide"],
     ["regional", "regionally"],
+    ["pan-india", "pan india"],
     ["enterprise"],
     ["entire"],
     ["sole", "solely"],
     ["single-handedly", "singlehandedly"],
   ],
   expertise: [
-    ["expert", "experts"],
-    ["guru"],
-    ["veteran"],
+    ["expert", "experts", "expertly"],
+    ["guru", "gurus"],
+    ["veteran", "veterans"],
     ["world-class"],
     ["thought leader"],
     ["best-in-class"],
@@ -432,51 +501,237 @@ const CLAIM_FAMILIES = {
   ],
 };
 
+// Families the engine does not have. "credential" here only adds forms to the shared
+// kind (degrees, exams, honours); rank and tenure are read by the detectors below and
+// language by the name list, and those three kinds are declared in APP_ONLY_KINDS.
+export const APP_ONLY_KINDS = ["rank", "tenure", "language"];
+export const APP_ONLY_FAMILIES = {
+  credential: [
+    ["degree", "degrees"],
+    ["bachelor's", "bachelors", "bachelor"],
+    ["master's", "masters"],
+    ["b.tech", "btech"], ["m.tech", "mtech"], ["b.e"], ["b.sc", "bsc"], ["m.sc", "msc"], ["b.com", "bcom"], ["m.com", "mcom"],
+    ["bba"], ["bca"], ["mca"], ["pgdm"], ["pgdba"], ["mbbs"], ["llb"],
+    ["cpa"], ["cfa"], ["pmp"], ["frm"], ["acca"], ["cma"], ["icwa"],
+    ["honours", "honors"], ["distinction"], ["first class"], ["gold medal"], ["rank holder"],
+    ["valedictorian"], ["cum laude"], ["dean's list"],
+  ],
+  language: [
+    ...["hindi", "english", "tamil", "telugu", "kannada", "malayalam", "marathi", "bengali", "gujarati", "punjabi", "urdu",
+      "odia", "assamese", "sanskrit", "french", "german", "spanish", "mandarin", "chinese", "japanese", "korean", "arabic",
+      "russian", "portuguese", "italian", "dutch"].map((n) => [n]),
+    ["bilingual"], ["trilingual"], ["multilingual"], ["polyglot"], ["mother tongue"], ["native speaker"],
+  ],
+};
+
+// Plain business phrases that contain a claim word and claim nothing. Exact phrases
+// only; the bare word still blocks. Twin of the engine's exemption list.
+const CLAIM_PHRASE_EXEMPTIONS = /(?<![\p{L}\p{N}])(?:executive\s+summary|enterprise\s+reporting|award[\s\p{Pd}]+winning|best[\s\p{Pd}]+practices?)(?![\p{L}\p{N}])/giu;
+
 const CLAIM_FORMS = [];
-for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
-  for (const family of families) for (const form of family) CLAIM_FORMS.push({ kind, form, family });
+for (const families of [CLAIM_FAMILIES, APP_ONLY_FAMILIES]) {
+  for (const [kind, rows] of Object.entries(families)) {
+    for (const family of rows) for (const form of family) CLAIM_FORMS.push({ kind, form, family });
+  }
 }
 // Longest first so "vice president" is read before "president".
 CLAIM_FORMS.sort((a, b) => b.form.length - a.form.length);
-// A space and a hyphen are interchangeable inside a form: "world class", "world-class".
-const formPattern = (form) => escapeRegExp(form).replace(/[ -]/g, "[\\s\\p{Pd}]+");
-const formKey = (form) => form.toLowerCase().replace(/[\s\p{Pd}]+/gu, " ");
+// A space and a hyphen are interchangeable inside a form: "world class", "world-class". An apostrophe may be curly.
+const formPattern = (form) => escapeRegExp(form).replace(/[ -]/g, "[\\s\\p{Pd}]+").replace(/'/g, "['’]");
+const formKey = (form) => form.toLowerCase().replace(/’/g, "'").replace(/[\s\p{Pd}]+/gu, " ");
 const CLAIM_BY_FORM = new Map(CLAIM_FORMS.map((f) => [formKey(f.form), f]));
 const CLAIM_RE = new RegExp(
   `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.map((f) => formPattern(f.form)).join("|")})(?![\\p{L}\\p{N}])`,
   "giu",
 );
+const FORM_RES = new Map(CLAIM_FORMS.map(({ form }) => [form, new RegExp(`(?<![\\p{L}\\p{N}])${formPattern(form)}(?![\\p{L}\\p{N}])`, "iu")]));
 
-/** A predicate: does the confirmed facts' text contain this claim form (space and hyphen alike)? */
-function claimFormInSource(sourceText) {
-  const facts = factTokenSet(sourceText);
-  const cleanFacts = cleanText(sourceText);
-  return (form) =>
-    /[\s-]/.test(form)
-      ? new RegExp(`(?<![\\p{L}\\p{N}])${formPattern(form)}(?![\\p{L}\\p{N}])`, "iu").test(cleanFacts)
-      : facts.has(form);
+/** A predicate over claim forms: does this text contain the form (space and hyphen alike)? Answers are kept per form. */
+function formPredicate(text) {
+  const facts = buildFactTokenSet(text);
+  const clean = cleanText(text);
+  const answers = new Map();
+  return (form) => {
+    if (!answers.has(form)) {
+      answers.set(form, /[\s\p{Pd}'’]/u.test(form) ? FORM_RES.get(form).test(clean) : facts.has(form));
+    }
+    return answers.get(form);
+  };
 }
 
-/**
- * Credential, seniority, scope and expertise words in `text` that the facts
- * never state, in any letter case and anywhere in the line.
- *
- * @param {string} text
- * @param {string} sourceText the user's confirmed facts, serialised
- * @returns {{ kind: string, value: string }[]} value is the word as written
- */
-export function unsupportedClaimWords(text, sourceText) {
-  const inSource = claimFormInSource(sourceText);
+// Seniority is a claim about a job, so only the places that state a job back it: a
+// title line (**...**), the summary, and the facts the candidate added.
+function seniorityText(sourceText) {
   const out = [];
-  for (const match of cleanText(text).matchAll(CLAIM_RE)) {
-    const written = match[0].replace(/\s+/g, " ");
-    const entry = CLAIM_BY_FORM.get(formKey(written));
-    if (!entry) continue;
-    const supported = entry.family.some(inSource);
-    if (!supported) out.push({ kind: entry.kind, value: written });
+  let section = "";
+  for (const line of cleanText(sourceText).split("\n")) {
+    const heading = /^\s*##\s+(.*?)\s*$/.exec(line);
+    if (heading) {
+      section = heading[1].toLowerCase();
+      continue;
+    }
+    if (/^\s*\*\*.+\*\*\s*$/.test(line) || section === "summary" || section.startsWith("additional facts stated by the candidate")) out.push(line);
+  }
+  return out.join("\n");
+}
+
+const sourcePredicate = (src) => fromSource(src, "pred", formPredicate);
+const seniorityPredicate = (src) => fromSource(src, "senior", (text) => formPredicate(seniorityText(text)));
+
+// ---- ranks and tenure: phrases, not words ------------------------------------------
+
+const ORDINALS = new Set(`1st 2nd 3rd 4th 5th 6th 7th 8th 9th 10th first second third fourth fifth sixth seventh eighth ninth tenth`.split(" "));
+const RANK_CONTEXT = new Set("ranked placed stood secured position rank highest best top".split(" "));
+const AFTER_BEST_SKIP = new Set("in of at for to and with by on from as the a an".split(" "));
+const NUMBER_BEFORE_YEARS = new Set([...Object.keys(NUMBER_WORDS), "one", "few", "several", "many", "multiple", "numerous", "countless", "couple"]);
+
+const phraseKey = (s) => s.toLowerCase().replace(/’/g, "'").replace(/[\s\p{Pd}]+/gu, " ").trim();
+
+function mergeSpans(spans) {
+  spans.sort((a, b) => a.s - b.s || b.e - a.e);
+  const out = [];
+  for (const span of spans) {
+    const last = out[out.length - 1];
+    if (last && span.s <= last.e) last.e = Math.max(last.e, span.e);
+    else out.push({ ...span });
   }
   return out;
 }
+
+/** Rank claims in cleaned text: "Ranked 1st", "top 5", "Best performer", "Second-highest". */
+function rankHits(clean) {
+  const text = clean.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length)).replace(/best[\s\p{Pd}]+in[\s\p{Pd}]+class/giu, (m) => " ".repeat(m.length));
+  const words = [...text.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({ w: m[0].toLowerCase(), s: m.index, e: m.index + m[0].length }));
+  const spans = [];
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])top\s+\d+(?:\.\d+)?\s?%?/giu)) spans.push({ s: m.index, e: m.index + m[0].trimEnd().length });
+  for (const m of text.matchAll(/#\s?1(?!\d)|(?<![\p{L}\p{N}])no\.?\s?1(?!\d)|(?<![\p{L}\p{N}])number one(?![\p{L}\p{N}])/giu)) spans.push({ s: m.index, e: m.index + m[0].length });
+  words.forEach((word, i) => {
+    if (["ranked", "rank", "ranking", "highest", "winner", "winners"].includes(word.w)) spans.push({ s: word.s, e: word.e });
+    if (word.w === "best") {
+      const next = words[i + 1];
+      const joined = next && /^[\s\p{Pd}]*$/u.test(text.slice(word.e, next.s)) && !AFTER_BEST_SKIP.has(next.w) && !/^\d/.test(next.w);
+      spans.push({ s: word.s, e: joined ? next.e : word.e });
+    }
+    if (ORDINALS.has(word.w)) {
+      for (let j = Math.max(0, i - 3); j <= Math.min(words.length - 1, i + 3); j++) {
+        if (j !== i && RANK_CONTEXT.has(words[j].w)) spans.push({ s: Math.min(word.s, words[j].s), e: Math.max(word.e, words[j].e) });
+      }
+    }
+  });
+  return mergeSpans(spans).map(({ s, e }) => text.slice(s, e).trim()).filter(Boolean);
+}
+
+/** Tenure claims in cleaned text: "decade", "several years", "long-standing", "years of experience" with no figure. */
+function tenureHits(clean) {
+  const text = clean.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length));
+  const out = [];
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:decades?|long[\s\p{Pd}]standing)(?![\p{L}\p{N}])/giu)) out.push(m[0]);
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:several|many|multiple|numerous|countless|a\s+few|(?:a\s+)?couple\s+of)\s+years?(?![\p{L}\p{N}])/giu)) out.push(m[0]);
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])years?\s+of\s+experience/giu)) {
+    const before = /([\p{L}\p{N}+]+)[\s+-]*$/u.exec(text.slice(Math.max(0, m.index - 24), m.index));
+    const prev = before?.[1].toLowerCase() ?? "";
+    if (/\d/.test(prev) || NUMBER_BEFORE_YEARS.has(prev)) continue;
+    out.push(m[0]);
+  }
+  return out;
+}
+
+const phraseHits = (clean) => [...rankHits(clean).map((v) => ({ kind: "rank", value: v })), ...tenureHits(clean).map((v) => ({ kind: "tenure", value: v }))];
+const sourcePhraseKeys = (src) => fromSource(src, "phrases", (text) => new Set(phraseHits(cleanText(text)).map(({ kind, value }) => `${kind}|${phraseKey(value)}`)));
+
+/**
+ * Every claim word and phrase in `text` (cleaned) with whether the facts back it.
+ * @returns {{ kind: string, value: string, index: number, end: number, supported: boolean }[]} words only; phrases have index -1
+ */
+function claimMatches(clean, sourceText) {
+  const text = clean.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length));
+  const inSource = sourcePredicate(sourceText);
+  const inTitle = seniorityPredicate(sourceText);
+  const found = [];
+  for (const match of text.matchAll(CLAIM_RE)) {
+    const entry = CLAIM_BY_FORM.get(formKey(match[0].replace(/\s+/g, " ")));
+    if (!entry) continue;
+    const check = entry.kind === "seniority" ? inTitle : inSource;
+    found.push({
+      kind: entry.kind, value: match[0].replace(/\s+/g, " "), index: match.index, end: match.index + match[0].length,
+      supported: entry.family.some(check), form: entry.form,
+    });
+  }
+  // "bachelor's degree" is one thing for the user to confirm, not two.
+  const merged = [];
+  for (const hit of found) {
+    const prev = merged[merged.length - 1];
+    if (prev && hit.kind === "credential" && prev.kind === "credential" && !prev.supported && !hit.supported
+      && /^degrees?$/i.test(hit.value) && /^\s+$/.test(text.slice(prev.end, hit.index))) {
+      prev.value = `${prev.value} ${hit.value}`;
+      prev.end = hit.end;
+    } else merged.push({ ...hit });
+  }
+  return merged;
+}
+
+/**
+ * Credential, rank, tenure, language, seniority, scope and expertise claims in `text`
+ * that the facts never state, in any letter case. Seniority words are backed only by a
+ * title line, the summary or an added fact; every other kind by the facts anywhere.
+ *
+ * @param {string} text
+ * @param {string} sourceText the user's confirmed facts, serialised
+ * @returns {{ kind: string, value: string }[]} value is the word or phrase as written
+ */
+export function unsupportedClaimWords(text, sourceText) {
+  const clean = cleanText(text);
+  const out = claimMatches(clean, sourceText).filter((h) => !h.supported).map(({ kind, value }) => ({ kind, value }));
+  const keys = sourcePhraseKeys(sourceText);
+  for (const { kind, value } of phraseHits(clean)) if (!keys.has(`${kind}|${phraseKey(value)}`)) out.push({ kind, value });
+  return out;
+}
+
+// ---- text the check cannot read ----------------------------------------------------
+
+const SCRIPTS = ["Latin", "Cyrillic", "Greek", "Armenian", "Hebrew", "Arabic", "Devanagari", "Bengali", "Gurmukhi", "Gujarati", "Oriya",
+  "Tamil", "Telugu", "Kannada", "Malayalam", "Sinhala", "Thai", "Han", "Hiragana", "Katakana", "Hangul", "Georgian", "Ethiopic"]
+  .map((name) => [name, new RegExp(`\\p{Script=${name}}`, "u")]);
+const LATIN_TOKEN = /^[\p{Script=Latin}\p{M}\p{N}]+$/u;
+const scriptOf = (ch) => SCRIPTS.find(([, re]) => re.test(ch))?.[0] ?? "Other";
+
+/** Tokens of cleaned text that have a letter outside the Latin script, with the scripts their letters use. */
+function nonLatinTokens(clean) {
+  const out = [];
+  if (!/[^\u0000-ɏḀ-ỿ]/.test(clean)) return out;
+  for (const m of clean.matchAll(/[\p{L}\p{M}\p{N}]+/gu)) {
+    if (LATIN_TOKEN.test(m[0])) continue;
+    const scripts = new Set();
+    for (const ch of m[0]) if (/\p{L}/u.test(ch)) scripts.add(scriptOf(ch));
+    if (scripts.size) out.push({ token: m[0].toLowerCase(), scripts });
+  }
+  return out;
+}
+const sourceNonLatin = (src) => fromSource(src, "nonlatin", (text) => new Set(nonLatinTokens(cleanText(text)).map((t) => t.token)));
+
+/** True when the text has a token the fact check cannot read (mixed scripts, or non-Latin letters the facts do not contain). */
+function hasUnreadableText(clean, sourceText) {
+  let known = null;
+  for (const { token, scripts } of nonLatinTokens(clean)) {
+    if (scripts.size > 1) return true;
+    if (scripts.has("Latin")) continue;
+    known ??= sourceNonLatin(sourceText);
+    if (!known.has(token)) return true;
+  }
+  return false;
+}
+
+// ---- the check ---------------------------------------------------------------------
+
+// The engine's coverage gaps that do not block. "no-count-claims-recognized" means the
+// engine's count extractor read no count in the line; this layer checks every figure
+// itself (numberClaims and the number-context check), so that gap leaves nothing
+// unchecked here. Any other reason, notably "scope-not-checked" (a language the engine
+// could not read), blocks.
+export const NON_BLOCKING_COVERAGE = ["no-count-claims-recognized"];
+
+const UNREADABLE_MESSAGE = "This line has text the fact check cannot read (letters outside the English alphabet). Rewrite it in English letters, or remove it.";
+const COVERAGE_MESSAGE = "The fact check could not read this line fully, so it is blocked. Rewrite it in plain English.";
 
 /**
  * Check one piece of tailored text against the user's confirmed facts.
@@ -509,23 +764,35 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
     }
   }
 
-  const allowedNumbers = new Set(numberClaims(sourceText).map((c) => c.key));
+  const allowedNumbers = fromSource(sourceText, "numbers", (src) => new Set(numberClaims(src).map((c) => c.key)));
   for (const claim of numberClaims(target)) {
     if (!allowedNumbers.has(claim.key)) {
       add("number", claim.raw, `The figure "${claim.raw}" is not in your confirmed facts.`);
     }
   }
-
-  for (const { kind, value } of unsupportedClaimWords(target, sourceText)) {
-    add(kind, value, `"${value}" is not in your confirmed facts.`);
+  for (const { value, raw } of unsupportedNumberContexts(target, sourceText)) {
+    add("number", value, `The figure "${raw}" is in your confirmed facts, but about something else. Confirm "${value}" only if it is true.`);
   }
 
+  const matches = claimMatches(target, sourceText);
+  for (const { kind, value, supported } of matches) {
+    if (!supported) add(kind, value, `"${value}" is not in your confirmed facts.`);
+  }
+  const keys = sourcePhraseKeys(sourceText);
+  for (const { kind, value } of phraseHits(target)) {
+    if (!keys.has(`${kind}|${phraseKey(value)}`)) add(kind, value, `"${value}" is not in your confirmed facts.`);
+  }
+
+  if (hasUnreadableText(target, sourceText)) add("unreadable", "", UNREADABLE_MESSAGE);
+
+  // Name check on the line without the claim forms the facts back ("Sr.", "Vice President"
+  // are claim words, not names) and without exempt phrases.
+  let nameText = target.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length));
+  for (const m of [...matches].reverse()) {
+    if (m.supported) nameText = nameText.slice(0, m.index) + " ".repeat(m.end - m.index) + nameText.slice(m.end);
+  }
   const facts = factTokenSet(sourceText);
-  const claimInSource = claimFormInSource(sourceText);
-  for (const name of unsupportedNames(target, facts)) {
-    // Exempt when this is a claim form whose family the facts support ("PhD" is mixed-case, so the name check sees it; "Ph.D." in the facts supports it).
-    const entry = CLAIM_BY_FORM.get(formKey(name));
-    if (entry && entry.family.some(claimInSource)) continue;
+  for (const name of unsupportedNames(nameText, facts)) {
     add("name", name, `"${name}" is not mentioned in your confirmed facts.`);
   }
 
@@ -546,11 +813,17 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
     for (const phrase of result?.forbidden ?? []) {
       add("forbidden", phrase, `"${phrase}" is on the list of phrases that are never allowed.`);
     }
+    // A coverage gap means part of the line was not checked: fail closed unless the gap is a known harmless one.
+    if (result?.coverage && !NON_BLOCKING_COVERAGE.includes(result.coverage.reason)) add("coverage", "", COVERAGE_MESSAGE);
   }
 
-  // The same value can be reported by both layers under different kinds.
+  // The same value can be reported by both layers under different kinds. An empty value
+  // names no claim, so those are kept apart by kind.
   const byValue = new Map();
-  for (const issue of issues) if (!byValue.has(lower(issue.value))) byValue.set(lower(issue.value), issue);
+  for (const issue of issues) {
+    const id = issue.value ? lower(issue.value) : `\0${issue.kind}`;
+    if (!byValue.has(id)) byValue.set(id, issue);
+  }
   const unique = [...byValue.values()];
 
   const advisory = borrowedTerms(target, facts, { before, jdText });
