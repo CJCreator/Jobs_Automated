@@ -191,4 +191,19 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON users, accounts, verification_tokens TO rolewright_system;
+
+-- P1-2
+CREATE TABLE IF NOT EXISTS trial_counters (
+  user_id uuid PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  tailorings_used integer NOT NULL DEFAULT 0 CHECK (tailorings_used BETWEEN 0 AND 5),
+  uploads_used integer NOT NULL DEFAULT 0 CHECK (uploads_used BETWEEN 0 AND 3),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE trial_counters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trial_counters FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS trial_counters_isolation ON trial_counters;
+CREATE POLICY trial_counters_isolation ON trial_counters
+  USING (user_id = current_setting('app.user_id')::uuid)
+  WITH CHECK (user_id = current_setting('app.user_id')::uuid);
+GRANT SELECT, INSERT, UPDATE ON trial_counters TO rolewright_app;
 `;

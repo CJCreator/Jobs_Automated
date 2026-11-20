@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { useApi } from "@/lib/client/use-api";
 import { useLlmKey } from "@/lib/client/llm-key";
 import { providerLabel, useProviders } from "@/lib/client/providers";
+import { trialApi, trialUsable, useTrial } from "@/lib/client/trial";
 import type { Facts, FactsResponse, FactsSave } from "@/lib/client/types";
 import { confirmationCounts } from "@/lib/facts.mjs";
 import { NOTICE_VERSION } from "@/lib/notice.mjs";
@@ -21,9 +22,12 @@ export function ResumeView() {
   const { llm, ready } = useLlmKey();
   const { providers } = useProviders();
 
+  const { trial, loading: trialLoading, reload: reloadTrial } = useTrial();
+  // No key of the user's own: the free trial, when this server offers it and some of it is left.
+  const onTrial = !llm && trialUsable(trial, "uploads");
   // Keyed on the provider, so choosing another one asks again.
   const consentState = useApi<{ noticeVersion: string; accepted: boolean; storageAccepted: boolean }>(
-    llm ? `/api/consent?provider=${encodeURIComponent(llm.provider)}` : "/api/consent",
+    llm ? `/api/consent?provider=${encodeURIComponent(llm.provider)}` : onTrial ? "/api/consent?provider=trial" : "/api/consent",
   );
   const [storageAgreed, setStorageAgreed] = useState(false);
 
@@ -114,13 +118,16 @@ export function ResumeView() {
       // The server records the agreement and refuses the upload without it.
       await api<{ accepted: boolean }>("/api/consent", {
         method: "POST",
-        json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: llm?.provider ?? "" },
+        json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: llm ? llm.provider : "trial" },
       });
       consentSaved = true;
       consentState.setData({ noticeVersion: NOTICE_VERSION, accepted: true, storageAccepted: true });
       const form = new FormData();
       form.append("file", file);
-      const res = await api<FactsResponse>("/api/resume", { method: "POST", form });
+      const res = llm
+        ? await api<FactsResponse>("/api/resume", { method: "POST", form })
+        : await trialApi<FactsResponse>("/api/resume", { form });
+      reloadTrial();
       setFacts(res.facts);
       setSaved(JSON.stringify(res.facts));
       setUploadDone(true);
@@ -130,6 +137,8 @@ export function ResumeView() {
       focusAfterUpload.current = "facts-heading";
     } catch (e) {
       setUploadError(e instanceof ApiError ? e.message : consentSaved ? en.common.loadError : en.consent.saveFailed);
+      // The count may have changed (a use taken, or none left): read it again.
+      reloadTrial();
       focusAfterUpload.current = "upload-error";
     } finally {
       setUploading(false);
@@ -192,7 +201,8 @@ export function ResumeView() {
     }
   };
 
-  const noKey = ready && !llm;
+  const noKey = ready && !llm && !onTrial && !trialLoading;
+  const trialUsedUp = !llm && Boolean(trial?.available && trial.verified) && !onTrial;
 
   return (
     <div className="space-y-8">
@@ -203,12 +213,14 @@ export function ResumeView() {
         </h2>
         {noKey ? (
           <Notice tone="warn" title={t.noKeyTitle}>
-            <p>{t.noKeyBody}</p>
+            <p>{trialUsedUp ? en.trial.usedUpUploads : t.noKeyBody}</p>
             <Link href="/app/key" className="inline-block min-h-8 py-1 font-semibold text-brand underline underline-offset-4">
-              {t.noKeyLink}
+              {trialUsedUp ? en.trial.addKey : t.noKeyLink}
             </Link>
           </Notice>
         ) : null}
+
+        {onTrial && trial ? <p className="font-medium">{en.trial.leftUploads(trial.uploadsLeft)}</p> : null}
 
         <fieldset disabled={noKey || uploading || !ready} className="space-y-5 border-0 p-0">
           <legend className="sr-only">{t.uploadTitle}</legend>
@@ -242,7 +254,7 @@ export function ResumeView() {
               }}
               label={
                 <>
-                  {en.consent.lead(llm ? providerLabel(llm.provider, providers) : t.providerFallback)}{" "}
+                  {llm ? en.consent.lead(providerLabel(llm.provider, providers)) : en.trial.consentLead}{" "}
                   <Link href="/privacy" target="_blank" className="inline-block min-h-6 font-semibold text-brand underline underline-offset-4">
                     {en.consent.linkText}
                   </Link>

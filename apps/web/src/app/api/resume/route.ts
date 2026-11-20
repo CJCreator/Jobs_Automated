@@ -6,10 +6,12 @@ import { extractFacts } from "@/lib/llm/index.mjs";
 import { requireConsent } from "@/lib/server/consent";
 import { readBodyBytes } from "@/lib/server/body";
 import { HttpError, json, route } from "@/lib/server/http";
-import { readLlmHeaders } from "@/lib/server/llm-key";
+import { readLlmHeaders, requireTrialAccess, trialHttpError } from "@/lib/server/llm-key";
 import { pdfText } from "@/lib/server/pdf-text.mjs";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
+import { runWithTrial, withReservation } from "@/lib/server/trial.mjs";
+import { en } from "@/i18n/en";
 
 export const runtime = "nodejs";
 
@@ -30,9 +32,10 @@ const cleanFilename = (name: string) => name.replace(/[\u0000-\u001f\u007f]/g, "
 
 export const POST = route("resume.upload", async (req, { state }) => {
   const userId = await requireUser(state);
-  const llm = readLlmHeaders(req);
+  const llm = readLlmHeaders(req, { allowTrial: true });
   // Before the body is read and before a rate-limit token is spent: no collection without consent.
-  await requireConsent(userId, llm.provider);
+  if (llm.trial) await requireTrialAccess(userId, req);
+  else await requireConsent(userId, llm.provider);
   await takeRateLimit("upload", userId);
 
   const type = req.headers.get("content-type") ?? "";
@@ -64,16 +67,26 @@ export const POST = route("resume.upload", async (req, { state }) => {
     );
   }
 
-  const raw = await extractFacts({ provider: llm.provider, key: llm.key, model: llm.model, resumeText: text });
-  const proposed = normalizeFacts(raw, { trustConfirmed: false });
-
   const db = await getDb();
-  await saveResume(db, userId, { filename: cleanFilename(file.name), rawText: text });
-  // A new resume replaces the proposal. Items the upload does not contain are
-  // labelled "model"; items unchanged since the user confirmed them keep their
-  // id and confirmation. What the user stated themselves or said they cannot
-  // confirm is never touched. Read and written under the facts row lock, so a
-  // review action at the same moment is not lost.
-  const facts = await changeFacts(db, userId, (existing) => reconcileUpload(existing, proposed, text));
+  const work = async () => {
+    const raw = llm.trial
+      ? (await runWithTrial((c: { provider: string; key: string; model: string }) => extractFacts({ ...c, resumeText: text }))).value
+      : await extractFacts({ provider: llm.provider, key: llm.key, model: llm.model, resumeText: text });
+    const proposed = normalizeFacts(raw, { trustConfirmed: false });
+    await saveResume(db, userId, { filename: cleanFilename(file.name), rawText: text });
+    // A new resume replaces the proposal. Items the upload does not contain are
+    // labelled "model"; items unchanged since the user confirmed them keep their
+    // id and confirmation. What the user stated themselves or said they cannot
+    // confirm is never touched. Read and written under the facts row lock, so a
+    // review action at the same moment is not lost.
+    return changeFacts(db, userId, (existing) => reconcileUpload(existing, proposed, text));
+  };
+  // A trial reading is taken just before the model call and given back if anything fails before the facts are stored.
+  let facts;
+  try {
+    facts = llm.trial ? await withReservation(db, userId, "uploads", work, { usedUpMessage: en.trial.usedUpUploads }) : await work();
+  } catch (err) {
+    throw trialHttpError(err);
+  }
   return json({ facts, counts: confirmationCounts(facts) });
 });
