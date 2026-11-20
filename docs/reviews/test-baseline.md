@@ -12,7 +12,8 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 | After the monorepo move | `61c7e9a` | 19,988 | 49 | New failures were tests reading upstream `.github/` from the engine and tests of features about to be removed. |
 | After removals and rebrand | `c357f7e` | 18,331 | 110 | Removed market mode sets and community files broke tests that hard-code them. |
 | After the skill rename | `97fd9d1` | 18,316 | 117 | The rename also rewrote some regex literals; reverted in the next commit. |
-| After test repairs | this commit | 19,509 | 28 | Every inline section runs to the end; earlier runs stopped at a crash reading the removed `modes/zh`, which hid later sections. All 28 failures are on the pre-existing list below. |
+| After Phase 0 (all tasks merged) | `3922e19` | 19,678 | 28 | All failures on the pre-existing list below; lint passes (1,951 files). |
+| After test repairs | `9d6c104` | 19,509 | 28 | Every inline section runs to the end; earlier runs stopped at a crash reading the removed `modes/zh`, which hid later sections. All 28 failures are on the pre-existing list below. |
 
 ## The app
 
@@ -45,3 +46,17 @@ After the browser sweep and the merge of P0-8 and P0-12 (P0-11, merged tree): `n
 
 - A change must not add failures relative to the latest row above. Fixing a pre-existing failure is welcome; record it here.
 - A test tied to a deliberately removed feature is retired in the same change that removes the feature, with a reason in the commit message.
+
+## Phase 0 exit (merged `3922e19`)
+
+| Check | Result |
+|---|---|
+| `apps/web` `npm run typecheck` | pass |
+| `apps/web` `npm test` | 394 pass, 0 fail, 4 skipped (Postgres-only; 371 of 371 when run on Postgres 16 during P0-8) |
+| `apps/web` `npm run test:flow` | 17 of 17 |
+| `apps/web` `npm run test:e2e` | 21 of 21 |
+| `apps/web` `npm run test:prod` | 15 of 15 |
+| `packages/engine` `npm run lint` | pass |
+| `packages/engine` `node test-all.mjs --quick` | 19,678 pass, 28 fail (pre-existing list) |
+
+Browser runs set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. The app CI workflow (`app-ci.yml`) has not run yet.
