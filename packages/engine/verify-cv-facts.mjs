@@ -294,7 +294,7 @@ const COUNT_CLAIM_RE = new RegExp(
   // window. `(?:[\p{L}\p{N}]+-)*` lets the counted noun close a hyphenated
   // compound ("318 TryHackMe-Rooms"): German writes the modifier and the noun
   // as one hyphenated token, which a whitespace-only window never saw.
-  String.raw`(?<![A-Za-z]-)\b(?!1C\b)(\d[\d,.]*(?:[kKmMbB]\b|(?:${GLUED_MAGNITUDE_ALT})\b|\s+(?:${SPELLED_MAGNITUDE_ALT})\b)?)\s*\+?\s*(?:\p{L}[\p{L}\p{M}-]*\s+){0,${MODIFIER_WINDOW}}?(?:[\p{L}\p{N}]+-)*(${METRIC_NOUNS.join('|')})(?![\p{L}\p{N}])`,
+  String.raw`(?<!\d[,.])(?:(?<![A-Za-z]-)\b|(?<=\p{L}\p{Pd}?)(?=\d{1,3}(?:,\d{3})+(?![\d,]))|(?<=\p{L}\p{Pd})(?=\d+(?:\.\d+)?(?:[kKmMbB]|${GLUED_MAGNITUDE_ALT})(?![\p{L}\p{N}])))(?!1C\b)(\d[\d,.]*(?!\d)(?:[kKmMbB]\b|(?:${GLUED_MAGNITUDE_ALT})\b|\s+(?:${SPELLED_MAGNITUDE_ALT})\b)?)\s*\+?\s*(?:\p{L}[\p{L}\p{M}-]*\s+){0,${MODIFIER_WINDOW}}?(?:[\p{L}\p{N}]+-)*(${METRIC_NOUNS.join('|')})(?![\p{L}\p{N}])`,
   'giu'
 );
 const NOUN_SYNONYMS = new Map([
@@ -397,12 +397,12 @@ const NOUN_SYNONYMS = new Map([
 //
 // Currency codes are matched case-sensitively: lowercase "eur" or "gbp" in prose
 // is not a currency. A bare "pound(s)" is left out because it is also a weight.
-const MAGNITUDE_ALT = String.raw`(?:\s?(?:thousand|million|billion)\b|\s?[kKmMbB](?![\p{L}]))`;
+const MAGNITUDE_ALT = String.raw`(?:\s?(?:thousand|million|billion|lakhs?|lacs?|crores?|cr)\b|\s?[kKmMbB](?![\p{L}]))`;
 const SIMPLE_CLAIM_PATTERNS = [
   /\b\d+(?:\.\d+)?[^\S\n]?(?:%|(?:percent|per\s?cent|pct)\b)/gi,
-  new RegExp(String.raw`(?<![\w$€£])[$€£]\s?\d[\d,.]*(?:\s?(?:thousand|million|billion)\b|\s?[kKmMbB])?`, 'gu'),
+  new RegExp(String.raw`(?<![\w$€£])[$€£]\s?\d[\d,.]*(?:\s?(?:thousand|million|billion|lakhs?|lacs?|crores?|cr)\b|\s?[kKmMbB])?`, 'gu'),
   new RegExp(String.raw`(?:\b(?:USD|EUR|GBP)|\bUS\$)\s?\d[\d,.]*${MAGNITUDE_ALT}?`, 'gu'),
-  new RegExp(String.raw`\b\d[\d,.]*${MAGNITUDE_ALT}?\s?-?\s?(?:(?:USD|EUR|GBP)\b|(?:[Dd]ollars?|[Ee]uros?)\b)`, 'gu'),
+  new RegExp(String.raw`(?<!\d[,.])\b\d[\d,.]*${MAGNITUDE_ALT}?\s?-?\s?(?:(?:USD|EUR|GBP)\b|(?:[Dd]ollars?|[Ee]uros?)\b)`, 'gu'),
   /\b\d+(?:\.\d+)?\s?x\b/gi,
   /\b\d+(?:\.\d+)?\s?-?\s?fold\b/gi,
 ];
@@ -429,7 +429,7 @@ function canonicalMetric(raw) {
   if (percent) return `${percent[1]}%`;
   const multiplier = /^(\d+(?:\.\d+)?) ?(?:x|-? ?fold)$/.exec(claim);
   if (multiplier) return `${multiplier[1]}x`;
-  const amount = String.raw`(\d[\d.]*)(?: ?(thousand|million|billion|[kmb]))?`;
+  const amount = String.raw`(\d[\d.]*)(?: ?(thousand|million|billion|lakhs?|lacs?|crores?|cr|[kmb]))?`;
   const lead = new RegExp(String.raw`^(\$|€|£|us\$|usd|eur|gbp) ?${amount}$`).exec(claim);
   const trail = lead ? null : new RegExp(String.raw`^${amount} ?-? ?(usd|eur|gbp|dollars?|euros?)$`).exec(claim);
   if (!lead && !trail) return claim;
@@ -1131,7 +1131,44 @@ export const CLAIM_FAMILIES = Object.freeze(Object.fromEntries(Object.entries({
 
 // Plain business phrases that contain a claim word and claim nothing: not read
 // as claim words. Exact phrases only; the bare word still blocks.
-const CLAIM_PHRASE_EXEMPTIONS = /(?<![\p{L}\p{N}])(?:executive\s+summary|enterprise\s+reporting|award[\s\p{Pd}]+winning)(?![\p{L}\p{N}])/giu;
+// "award-winning" is not exempt (owner decision, P1-19c): it is read as the
+// award family, so it passes only when the facts say award, awards or
+// awarded ("Won the CFO Excellence Award 2022"), and blocks otherwise.
+const CLAIM_PHRASE_EXEMPTIONS = /(?<![\p{L}\p{N}])(?:executive\s+summary|enterprise\s+reporting)(?![\p{L}\p{N}])/giu;
+
+// "C-suite" names the candidate's own seniority unless it plainly names the
+// audience. Only two closed shapes are exempt, both on one line:
+//   - AFTER: "C-suite" then one space or a hyphen, an optional "reporting",
+//     and a noun from a short audience list, with no role noun after it:
+//     "a C-suite sponsor", "C-suite stakeholders", "Prepared C-suite
+//     reporting packs". "C-suite engagement lead", "served on C-suite review
+//     boards", "Member of the C-suite\nReports to..." and "Member of the
+//     C-suite — reviews" are not exempt.
+//   - BEFORE: an exact form of present/report/brief/escalate/communicate/
+//     pitch, then up to three words from a closed object list, then "to the
+//     C-suite": "Presented quarterly results to the C-suite". Any other word
+//     in the gap ("for promotion", "my transition", "himself", "and was
+//     promoted", "on my move") is not exempt.
+// Neither shape is exempt after a role predicate ("as a", "I am a", "was
+// the"): "worked as a C-suite sponsor", "I am a C-suite audience".
+const C_SUITE_RE = /(?<![\p{L}\p{N}])c[\s\p{Pd}]+suite(?![\p{L}\p{N}])/giu;
+const C_SUITE_AUDIENCE_AFTER_RE = /^(?: |\p{Pd})(?:reporting(?: |\p{Pd}))?(?:sponsors?|stakeholders?|audiences?|narratives?|presentations?|briefings?|decks?|packs?|dashboards?|communications?|visibility|engagement|alignment|buy-in)(?![\p{L}\p{N}])(?![^\S\n]*\p{Pd}?[^\S\n]*(?:leads?|leaders?|heads?|managers?|directors?|officers?|executives?|owners?|members?|chairs?|boards?|roles?|positions?|seats?|levels?|teams?|councils?|committees?)(?![\p{L}\p{N}]))/iu;
+const C_SUITE_OBJECT_WORDS = 'the|our|my|quarterly|monthly|weekly|annual|yearly|results|findings|updates|plans?|strategy|risks|numbers|figures|recommendations|proposals|budgets?|forecasts?|insights|metrics|analysis|reports|progress|performance|outcomes|financials|issues|status';
+const C_SUITE_AUDIENCE_BEFORE_RE = new RegExp(String.raw`(?<![\p{L}\p{N}])(?:present(?:ed|ing|s)?|report(?:ed|ing|s)?|brief(?:ed|ing|s)?|escalat(?:ed|es|ing)|communicat(?:ed|es|ing)|pitch(?:ed|es|ing)?)[^\S\n]+(?:(?:${C_SUITE_OBJECT_WORDS})[^\S\n]+){0,3}to[^\S\n]+the[^\S\n]+$`, 'iu');
+// "as a", "am a", "was the", "served as": the C-suite phrase is the
+// candidate's own role, whatever noun follows.
+const C_SUITE_ROLE_PREDICATE_RE = /(?<![\p{L}\p{N}])(?:as|am|i['’]m|is|was|were|are|be|been|being|became|become|becoming|appointed|named|acting|interim|elected|hired|promoted|elevated)[^\S\n]+(?:(?:an?|the|my|our)[^\S\n]+)?$/iu;
+const C_SUITE_WINDOW = 80;
+function withoutAudienceCSuite(text) {
+  return text.replace(C_SUITE_RE, (match, offset, whole) => {
+    const end = offset + match.length;
+    const before = whole.slice(Math.max(0, offset - C_SUITE_WINDOW), offset);
+    if (C_SUITE_ROLE_PREDICATE_RE.test(before)) return match;
+    if (C_SUITE_AUDIENCE_AFTER_RE.test(whole.slice(end, end + C_SUITE_WINDOW))
+      || C_SUITE_AUDIENCE_BEFORE_RE.test(before)) return ' ';
+    return match;
+  });
+}
 
 const CLAIM_FORMS = [];
 for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
@@ -1183,7 +1220,10 @@ const claimWordSource = (text) => fromSource(text, strippedSource).normalize('NF
 function builtinClaimWordFacts(targetText, sourceText) {
   // The role the letter is for is the job being applied to, not a claim about the candidate.
   const withoutRoleTitle = String(targetText ?? '').replace(/<div\b[^>]*\bclass="[^"]*\brole-title\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, ' ');
-  const target = stripMarkup(withoutRoleTitle).normalize('NFKC').replace(/\p{Cf}/gu, '').replace(CLAIM_PHRASE_EXEMPTIONS, ' ');
+  // Line breaks are kept for the C-suite shapes, which never cross a line,
+  // then folded to spaces as before.
+  let target = stripMarkup(withoutRoleTitle, { keepLineBreaks: true }).normalize('NFKC').replace(/\p{Cf}/gu, '').replace(CLAIM_PHRASE_EXEMPTIONS, ' ');
+  target = withoutAudienceCSuite(target).replace(/\n/g, ' ');
   const source = fromSource(sourceText, claimWordSource);
   const inSource = (form) => CLAIM_FORM_RES.get(form).test(source);
   const facts = [];
@@ -2235,7 +2275,7 @@ function compactMagnitude(raw) {
 // of whatever follows it, even when the noun is not in METRIC_NOUNS. A currency
 // amount ("$2M and ...") is read by SIMPLE_CLAIM_PATTERNS and is skipped here.
 const MAGNITUDE_COUNT_RE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}$€£₹.-])(?<!\b(?:Rs|INR|USD|EUR|GBP)\.?\s?)(\d[\d,.]*(?:[kKmMbB]|${GLUED_MAGNITUDE_ALT}|\s+(?:${SPELLED_MAGNITUDE_ALT})))(?![\p{L}\p{N}])\s*\+?\s*(\p{L}[\p{L}\p{M}-]*)`,
+  String.raw`(?<![\p{L}\p{N}$€£₹.-])(?<!\d,)(?<!\b(?:Rs|INR|USD|EUR|GBP)\.?\s?)(\d[\d,.]*(?:[kKmMbB]|${GLUED_MAGNITUDE_ALT}|\s+(?:${SPELLED_MAGNITUDE_ALT})))(?![\p{L}\p{N}])\s*\+?\s*(\p{L}[\p{L}\p{M}-]*)`,
   'giu',
 );
 // Words after a magnitude that are not what is counted.
@@ -2249,39 +2289,323 @@ const MAGNITUDE_NOT_A_NOUN = new Set(`a an and or but the to in of for with at b
 const MAGNITUDE_WORD_END_RE = new RegExp(String.raw`\d(?:[kmb]|${GLUED_MAGNITUDE_ALT})$|\s(?:${SPELLED_MAGNITUDE_ALT})$`, 'iu');
 const MAGNITUDE_COUNT_AT_RE = new RegExp(MAGNITUDE_COUNT_RE.source, 'iyu');
 
+// ---------------------------------------------------------------------------
+// Money is money on both sides (P1-19c).
+//
+// A figure with a currency mark (₹, Rs, Rs., INR, $, USD, €, £, a trailing
+// "rupees" or "dollars") is an amount of money. It is compared as money, by
+// value and currency, and it never counts the words after it: "Earned ₹2
+// crore from customers" says nothing about how many customers there were, so
+// it can neither make nor back the count "2 crore customers". Each currency
+// span is masked with MONEY_MASK before the count patterns run, so no count
+// pattern can start inside it.
+//
+// A rupee amount is one key whatever its spelling: "₹2 crore", "Rs. 2 Cr",
+// "INR 200 lakh", "2 crore rupees" and "₹2,00,00,000" are all "₹2crore". A
+// figure with no currency mark is read as a count, as before, except for the
+// money-word rule in sourceMetricBase and the re-keying in metricClaims below.
+//
+// Every builder here is linear: each regex starts a number only where no
+// digit, comma or dot precedes it, and every look to the left or right of an
+// amount reads a bounded window of characters.
+// ---------------------------------------------------------------------------
+
+// Indian digit grouping: 1,00,000 and 2,00,00,000. normalizeClaim reads the
+// last group only and turned "1,00,000" into "1,00000"; the grouping is folded
+// to plain digits before anything else reads the number.
+const INDIAN_GROUPED_RE = /(?<![\d,.])\d{1,2}(?:,\d{2})+,\d{3}(?:\.\d+)?(?![\d]|[,.]\d)/g;
+function foldIndianGrouping(text) {
+  return text.includes(',') ? text.replace(INDIAN_GROUPED_RE, (match) => match.replace(/,/g, '')) : text;
+}
+
+// A bullet wrapped onto an indented next line is one statement: "- Served
+// 10,000\n  customers". stripMarkup drops indentation, so the lines are joined
+// on the raw text first. Only an indented line that is not itself a bullet,
+// after a bullet or its continuation, is joined; an unindented line is a new
+// statement ("Budget: ₹2 crore\nCustomers served daily").
+const BULLET_LINE_RE = /^[^\S\n]*(?:[-*+•‣◦⁃∙]|\d{1,3}[.)])[^\S\n]+\S/u;
+const CONTINUATION_LINE_RE = /^[^\S\n]+\S/;
+function joinWrappedLines(text) {
+  if (!text.includes('\n')) return text;
+  const out = [];
+  let inBullet = false;
+  for (const line of text.split('\n')) {
+    const bullet = BULLET_LINE_RE.test(line);
+    if (inBullet && !bullet && CONTINUATION_LINE_RE.test(line)) {
+      out[out.length - 1] += ` ${line.trim()}`;
+      continue;
+    }
+    inBullet = bullet;
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+const MONEY_NUMBER = String.raw`\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?`;
+// Word magnitudes, and single letters. A single letter is a magnitude only
+// first, and not before "&", "/" or a dash: "₹200 crore M&A", "₹5 crore K-12".
+const MONEY_WORD_MAGNITUDE = String.raw`lakhs?|lacs?|crores?|cr|thousand|million|mn|billion|bn|trillion|tn`;
+const MONEY_MAGNITUDE = String.raw`${MONEY_WORD_MAGNITUDE}|[kmb](?![&/\p{Pd}])`;
+// "₹20L": an L glued to the number is lakh.
+const GLUED_LAKH = String.raw`(?<=\d)L`;
+const MONEY_MAGNITUDES = String.raw`(?:[^\S\n]{0,3}(${MONEY_MAGNITUDE})(?![\p{L}\p{N}])(?:[^\S\n]{0,3}(${MONEY_WORD_MAGNITUDE})(?![\p{L}\p{N}]))?|(${GLUED_LAKH})(?![\p{L}\p{N}&/\p{Pd}]))?`;
+const RUPEE_WORD = String.raw`(?:rupees?|inr)(?![\p{L}\p{N}\p{Pd}])`;
+// groups: 1 number, 2-3 magnitudes, 4 glued L (after a mark);
+//         5 number, 6-7 magnitudes, 8 glued L (before "rupees").
+// Two magnitudes multiply: "₹2 lakh crore" is 2 x 1e5 x 1e7.
+const INR_AMOUNT_RE = new RegExp(
+  String.raw`(?:₹|(?<![\p{L}\p{N}])(?:rs|inr)\.?)[^\S\n]{0,3}(${MONEY_NUMBER})${MONEY_MAGNITUDES}(?:[^\S\n]{0,3}${RUPEE_WORD})?` +
+  String.raw`|(?<![\p{L}\p{N}.,])(${MONEY_NUMBER})${MONEY_MAGNITUDES}[^\S\n]{0,3}${RUPEE_WORD}`,
+  'giu',
+);
+const MONEY_MULTIPLIERS = new Map([
+  ['k', 1e3], ['thousand', 1e3], ['lakh', 1e5], ['lakhs', 1e5], ['lac', 1e5], ['lacs', 1e5], ['l', 1e5],
+  ['crore', 1e7], ['crores', 1e7], ['cr', 1e7], ['m', 1e6], ['mn', 1e6], ['million', 1e6],
+  ['b', 1e9], ['bn', 1e9], ['billion', 1e9], ['trillion', 1e12], ['tn', 1e12],
+]);
+// What may not follow an amount the parser read: more digits, a separator
+// and a digit, or a word that looks like a magnitude. Each means the amount
+// was not read whole, and it fails closed (unreadableMoneyKey).
+const MONEY_LEFTOVER_RE = /^(?:[,.]?\d|[^\S\n]{0,3}(?:(?:lakhs?|lacs?|crores?|cr|thousand|million|mn|billion|bn|trillion|tn|\p{L}*illions?)(?!\p{L})|[kmbl](?![\p{L}\p{N}&/\p{Pd}])))/iu;
+// A range after an amount with no magnitude: "₹2-3 crore", "₹2 to 30 crore".
+// The first figure alone is not the amount, so the key is the whole run.
+const MONEY_RANGE_TAIL_RE = new RegExp(String.raw`^[^\S\n]{0,3}(?:\p{Pd}|to(?![\p{L}\p{N}]))[^\S\n]{0,3}(?:₹|rs\.?|inr)?[^\S\n]{0,3}\d[\d,.]*(?:[^\S\n]{0,3}(?:${MONEY_WORD_MAGNITUDE}|[kmbl])(?![\p{L}\p{N}])){0,2}`, 'iu');
+
+/** Whether an INR_AMOUNT_RE match read a magnitude. */
+function moneyHasMagnitude(match) {
+  return Boolean(match[2] ?? match[6] ?? match[4] ?? match[8]);
+}
+
+/** The rupee value of one INR_AMOUNT_RE match. */
+function rupeeValue(match) {
+  const number = Number((match[1] ?? match[5]).replace(/,/g, ''));
+  let value = number;
+  for (const magnitude of [match[2] ?? match[6], match[3] ?? match[7], match[4] ?? match[8]]) {
+    if (magnitude) value *= MONEY_MULTIPLIERS.get(magnitude.toLowerCase());
+  }
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * The key of an amount the parser could not read whole ("₹2 3", "₹2,5"): the
+ * text itself, so only the same text in the facts backs it.
+ */
+function unreadableMoneyKey(text) {
+  return `₹?${normalizeClaim(text).replace(/\s+/g, '')}`;
+}
+
+/**
+ * One key per rupee value: ₹2crore, ₹2.5crore, ₹20lakh, ₹50000. Equal values
+ * give equal keys and different values different keys.
+ */
+function rupeeKey(value) {
+  if (Number.isInteger(value)) {
+    if (value >= 1e7 && value % 1e5 === 0) return `₹${value / 1e5 / 100}crore`;
+    if (value >= 1e5 && value % 1e3 === 0) return `₹${value / 1e3 / 100}lakh`;
+  }
+  return `₹${value}`;
+}
+
+// What a currency span is replaced with before the count patterns run: not a
+// letter, not a digit and not a space, so nothing reads across it.
+const MONEY_MASK = '¤';
+// SIMPLE_CLAIM_PATTERNS entries that are money ($, €, £, USD, "dollars").
+const OTHER_CURRENCY_PATTERNS = SIMPLE_CLAIM_PATTERNS.slice(1, 4);
+
+/**
+ * Rupee keys in `text`, and `text` with every currency amount masked.
+ *
+ * @param {string} text
+ * @returns {{keys: string[], masked: string}}
+ */
+function moneyInText(text) {
+  const spans = [];
+  const keys = [];
+  for (const match of text.matchAll(INR_AMOUNT_RE)) {
+    const end = match.index + match[0].length;
+    const after = text.slice(end, end + 40);
+    const range = moneyHasMagnitude(match) ? null : MONEY_RANGE_TAIL_RE.exec(after);
+    const leftover = range ? null : MONEY_LEFTOVER_RE.exec(after);
+    spans.push([match.index, end + (leftover ? leftover[0].length : 0)]);
+    keys.push(range || leftover ? unreadableMoneyKey(match[0] + (range ?? leftover)[0]) : rupeeKey(rupeeValue(match)));
+  }
+  for (const pattern of OTHER_CURRENCY_PATTERNS) {
+    for (const match of text.matchAll(pattern)) spans.push([match.index, match.index + match[0].length]);
+  }
+  if (!spans.length) return { keys, masked: text };
+  spans.sort((a, b) => a[0] - b[0]);
+  let masked = '';
+  let at = 0;
+  for (const [from, to] of spans) {
+    if (to <= at) continue;
+    const start = Math.max(from, at);
+    masked += text.slice(at, start) + MONEY_MASK.repeat(to - start);
+    at = to;
+  }
+  return { keys, masked: masked + text.slice(at) };
+}
+
+// Words that name an amount of money. A lakh or crore amount the source
+// states as money backs a count-shaped claim of the same figure only for one
+// of these words ("Handled 2 crore budgets" from "Handled budgets of ₹2
+// crore"), never for a word that counts people or things: money is not a
+// count of customers or analysts, however near they stand.
+const MONEY_NOUN_FORMS = [
+  // Only words that are never a count of things: "2 lakh loans" or "2 crore
+  // sales" can be a count, so loans, grants, funds, sales, fees, costs and the
+  // like are left out and need the same count in the facts.
+  ['budget', 'budgets'], ['revenue', 'revenues'], ['turnover'], ['funding'], ['spend', 'spending'],
+  ['capex'], ['opex'], ['payroll'], ['gmv'], ['arr'], ['aum'],
+];
+const MONEY_NOUNS = new Map();
+for (const forms of MONEY_NOUN_FORMS) for (const form of forms) MONEY_NOUNS.set(form, forms);
+
+// The word an amount is OF, to its left: "budgets of ₹2 crore", "Budget: ₹2
+// crore", "budgets totalling 2 crore", "budget (₹2 crore)", "budget ₹2
+// crore". One linker at most; any other word between them means no label.
+const MONEY_LABEL_LEFT_RE = /(?<![\p{L}\p{N}])(\p{L}[\p{L}\p{M}-]*)[^\S\n]{0,3}(?:(?:of|worth|totall?ing|totall?ed|amounting[^\S\n]{1,3}to|valued[^\S\n]{1,3}at)[^\S\n]{1,3}|[:(][^\S\n]{0,3})?$/iu;
+// The word right after an amount: "₹2 crore budgets".
+const MONEY_LABEL_RIGHT_RE = /^[^\S\n]{0,3}(\p{L}[\p{L}\p{M}-]*)(?![\p{L}\p{N}])/u;
+// A number (digits, or a spelled number already rewritten as digits) within
+// the modifier window before a word counts that word: "3 budgets of ₹2 crore"
+// is three budgets. A digit glued to letters (FY23, Q3, B2B) counts nothing.
+const COUNTER_BEFORE_RE = new RegExp(String.raw`(?<![\p{L}\p{N}.,])\d[\d,.]*[^\S\n]{1,3}(?:\p{L}[\p{L}\p{M}-]*[^\S\n]{1,3}){0,${MODIFIER_WINDOW - 1}}$`, 'u');
+const LABEL_WINDOW = 48;
+
+/** The money word the amount at [start, end) is of, on its left, or null. */
+function moneyLabelBefore(text, start) {
+  const from = Math.max(0, start - LABEL_WINDOW);
+  const match = MONEY_LABEL_LEFT_RE.exec(text.slice(from, start));
+  if (!match) return null;
+  const at = from + match.index;
+  // The window cut the word: it is longer than the window, and no money word.
+  if (at === from && from > 0 && /[\p{L}\p{N}]/u.test(text[from - 1])) return null;
+  const forms = MONEY_NOUNS.get(match[1].toLowerCase());
+  if (!forms) return null;
+  if (COUNTER_BEFORE_RE.test(text.slice(Math.max(0, at - LABEL_WINDOW), at))) return null;
+  return forms;
+}
+
+/** The money word right after the amount ending at `end`, or null. */
+function moneyLabelAfter(text, end) {
+  const match = MONEY_LABEL_RIGHT_RE.exec(text.slice(end, end + LABEL_WINDOW));
+  // A word that runs to the end of the window may be cut; no money word is that long.
+  if (!match || (match[0].length === LABEL_WINDOW && end + LABEL_WINDOW < text.length)) return null;
+  return MONEY_NOUNS.get(match[1].toLowerCase()) ?? null;
+}
+
+/**
+ * Count-shaped keys a rupee amount backs in one source line: "₹2 crore
+ * budgets" and "budgets of ₹2 crore" back "2crore budgets" (and "2crore
+ * budget", and every other spelling of the figure), because a lakh or crore
+ * figure written without a mark is rupees. Only a money word next to the
+ * amount is backed, never a counted word or a word across a comma, a line
+ * break or another number.
+ */
+const LAKH_CRORE_KEY_RE = /^\d+(?:\.\d+)?(?:lakh|crore) /;
+function rupeeLabelClaims(line) {
+  const claims = [];
+  if (!/\d/.test(line)) return claims;
+  // Labels are read on the masked line, so another amount is no counter.
+  const { masked } = moneyInText(line);
+  for (const match of line.matchAll(INR_AMOUNT_RE)) {
+    const end = match.index + match[0].length;
+    const after = line.slice(end, end + 40);
+    if (MONEY_LEFTOVER_RE.test(after) || (!moneyHasMagnitude(match) && MONEY_RANGE_TAIL_RE.test(after))) continue;
+    const value = rupeeValue(match);
+    for (const forms of [moneyLabelBefore(masked, match.index), moneyLabelAfter(masked, match.index + match[0].length)]) {
+      if (!forms) continue;
+      for (const form of forms) {
+        // Only the lakh and crore spellings: the rule is about a rupee figure
+        // written without its mark, so "₹50,000" backs no "50k budgets".
+        const claim = `${value} ${form}`;
+        for (const variant of countVariants(claim)) if (LAKH_CRORE_KEY_RE.test(variant)) claims.push(variant);
+      }
+    }
+  }
+  return claims;
+}
+
+// A plain lakh or crore figure with no word after it, at the end of a clause:
+// "Handled budgets of 2 crore", "Raised 2 crore."
+const BARE_AMOUNT_END_RE = new RegExp(
+  String.raw`(?<![\p{L}\p{N}${MONEY_MASK}$€£₹.,-])(\d+(?:\.\d+)?[^\S\n]{0,3}(?:${GLUED_MAGNITUDE_ALT}|lakhs?|crores?))(?![\p{L}\p{N}])(?=[^\S\n]{0,3}(?:[,;.!?)\n]|$))`,
+  'giu',
+);
+// Words after a figure that say when, not what: "2 crore annually".
+const AMOUNT_ADVERBS = new Set(['annually', 'yearly', 'monthly', 'quarterly', 'weekly', 'daily']);
+const WORTH_OF_RE = /^[^\S\n]{1,3}of[^\S\n]{1,3}(\p{L}[\p{L}\p{M}-]*)(?![\p{L}\p{N}])/iu;
+const CLAUSE_END_RE = /^[^\S\n]{0,3}(?:[,;.!?)\n]|$)/u;
+
+/**
+ * The claim key for a lakh or crore count-shaped figure whose next word is
+ * not what it counts. "2 crore worth of budgets" is "2crore budgets", and
+ * "budgets totalling 2 crore annually" is "2crore budgets" too: the money
+ * word on its left names it. With no money word there the key stays what it
+ * was ("2crore annually"), and only the same words back it.
+ */
+function rekeyAmount(text, amount, numberAt, noun, nounEnd) {
+  if (noun === 'worth') {
+    const of = WORTH_OF_RE.exec(text.slice(nounEnd, nounEnd + LABEL_WINDOW));
+    if (of) return `${amount} ${of[1].toLowerCase()}`;
+  } else if (AMOUNT_ADVERBS.has(noun) && CLAUSE_END_RE.test(text.slice(nounEnd, nounEnd + 8))) {
+    const label = moneyLabelBefore(text, numberAt);
+    if (label) return `${amount} ${label[1]}`;
+  }
+  return null;
+}
+
+const COORDINATORS = new Set(['and', 'or']);
+
 /** Extract metric-like claims that require source evidence. */
 export function metricClaims(text, { keepPlanHorizons = false } = {}) {
-  const clean = spellNumbers(stripMarkup(text, { keepLineBreaks: true }));
+  const clean = foldIndianGrouping(spellNumbers(stripMarkup(joinWrappedLines(String(text ?? '')), { keepLineBreaks: true })));
   const claims = new Set();
   for (const pattern of SIMPLE_CLAIM_PATTERNS) {
     for (const match of clean.matchAll(pattern)) claims.add(canonicalMetric(match[0]));
   }
+  // Rupee amounts are money: one key each, and masked from the count patterns
+  // with every other currency amount.
+  const { keys, masked } = moneyInText(clean);
+  for (const key of keys) claims.add(key);
   // Where each COUNT_CLAIM_RE number starts: it already binds that number to its
   // noun, so "2M active users" is not a second claim "2m active".
-  const counted = new Set([...clean.matchAll(COUNT_CLAIM_RE)].map((m) => m.index + m[0].indexOf(m[1])));
+  const counted = new Set([...masked.matchAll(COUNT_CLAIM_RE)].map((m) => m.index + m[0].indexOf(m[1])));
   // "14M evaluations for users": the counted thing is the word right after the
   // magnitude. The modifier window reached across "for" to the metric noun
   // "users" and reported "14m users". When a stop word sits between the number
   // and the noun the window found, and the word right after the number is a
   // plausible noun, the magnitude pattern below owns that figure.
-  for (const match of countMatches(clean, { keepPlanHorizons })) {
+  for (const match of countMatches(masked, { keepPlanHorizons })) {
     const noun = match[2].toLowerCase();
     if (MAGNITUDE_WORD_END_RE.test(match[1])) {
       const numberAt = match.index + match[0].indexOf(match[1]);
       const between = match[0].slice(match[0].indexOf(match[1]) + match[1].length).toLowerCase().match(/\p{L}+/gu) ?? [];
       MAGNITUDE_COUNT_AT_RE.lastIndex = numberAt;
-      const found = MAGNITUDE_COUNT_AT_RE.exec(clean);
+      const found = MAGNITUDE_COUNT_AT_RE.exec(masked);
       if (found && !MAGNITUDE_NOT_A_NOUN.has(found[2].toLowerCase()) && between.slice(0, -1).some((word) => MAGNITUDE_NOT_A_NOUN.has(word))) {
         counted.delete(numberAt);
-        continue;
+        // "2 crore budgets and customers": a coordinated noun is counted too.
+        if (!between.slice(0, -1).some((word) => COORDINATORS.has(word))) continue;
       }
     }
     claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
   }
-  for (const match of clean.matchAll(MAGNITUDE_COUNT_RE)) {
+  for (const match of masked.matchAll(MAGNITUDE_COUNT_RE)) {
     const noun = match[2].toLowerCase();
     if (MAGNITUDE_NOT_A_NOUN.has(noun) || counted.has(match.index)) continue;
-    claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
+    const amount = compactMagnitude(match[1]);
+    const rekeyed = /(?:lakh|crore)$/.test(amount)
+      ? rekeyAmount(masked, amount, match.index, noun, match.index + match[0].length)
+      : null;
+    claims.add(normalizeClaim(rekeyed ?? `${amount} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
+  }
+  // A lakh or crore figure with no word after it is named by the money word on
+  // its left ("budgets of 2 crore" is "2crore budgets"), or is the bare figure.
+  for (const match of masked.matchAll(BARE_AMOUNT_END_RE)) {
+    const amount = compactMagnitude(match[1].replace(/[^\S\n]+/g, ' '));
+    const label = moneyLabelBefore(masked, match.index);
+    claims.add(normalizeClaim(label ? `${amount} ${label[1]}` : amount));
   }
   return claims;
 }
@@ -2291,7 +2615,7 @@ export function metricClaims(text, { keepPlanHorizons = false } = {}) {
 // Used solely to answer "were there count claims this gate could not read?",
 // never to build a claim: it has no lexicon, so it cannot say what was counted.
 const GENERIC_COUNT_RE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}])(\d[\d,.]*)\s*\+?\s*(?:[\p{L}][\p{L}\p{M}-]*[\s]+){0,${MODIFIER_WINDOW}}([\p{L}][\p{L}\p{M}]{2,})`,
+  String.raw`(?<![\p{L}\p{N}])(?<!\d[,.])(\d[\d,.]*)\s*\+?\s*(?:[\p{L}][\p{L}\p{M}-]*[\s]+){0,${MODIFIER_WINDOW}}([\p{L}][\p{L}\p{M}]{2,})`,
   'giu',
 );
 // A year is not a count. "Led the 2024 migration" is the shape above and none
@@ -2444,6 +2768,14 @@ function allowedMetricSet(sourceText, allowMetrics) {
 // currency mark is money, not a count, and a number after a PIN or ZIP label
 // is a postcode; ten digits and up is a phone number or an ID.
 const LABELLED_NUMBER_RE = /(?:[$€£₹]|\b(?:rs|inr|usd|eur|gbp|pin|pincode|zip)\b\.?)\s*\d[\d,.]*/giu;
+// A year is told by the words around it, not by its value ("2,000 invoices"
+// is a count): "since 2020", "in 2019", "FY 2021", "2019 – 2023". Such a year
+// gives no count variant in the source, so "Analyst since 2020 customers were
+// served" does not back "2.02k customers". The year itself is masked.
+const DATED_YEAR_RE = /(?<=(?<![\p{L}\p{N}])(?:since|in|from|during|until|till|circa|fy|year)[^\S\n]{1,3})(?:19|20)\d{2}(?![\p{L}\p{N}])|(?<![\p{L}\p{N}.,])(?:19|20)\d{2}(?=[^\S\n]{0,3}[\p{Pd}][^\S\n]{0,3}(?:(?:19|20)\d{2}|present|now|date|today)(?![\p{L}\p{N}]))|(?<=(?<![\p{L}\p{N}.,])(?:19|20)\d{2}[^\S\n]{0,3}[\p{Pd}][^\S\n]{0,3})(?:19|20)\d{2}(?![\p{L}\p{N}])/giu;
+function maskDatedYears(line) {
+  return line.replace(DATED_YEAR_RE, (year) => MONEY_MASK.repeat(year.length));
+}
 const PLAIN_SOURCE_COUNT_RE = /(?<![\p{L}\p{N}.$€£₹-])(?<!(?:[$€£₹]|\b(?:rs|inr|usd|eur|gbp|pin|pincode|zip)\b\.?)\s*)(\d{4,9})(?!\d)\s+(\p{L}[\p{L}\p{M}-]*)/gu;
 
 /**
@@ -2456,23 +2788,33 @@ const PLAIN_SOURCE_COUNT_RE = /(?<![\p{L}\p{N}.$€£₹-])(?<!(?:[$€£₹]|\b
  * 2020" over "Customers were served daily" read as "2020 customers", and its
  * variant "2.02k customers" was support for a figure the source never states.
  * A large plain number counts the word after it even when that word is no
- * listed noun. All of this adds support and never raises a claim. No rule
- * here turns a lakh or crore amount the source states as money ("₹2 crore
- * budgets") into a bare count claim ("2 crore budgets"); P1-19c rebuilds that.
- * The count patterns can still read a money figure as a count on both sides
- * ("₹2 crore from customers" reads as "2crore customers"), as main does.
+ * listed noun. All of this adds support and never raises a claim. Lines are
+ * statements: a wrapped bullet is joined first, Indian digit grouping is
+ * folded, and a year dated by its words ("since 2020") gives no variant.
+ * A rupee amount stated as money backs the same figure as a count-shaped
+ * claim of the money word next to it, and of no other word
+ * (rupeeLabelClaims): "budgets of ₹2 crore" backs "2crore budgets", never
+ * "2crore customers". Money is masked from the count patterns on both sides,
+ * so "₹2 crore from customers" is no count of customers (P1-19c).
  */
 function sourceMetricBase(text) {
   const allowed = sourceMetricClaims(text);
   const perLine = new Set();
-  for (const line of stripMarkup(text, { keepLineBreaks: true }).split('\n')) {
-    if (!/\d/.test(line)) continue;
+  // Wrapped bullets are joined first, so a statement is one line.
+  for (const raw of stripMarkup(joinWrappedLines(text), { keepLineBreaks: true }).split('\n')) {
+    if (!/\d/.test(raw)) continue;
+    const line = foldIndianGrouping(raw);
+    // A lakh or crore amount stated as money backs the same figure as a
+    // count-shaped claim of the money word next to it (rupeeLabelClaims).
+    for (const claim of rupeeLabelClaims(spellNumbers(line))) allowed.add(claim);
     // Variants only for counts: a number after a currency mark or a PIN
-    // label is left out, and so is a plain number of ten digits or more.
-    for (const claim of sourceMetricClaims(line.replace(LABELLED_NUMBER_RE, ' '))) {
+    // label is left out, and so is a plain number of ten digits or more,
+    // and a year the words around it date ("since 2020").
+    const counts = maskDatedYears(line);
+    for (const claim of sourceMetricClaims(counts.replace(LABELLED_NUMBER_RE, ' '))) {
       if (!/^\d{10}/.test(claim)) perLine.add(claim);
     }
-    for (const match of normalizeClaim(line).matchAll(PLAIN_SOURCE_COUNT_RE)) {
+    for (const match of normalizeClaim(counts).matchAll(PLAIN_SOURCE_COUNT_RE)) {
       const claim = `${match[1]} ${match[2]}`;
       allowed.add(claim);
       perLine.add(claim);
@@ -2798,10 +3140,14 @@ export function verifyFactsFromText(targetText, {
   // real evidence still fails on that, and a coverage gap only turns a would-be
   // 'pass' into 'warn' so the caller is told the gate could not read it.
   // One coverage object, so callers that read `coverage.reason` keep working.
-  // A count gap keeps its reason and gains the scope sentence.
+  // A language gap wins the reason: when both gaps are present the reason is
+  // scope-not-checked, which blocks, and the count gap only adds its message
+  // and spans. Before, the count gap kept its reason (which does not block),
+  // so a line that was not checked for scope passed whenever it also carried
+  // counts the extractor could not read (P1-20 review).
   const countGap = diagnoseCoverage(targetText);
   const coverage = !languageGap ? countGap
-    : countGap ? { ...countGap, message: `${countGap.message} ${languageGap}` }
+    : countGap ? { ...countGap, reason: COVERAGE_REASONS[1], message: `${countGap.message} ${languageGap}` }
       : { reason: COVERAGE_REASONS[1], message: languageGap, spans: [] };
   const blocked = invented.length || unsupportedFacts.length || forbidden.length;
   return {
@@ -3032,7 +3378,8 @@ function runSelfTest() {
   equal('pan-india is a scope word', p1Words('Pan-India reporting'), ['pan-india']);
   equal('general manager is seniority', p1Words('General Manager, reporting').includes('general manager'), true);
   equal('executive summary is exempt', p1Words('Wrote the executive summary'), []);
-  equal('award-winning is exempt', p1Words('Award-winning close team'), []);
+  equal('award-winning blocks without an award in the facts', p1Words('Award-winning close team'), ['award']);
+  equal('award-winning passes with an award in the facts', verifyFactsFromText('An award-winning analyst', { sourceText: 'Analyst. Won the CFO Excellence Award 2022.' }).unsupportedFacts, []);
   equal('plural lakhs is a magnitude', auditClaims('Served 5 lakhs customers', 'Served 5 customers').invented, ['5lakh customers']);
   equal('crore money does not back another noun', auditClaims('Managed 2 crore customers', 'Handled budgets of ₹2 crore').invented, ['2crore customers']);
   equal('a rupee figure is no count', auditClaims('Processed 50k invoices', 'Budget Rs 50000 invoices').invented, ['50k invoices']);
