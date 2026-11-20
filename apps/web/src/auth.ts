@@ -13,6 +13,8 @@ import Resend from "next-auth/providers/resend";
 import { getDb } from "@/lib/db/index.mjs";
 import * as repo from "@/lib/db/repo.mjs";
 import { assertSafeEnv, devLoginEnabled, strictEnv } from "@/lib/server/env-guard.mjs";
+import { takeRateLimit } from "@/lib/server/rate-limit";
+import { allowEmailLink } from "@/lib/server/signin-limit.mjs";
 import { maySignIn, signupMode } from "@/lib/server/signup-gate.mjs";
 
 declare module "next-auth" {
@@ -179,8 +181,19 @@ const config: NextAuthConfig = {
       // page as a known one, so the response does not reveal who has an
       // account. Returning a string makes Auth.js redirect before it creates
       // a token or sends an email.
-      if (!allowed && account && emailStep?.verificationRequest && signupMode(process.env) === "closed") {
-        return `/api/auth/verify-request?${new URLSearchParams({ provider: account.provider, type: "email" })}`;
+      const verifyRequest = account
+        ? `/api/auth/verify-request?${new URLSearchParams({ provider: account.provider, type: "email" })}`
+        : null;
+      if (!allowed && verifyRequest && emailStep?.verificationRequest && signupMode(process.env) === "closed") {
+        return verifyRequest;
+      }
+      // Email-link sends are limited per address. This is the only point before both the token
+      // is stored and the email is sent: Auth.js starts sendVerificationRequest and
+      // createVerificationToken together (Promise.all in send-token.js), so a refusal inside the
+      // adapter would not stop the email. Only addresses the gate admitted spend a send, and a
+      // limited address gets the same "check your email" page as any other.
+      if (allowed && verifyRequest && emailStep?.verificationRequest) {
+        if (!(await allowEmailLink({ email, take: takeRateLimit }))) return verifyRequest;
       }
       return allowed;
     },
