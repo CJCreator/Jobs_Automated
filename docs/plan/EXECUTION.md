@@ -286,3 +286,12 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - After P1-29, P1-27 can call the rate-limit records short-lived again.
 - **Launch-gate note:** do not set `ROLEWRIGHT_SIGNUPS=open` before P1-7 and P1-27. `env-guard` allows it once a grievance contact is set, whether or not the purge scheduler runs.
 - **P1-19 merged** with the P1-19d split, approved by the advisor. One exception is recorded and accepted: lakh and crore money can back a count noun one filler word further away than main allowed. On the other side, the merge closes main's larger hole of reading "2 crore customers" as "2 customers". The P1-19c case table is in `p1-19c-cases.md`.
+- **P1-27 notice sentences for rate-limit records**, from the advisor's P1-29 review. They are true only once P1-29 merges and the daily purge is running:
+  - "To limit abuse, we keep a short record of each rate-limited request: the kind of action, the time, and either your account ID or a keyed hash of your IP address or email address. We do not store the IP address or email address itself in these records."
+  - "These records are deleted once they are more than 24 hours old; the clean-up runs at least once a day, so a record can remain for up to about two days."
+  - "When you delete your account, the records stored under your account ID are deleted at the same time. Records stored under a hash of your IP address or email address are not linked to your account and are removed by the same clean-up, within about two days."
+
+  The notice must not say:
+  - "deleted after 24 hours" as a hard limit;
+  - "all rate-limit records are deleted with your account";
+  - that hashed records "cannot be linked" to a person.
