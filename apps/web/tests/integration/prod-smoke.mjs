@@ -10,11 +10,12 @@
 //
 // Remote mode: SMOKE_BASE_URL=https://<deployed host> builds and starts nothing and runs only the steps
 // that need no sign-in and write nothing. See runRemote() below. Optional and opt-in: SMOKE_SESSION_COOKIE
-// (the owner's own staging session, read from the environment and never printed) with SMOKE_TAILORING_ID
+// (the owner's own staging session, a full name=value pair such as
+// __Secure-authjs.session-token=..., read from the environment and never printed) with SMOKE_TAILORING_ID
 // times one GET of that tailoring.
 
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -88,13 +89,13 @@ const nextBin = path.join(appDir, "node_modules", "next", "dist", "bin", "next")
 
 process.once("exit", () => {
   killTree(child);
-  restoreGenerated();
+  if (!REMOTE) restoreGenerated();
 });
-for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => process.exit(130));
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, () => process.exit(130));
 
 async function stopServer() {
   if (!child) return;
-  const exited = child.exitCode === null ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
+  const exited = child.exitCode === null && child.signalCode === null ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
   killTree(child);
   await Promise.race([exited, new Promise((r) => setTimeout(r, 15_000))]);
 }
@@ -241,6 +242,9 @@ async function runRemote() {
     });
 
     await step("R5. the development sign-in (POST /api/auth/callback/dev) is refused: no session cookie is set", async () => {
+      const providers = await fetch(`${base}/api/auth/providers`, { signal: AbortSignal.timeout(30_000) });
+      const listed = await providers.json().catch(() => ({}));
+      assert.ok(!Object.keys(listed ?? {}).includes("dev") && !Object.values(listed ?? {}).some((p) => p?.id === "dev"), "/api/auth/providers lists the dev provider");
       const csrf = await fetch(`${base}/api/auth/csrf`, { signal: AbortSignal.timeout(30_000) });
       const { csrfToken } = await csrf.json();
       const csrfCookie = csrf.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
@@ -261,6 +265,7 @@ async function runRemote() {
     const tailoringId = process.env.SMOKE_TAILORING_ID;
     if (cookie && tailoringId) {
       await step("R6. signed in (opt-in): time one GET of the tailoring (the gate-timing line for P1-7)", async () => {
+        assert.ok(/^[\x21-\x7e]([\x20-\x7e]*[\x21-\x7e])?$/.test(cookie), "SMOKE_SESSION_COOKIE is not a valid cookie header value (expected name=value, one line)");
         assert.match(tailoringId, /^[A-Za-z0-9_-]+$/, "SMOKE_TAILORING_ID looks like an id");
         const started = performance.now();
         const res = await request(cookie, "GET", `/api/tailorings/${tailoringId}`);
@@ -290,7 +295,7 @@ if (REMOTE) await runRemote();
 const state = {};
 
 try {
-  await assertCleanStart(appDir, PORT);
+  await step("0. preflight: port 3124 is free and no other next process runs in this app directory", () => assertCleanStart(appDir, PORT));
   await step("1. seed the database directly: two users, A's confirmed facts, a job and a tailoring", async () => {
     const raw = {
       contact: { ...MOCK_RESUME.contact, confirmed: true },

@@ -137,10 +137,17 @@ export function noHorizontalScroll(page) {
  * Kill a server started with `detached: true` (its own process group on posix). `next` spawns a child
  * server, so the whole group goes, even when the parent has already exited.
  */
+const killed = new WeakSet();
 export function killTree(proc) {
   if (!proc) return;
+  if (!Number.isInteger(proc.pid) || proc.pid <= 1) return;
   // On win32 an exited parent has no tree left to kill.
   if (process.platform === "win32" && proc.exitCode !== null) return;
+  // A group is signalled at most once, so a recycled process group id is never hit by a second kill.
+  if (process.platform !== "win32") {
+    if (killed.has(proc)) return;
+    killed.add(proc);
+  }
   try {
     if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
     else process.kill(-proc.pid, "SIGKILL");

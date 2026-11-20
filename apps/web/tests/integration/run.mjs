@@ -141,7 +141,7 @@ function startServer(port, dataDir) {
 
 async function stopServer(child) {
   if (!child) return;
-  const exited = child.exitCode === null ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
+  const exited = child.exitCode === null && child.signalCode === null ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
   // The whole process group, as next-server is a child of the next CLI.
   killTree(child);
   await Promise.race([exited, new Promise((r) => setTimeout(r, 15_000))]);
@@ -238,7 +238,7 @@ function killServerSync() {
   killTree(child);
 }
 process.once("exit", killServerSync);
-for (const signal of ["SIGINT", "SIGTERM"]) {
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.once(signal, () => process.exit(130));
 }
 
