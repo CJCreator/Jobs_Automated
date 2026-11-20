@@ -22,16 +22,19 @@
 // facts is the existing check's job in claims.mjs). Years are exempt. A figure
 // with no noun near it cannot be judged and passes.
 //
-// Not covered: a wrong subject that shares one noun with the right one, such as
-// "Led 12 branch analysts" when the facts hold "12 branches" (a documented gap
-// in the tests).
+// Not covered (each is a documented pass in KNOWN_GAPS in the tests): a wrong
+// subject that shares one noun with the right one ("Led 12 branch analysts",
+// "Led 12 audit analysts", "Led 3 audit teams", "Managed 4 analyst teams",
+// "4 years of people management experience"); tool words in the fact sentence
+// count as support ("Increased Power BI adoption 30%"); a figure whose subject
+// is a verb or is out of reach ("Saved ₹2 crore", "Raised 2 crore funding",
+// "Led 12 analysts, auditing branches", "Led 12" then a line break). Known
+// false block: "Supported statutory audit for 12 locations".
 //
 // Measured on the HONEST fixture (116 lines, 92 non-year figures), against the
-// source alone and with the extra facts the tests add: 0 false blocks at
-// CONTEXT_WINDOW = 2, with every must-block and must-pass case holding. Other
-// windows, same cases: 1 misses "Reduced costs by 30%" and falsely blocks 5
-// honest lines; 3 and 4 have 0 false blocks but miss "Led 12 analysts across
-// branches". "of" does not use up the window ("oversight of 2 crore").
+// source alone and with the extra facts the tests add: 0 false blocks, with
+// every must-block and must-pass case holding. Stop words do not use up the
+// window; CONTEXT_WINDOW counts other words, and a preposition ends the scan.
 //
 // Pure functions, no I/O, so `node --test` can import this file directly.
 
@@ -114,23 +117,27 @@ function words(text) {
 
 // A sentence ends at ". " before a capital, at the end of text, and at ; | a bullet or a line break.
 // "Rs. 2 Cr", "B.Com" and "30.5%" are not ends.
-const SENTENCE_BREAK = /[.!?]+(?=\s+[\p{Lu}"“(\[]|\s*$)|[;|•\n]/gu;
+const SENTENCE_BREAK = /[.!?](?=\s+[\p{Lu}"“(\[]|\s*$)|[;|•\n]/gu;
 
 function sentences(text) {
   return cleanText(text).split(SENTENCE_BREAK).map((s) => s.trim()).filter(Boolean);
 }
 
-/** Find where a claim sits in a sentence, scanning forward from `from`. Returns [start, end] or null. */
+const EDGE = /[\p{L}\p{N}]/u;
+
+/** Find where a claim sits in a sentence, scanning forward from `from`, on token edges. Returns [start, end] or null. */
 function locate(sentence, lowered, claim, from) {
   const raw = claim.raw.toLowerCase();
-  let i = lowered.indexOf(raw, from);
-  if (i >= 0) return [i, i + raw.length];
+  for (let i = lowered.indexOf(raw, from); i >= 0; i = lowered.indexOf(raw, i + 1)) {
+    if (!EDGE.test(lowered[i - 1] ?? " ") && !EDGE.test(lowered[i + raw.length] ?? " ")) return [i, i + raw.length];
+  }
   // The text was rewritten before reading ("30 per cent", "30-45%"): find its digits.
   const digits = /\d[\d,]*(?:\.\d+)?/.exec(raw)?.[0];
   if (digits) {
-    const re = new RegExp(`(?<![\\p{L}\\p{N}])${digits.replace(/[.,]/g, "\\$&")}`, "u");
-    const m = re.exec(sentence.slice(from));
-    if (m) return [from + m.index, from + m.index + digits.length];
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${digits.replace(/[.,]/g, "\\$&")}(?!\\d)`, "gu");
+    re.lastIndex = from;
+    const m = re.exec(sentence);
+    if (m) return [m.index, m.index + digits.length];
   }
   return null;
 }
@@ -141,20 +148,25 @@ function figures(sentence) {
   const out = [];
   let from = 0;
   for (const claim of numberClaims(sentence)) {
-    if (claim.key.endsWith("|year")) continue;
     const at = locate(sentence, lowered, claim, from) ?? locate(sentence, lowered, claim, 0);
     if (!at) continue;
     from = at[1];
+    if (claim.key.endsWith("|year")) continue;
     out.push({ key: claim.key, raw: claim.raw, start: at[0], end: at[1] });
   }
   return out;
 }
 
+// A preposition ends the scan: what follows it is another phrase.
+const PREP = new Set("across in at for on to from into within over per while and".split(" "));
+
+/** Words from the figure outwards that count as its context: stop words are free, `window` others are kept. */
 function reach(side, window) {
   const out = [];
   let used = 0;
   for (const w of side) {
-    if (w.word !== "of") {
+    if (PREP.has(w.word)) break;
+    if (!STOP.has(w.word)) {
       if (used === window) break;
       used++;
     }
@@ -163,12 +175,20 @@ function reach(side, window) {
   return out;
 }
 
-/** The nouns that sit within the window of a figure, nearest first, each with its written form. */
-function nearbyNouns(sentence, fig, window = CONTEXT_WINDOW) {
-  const all = words(sentence);
-  // "of" links two nouns ("oversight of 2 crore", "team of 12") and does not use up the window.
-  const right = reach(all.filter((w) => w.start >= fig.end), window);
-  const left = reach(all.filter((w) => w.end <= fig.start).reverse(), window);
+const SCAN = 12; // words examined each side before the window rule applies
+
+/** The nouns that sit within the window of a figure, nearest first. `all` is the sentence's words. */
+function nearbyNouns(all, fig, window = CONTEXT_WINDOW) {
+  // First word that starts at or after the figure's end (binary search).
+  let lo = 0;
+  let hi = all.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (all[mid].start >= fig.end) hi = mid;
+    else lo = mid + 1;
+  }
+  const rightSide = all.slice(lo, lo + SCAN);
+  const leftSide = all.slice(Math.max(0, lo - SCAN), lo).filter((w) => w.end <= fig.start).reverse();
   const take = (side) => {
     const kept = [];
     for (const w of side) {
@@ -177,8 +197,8 @@ function nearbyNouns(sentence, fig, window = CONTEXT_WINDOW) {
     }
     return kept;
   };
-  const r = take(right).map((w, i) => ({ ...w, dist: i, side: "right" }));
-  const l = take(left).map((w, i) => ({ ...w, dist: i, side: "left" }));
+  const r = take(reach(rightSide, window)).map((w, i) => ({ ...w, dist: i, side: "right" }));
+  const l = take(reach(leftSide, window)).map((w, i) => ({ ...w, dist: i, side: "left" }));
   return [...r, ...l].filter((w) => isNoun(w.word)).sort((a, b) => a.dist - b.dist || (a.side === "right" ? -1 : 1));
 }
 
@@ -220,14 +240,14 @@ export function unsupportedNumberContexts(text, sourceText) {
   const out = [];
   const seen = new Set();
   for (const sentence of sentences(text)) {
+    const all = words(sentence);
     for (const fig of figures(sentence)) {
       const holders = index.get(fig.key);
       if (!holders) continue;
-      const nouns = nearbyNouns(sentence, fig);
+      const nouns = nearbyNouns(all, fig);
       if (!nouns.length) continue;
       const stems = nouns.map((n) => stem(n.word));
-      // An empty fact set is a bare figure the user confirmed on its own.
-      if (holders.some((set) => set.size === 0 || stems.some((s) => set.has(s)))) continue;
+      if (holders.some((set) => stems.some((s) => set.has(s)))) continue;
       const head = nouns[0];
       const value = `${fig.raw} ${head.written}`.slice(0, 60);
       if (seen.has(value)) continue;
