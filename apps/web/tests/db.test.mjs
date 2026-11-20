@@ -833,3 +833,40 @@ test("changeFacts holds a row lock on the Fact Base while its callback runs, eve
   });
   assert.ok(blocked, "the Fact Base row was not locked");
 });
+
+// ---- rate_events and account deletion / purge (P1-29) -------------------------
+
+const rateRows = async (d, subject) =>
+  (await d.system.query("SELECT count(*)::int AS n FROM rate_events WHERE subject = $1", [subject])).rows[0].n;
+
+test("deleteUserData removes that user's id-subject rate_events rows, not another user's or a hashed subject's", async () => {
+  const d = await freshDb();
+  const a = await seedEverything(d, "rate-a@example.com");
+  const b = await seedEverything(d, "rate-b@example.com");
+  for (const [bucket, subject] of [["ai", a], ["export", a], ["ai", b], ["signInIp", "f".repeat(64)]]) {
+    await d.system.query("INSERT INTO rate_events (bucket, subject) VALUES ($1, $2)", [bucket, subject]);
+  }
+  assert.equal(await repo.deleteUserData(d, a), true);
+  assert.equal(await rateRows(d, a), 0);
+  assert.equal(await rateRows(d, b), 1);
+  assert.equal(await rateRows(d, "f".repeat(64)), 1);
+});
+
+test("purgeInactiveUsers sweeps expired rate_events rows and keeps recent ones", async () => {
+  const d = await freshDb();
+  const now = new Date("2026-11-19T00:00:00Z");
+  await d.system.query("INSERT INTO rate_events (bucket, subject, at) VALUES ('ai', 'purge-old', $1), ('trialIp', 'purge-old2', $2), ('ai', 'purge-new', $3)",
+    ["2026-11-10T00:00:00Z", "2026-11-17T00:00:00Z", "2026-11-18T12:00:00Z"]);
+  assert.equal(await repo.purgeInactiveUsers(d, { now }), 0);
+  assert.equal(await rateRows(d, "purge-old"), 0);
+  assert.equal(await rateRows(d, "purge-old2"), 0);
+  assert.equal(await rateRows(d, "purge-new"), 1);
+});
+
+test("rolewright_app has no privilege on rate_events, and rolewright_system can delete from it", async () => {
+  for (const priv of ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+    const { rows } = await db.system.query("SELECT has_table_privilege('rolewright_app', 'rate_events', $1) AS ok", [priv]);
+    assert.equal(rows[0].ok, false, `rolewright_app has ${priv} on rate_events`);
+  }
+  await assert.rejects(db.withUser(A, (tx) => tx.query("DELETE FROM rate_events")), /permission denied/);
+});
