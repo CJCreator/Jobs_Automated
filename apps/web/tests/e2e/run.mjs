@@ -21,6 +21,7 @@ import {
   activeInfo,
   assertFocusVisible,
   assertSkipLinkFirst,
+  assertCleanStart,
   assertTargets,
   describeAxe,
   noHorizontalScroll,
@@ -248,6 +249,19 @@ async function untilQuiet(page) {
   }
 }
 
+// A retry often means something rewrote these files under the dev server.
+function logGeneratedMtimes() {
+  for (const file of GENERATED) {
+    let when = "missing";
+    try {
+      when = fs.statSync(file).mtime.toISOString();
+    } catch {
+      // Reported as missing.
+    }
+    console.log(`     ${path.basename(file)} mtime ${when}`);
+  }
+}
+
 /** At every screen state: axe in light and dark, target sizes, and a screenshot. */
 async function checkpoint(page, label) {
   // The dev server reloads the page when a source file changes under it (other
@@ -263,9 +277,10 @@ async function checkpoint(page, label) {
     } catch (e) {
       axeFindings.length = mark[0];
       sizeFindings.length = mark[1];
-      const transient = /context was destroyed|navigation|axe is not defined|reading 'run'|Target closed/i.test(String(e));
+      const transient = /context was destroyed|navigation|axe is not defined|reading 'run'/i.test(String(e));
       console.log(`     checkpoint "${label}" attempt ${attempt} failed (${String(e).split("\n")[0].slice(0, 120)})${transient && attempt < 6 ? ", retrying" : ""}`);
       if (attempt >= 6 || !transient) throw e;
+      logGeneratedMtimes();
       await untilQuiet(page);
     }
   }
@@ -477,6 +492,7 @@ const state = {};
 
 try {
   await step("1. next dev starts on port 3122 with the dev sign-in, the mock AI and a temp database", async () => {
+    await assertCleanStart(appDir, PORT);
     assert.ok(await freePort(PORT), `port ${PORT} is already in use`);
     child = startServer();
     await waitForServer();

@@ -1,7 +1,9 @@
 // Helpers for the browser test: axe, keyboard navigation, focus and target-size checks.
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 
 export const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
@@ -126,4 +128,75 @@ export async function assertTargets(page, what) {
 
 export function noHorizontalScroll(page) {
   return page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+}
+
+// ---------------------------------------------------------------------------
+// Server plumbing shared by the three harnesses (test:flow, test:e2e, test:prod).
+
+/**
+ * Kill a server started with `detached: true` (its own process group on posix). `next` spawns a child
+ * server, so the whole group goes, even when the parent has already exited.
+ */
+const killed = new WeakSet();
+export function killTree(proc) {
+  if (!proc) return;
+  if (!Number.isInteger(proc.pid) || proc.pid <= 1) return;
+  // On win32 an exited parent has no tree left to kill.
+  if (process.platform === "win32" && proc.exitCode !== null) return;
+  // A group is signalled at most once, so a recycled process group id is never hit by a second kill.
+  if (process.platform !== "win32") {
+    if (killed.has(proc)) return;
+    killed.add(proc);
+  }
+  try {
+    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    else process.kill(-proc.pid, "SIGKILL");
+  } catch {
+    // Already gone.
+  }
+}
+
+export function portIsFree(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once("error", () => resolve(false));
+    srv.listen(port, () => srv.close(() => resolve(true)));
+  });
+}
+
+/**
+ * Other `next` processes (the CLI, its server, its workers) whose working directory is this app. Linux only
+ * (reads /proc); elsewhere it returns [] and the port check is the only guard.
+ */
+export function staleNextProcesses(appDir) {
+  if (process.platform !== "linux") return [];
+  let here;
+  try {
+    here = fs.realpathSync(appDir);
+  } catch {
+    return [];
+  }
+  const found = [];
+  for (const name of fs.readdirSync("/proc")) {
+    if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
+    try {
+      if (fs.realpathSync(`/proc/${name}/cwd`) !== here) continue;
+      const cmd = fs.readFileSync(`/proc/${name}/cmdline`, "utf8").split("\0").join(" ").trim();
+      if (/next-server|next[\\/]dist|[\\/]next( |$)/.test(cmd)) found.push(`pid ${name}: ${cmd.slice(0, 160)}`);
+    } catch {
+      // The process exited, or it is not ours to inspect.
+    }
+  }
+  return found;
+}
+
+/** Fail fast, with a message that says what to stop, before a harness starts its own server. */
+export async function assertCleanStart(appDir, port) {
+  assert.ok(await portIsFree(port), `port ${port} is already in use. Stop whatever is listening on it (a server from an earlier run?) and run again.`);
+  const stale = staleNextProcesses(appDir);
+  assert.equal(
+    stale.length,
+    0,
+    `another next process already has ${appDir} as its working directory. Stop it and run again (the harness does not kill processes it did not start):\n  ${stale.join("\n  ")}`,
+  );
 }
