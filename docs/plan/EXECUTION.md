@@ -240,3 +240,18 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 - **Number-context timing limit.** The `number-context.test.mjs:96` limit of 150 ms was too tight on the CI runner, where the case took 153 ms at `9c5ef66`. The TEST wave should set it from the CI measurement plus a margin. The quadratic case it guards took more than 3 s before the fix.
 - **CodeQL `number-context.mjs:137`.** It flags incomplete escaping. This is a false positive, because the input holds only digits, commas and dots. Harden it anyway with a general regex escape as a P1-F fix.
 - Owner decision, 2026-11-20: Dependency Review is removed. On a private repository it needs paid Code Security. Restore it when the repository goes public.
+- **P1-19 rejected at final review** (a4b0cb5). `currencyAmountClaims` grows quadratically: 8 s cold and 1.3 GB heap on a 24k-character one-line fact base, and the process runs out of memory at 256 MB. All review rounds were used, so the fix is re-briefed as **P1-19b** (Opus, same branch): back amounts by adjacency only, no base-set copy, a worst-case cost test, and two must-block cases.
+- **New task P1-19c** (after P1-19b merges; Touches `packages/engine/verify-cv-facts.mjs` and tests): rupee amounts in the engine gate. It covers:
+  - ₹, Rs, Rs. and INR, plus trailing rupee or rupees, read as money with lakh or crore magnitudes;
+  - Indian digit grouping (₹2,00,00,000 = ₹2 crore);
+  - a bare lakh or crore figure read as INR;
+  - joining wrapped source bullets before the per-line pass.
+
+  Must block: ₹20 crore, Rs 20 lakh and ₹20,00,000 against facts valued at 2. The app layer already blocks these through `checkText`; the gap is live only on engine-direct paths.
+- **P1-20 must mirror P1-19:**
+  - the `CLAIM_FAMILIES` delta: topper, diploma, guru, veteran, "ph d", post-graduate, seniors, seniormost, principals, "heads of", avp/svp/evp, mgr, gm/general manager, c-suite, cxo/cxos, pan-india, expertly;
+  - the exemptions "executive summary", "enterprise reporting" and "award-winning";
+  - the `COVERAGE_REASONS` rule: `no-count-claims-recognized` does not block, `scope-not-checked` blocks;
+  - the read-only per-source memo;
+  - must-block cases "2 crore analysts" and "2 crore customers";
+  - an app-side worst-case cost test.
