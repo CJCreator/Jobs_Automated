@@ -1,0 +1,3 @@
+DevOps Engineer
+Terraform, Ansible, Jenkins, Prometheus, Grafana, Linux, Bash, Azure, Google Cloud
+Platform, Amazon Web Services, Infrastructure as Code, Kubernetes, Helm, Docker.

@@ -1,0 +1,5 @@
+Data Analyst, Placeholder Analytics
+Trained ML models with scikit-learn and PyTorch; wrote Pandas and NumPy pipelines.
+Worked on natural language processing for support tickets. Large language models
+were evaluated for summarisation. Fine-tuning the dashboards to cut load time.
+Skills: SQL, Python, C++, MLOps basics

@@ -1,0 +1,4 @@
+Senior Backend Engineer (Bengaluru)
+We are looking for an engineer experienced in Python, Django, PostgreSQL and Redis.
+You will run services on AWS with Docker and Kubernetes, and set up CI/CD pipelines.
+Nice to have: GraphQL, Terraform, and experience with LLMs. Go is a plus.
