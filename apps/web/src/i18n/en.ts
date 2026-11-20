@@ -468,6 +468,16 @@ export const en = {
     limited: "Sign-in requests are limited, so asking for several links in a row may not send more. Wait a few minutes before you try again.",
     back: "Back to sign in",
   },
+  // P2-2
+  dataExport: {
+    title: "Download your data",
+    body: "One JSON file with everything we hold for you: your account details, confirmed facts, uploaded resume text, job descriptions, tailorings and their suggestions, your consent records and your trial counts. It never includes an API key or sign-in token.",
+    button: "Download my data",
+    working: "Preparing your file",
+    done: "Your data file has been downloaded.",
+    failed: "We could not prepare your file. Try again in a moment.",
+    fallbackName: "rolewright-data.json",
+  },
 } as const;
 
 export type Strings = typeof en;
