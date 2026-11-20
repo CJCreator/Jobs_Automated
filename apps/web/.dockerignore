@@ -1,0 +1,15 @@
+# NOTE: Docker reads .dockerignore from the build context root. The image is
+# built from the repository root (docker build -f apps/web/Dockerfile .), so
+# the root context does not read this file; it applies when the context is
+# apps/web. The Dockerfile copies only what it needs, and removes the engine's
+# web UI, tests and fixtures itself.
+**/node_modules
+**/.next
+**/.next-*
+.data
+.env
+.env.*
+*.log
+.git
+tests
+docs
