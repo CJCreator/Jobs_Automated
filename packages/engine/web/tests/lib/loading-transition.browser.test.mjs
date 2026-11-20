@@ -27,7 +27,7 @@ test("loading transitions keep context and only latest requests settle Today", {
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   t.after(() => browser.close());
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const tab = (label) => page.getByRole("button", { name: new RegExp(`^${label} \\d+$`) });
