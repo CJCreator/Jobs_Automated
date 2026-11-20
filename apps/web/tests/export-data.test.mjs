@@ -93,3 +93,17 @@ test("the route follows the conventions: user required, rate limited, attachment
   assert.match(src, /attachment; filename="rolewright-data-/);
   assert.match(src, /"Cache-Control": "no-store"/);
 });
+
+test("the export lists the user's own events and none of another user's", async () => {
+  const { recordEvent } = await import("../src/lib/db/events.mjs");
+  const a = await seed("exp-ev-a");
+  const b = await seed("exp-ev-b");
+  await recordEvent(db, a.user.id, "resume_uploaded", { provider: "gemini" });
+  await recordEvent(db, a.user.id, "export_succeeded", { coverage_before: 40, coverage_after: 70 });
+  await recordEvent(db, b.user.id, "export_blocked", { reason: "fact_gate" });
+  const out = await exportUserData(db, a.user.id);
+  assert.deepEqual(out.events.map((e) => e.name), ["resume_uploaded", "export_succeeded"]);
+  assert.deepEqual(out.events[1].props, { coverage_before: 40, coverage_after: 70 });
+  assert.ok(!JSON.stringify(out.events).includes("fact_gate"));
+  assert.ok(out.events.every((e) => typeof e.at === "string"));
+});
