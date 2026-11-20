@@ -64,6 +64,9 @@ export function PrivacyNotice() {
           {t.retentionTitle}
         </h2>
         <p className="max-w-[65ch]">{t.retention}</p>
+        <p className="max-w-[65ch]" data-testid="export-line">
+          {t.exportLine}
+        </p>
       </section>
 
       <section aria-labelledby="contact-title" className="space-y-2">

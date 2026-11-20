@@ -4,6 +4,8 @@
 // table through db.system. Nothing secret is stored in these tables, and the account row
 // is still filtered so a column added later with such a name is never exported.
 
+import { listEvents } from "./events.mjs";
+
 const SECRET_NAME = /key|token|password|secret/i;
 
 export const EXPORT_FORMAT = "rolewright-export";
@@ -45,6 +47,8 @@ export async function exportUserData(db, userId, { now = new Date() } = {}) {
     };
   });
 
+  const events = await listEvents(db, userId);
+
   const clean = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, iso(v)]));
   return {
     format: EXPORT_FORMAT,
@@ -58,5 +62,6 @@ export async function exportUserData(db, userId, { now = new Date() } = {}) {
     tailorings: own.tailorings.map(clean),
     consents: own.consents.map(clean),
     trial: own.trial ? clean(own.trial) : null,
+    events: events.map(clean),
   };
 }

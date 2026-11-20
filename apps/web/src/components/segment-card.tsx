@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { Button, buttonClass, Card, Notice } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
@@ -20,6 +20,9 @@ export function SegmentCard() {
   const [editing, setEditing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const tipHeading = useRef<HTMLHeadingElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const focusAfter = useRef<"tip" | "radio" | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "info"; text: string } | null>(null);
 
   useEffect(() => {
@@ -38,6 +41,16 @@ export function SegmentCard() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    const where = focusAfter.current;
+    if (!where) return;
+    if (where === "tip" && editing) return;
+    if (where === "radio" && !editing) return;
+    focusAfter.current = null;
+    if (where === "tip") tipHeading.current?.focus();
+    else form.current?.querySelector<HTMLInputElement>("input[type=radio]:checked, input[type=radio]")?.focus();
+  }, [editing, saved]);
+
   const save = async (next: Segment | null) => {
     setBusy(true);
     setMessage(null);
@@ -45,6 +58,7 @@ export function SegmentCard() {
       const d = await api<ProfileResponse>("/api/profile", { method: "PUT", json: { segment: next } });
       setSaved(d.segment);
       setPicked(d.segment);
+      focusAfter.current = d.segment ? "tip" : null;
       setEditing(false);
       setMessage({ tone: "info", text: d.segment ? t.saved : t.cleared });
     } catch (e) {
@@ -61,7 +75,7 @@ export function SegmentCard() {
     <Card className="space-y-4" aria-labelledby="segment-title">
       {showTip ? (
         <div className="space-y-3">
-          <h2 id="segment-title" className="font-heading text-xl font-semibold">
+          <h2 id="segment-title" ref={tipHeading} tabIndex={-1} className="font-heading text-xl font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand">
             {t.yours}: {t.options[saved].label}
           </h2>
           <p className="max-w-[65ch]">{t.tips[saved]}</p>
@@ -69,13 +83,17 @@ export function SegmentCard() {
             <Link href="/app/resume" className={buttonClass("primary")}>
               {t.tipLink}
             </Link>
-            <Button variant="secondary" onClick={() => setEditing(true)}>
+            <Button variant="secondary" onClick={() => {
+                focusAfter.current = "radio";
+                setEditing(true);
+              }}>
               {t.change}
             </Button>
           </div>
         </div>
       ) : (
         <form
+          ref={form}
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
@@ -109,6 +127,20 @@ export function SegmentCard() {
             <Button type="submit" disabled={!picked} loading={busy}>
               {busy ? t.saving : t.save}
             </Button>
+            {saved ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setPicked(saved);
+                  setMessage(null);
+                  focusAfter.current = "tip";
+                  setEditing(false);
+                }}
+                disabled={busy}
+              >
+                {t.cancel}
+              </Button>
+            ) : null}
             {saved ? (
               <Button variant="secondary" onClick={() => void save(null)} disabled={busy}>
                 {t.clear}
