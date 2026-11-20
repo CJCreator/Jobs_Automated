@@ -237,5 +237,6 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 - Follow-ups recorded during wave 1 review:
   - **Shared hash key.** `ipSubject` and `emailSubject` use the same key without domain separation. This is harmless today because the two kinds of subject never share a bucket. Separate them if they ever do.
   - **Database certificate.** Cloud SQL certificate verification (`sslmode=verify-ca` with the server CA) is not done yet. ADR 0009 is amended to record this.
+- **Number-context timing limit.** The `number-context.test.mjs:96` limit of 150 ms was too tight on the CI runner, where the case took 153 ms at `9c5ef66`. The TEST wave should set it from the CI measurement plus a margin. The quadratic case it guards took more than 3 s before the fix.
 - **CodeQL `number-context.mjs:137`.** It flags incomplete escaping. This is a false positive, because the input holds only digits, commas and dots. Harden it anyway with a general regex escape as a P1-F fix.
 - Owner decision, 2026-11-20: Dependency Review is removed. On a private repository it needs paid Code Security. Restore it when the repository goes public.
