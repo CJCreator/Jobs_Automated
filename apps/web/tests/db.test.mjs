@@ -483,9 +483,24 @@ test("ROLEWRIGHT_TEST_OWNER_URL needs ROLEWRIGHT_TEST_DATABASE_URL too", () => {
   if (REQUIRE_PG && OWNER_URL) assert.equal(NON_OWNER, true);
 });
 
+test("a deployed host is refused before any DDL if asked to migrate in the app", async () => {
+  const saved = process.env.K_SERVICE;
+  process.env.K_SERVICE = "web";
+  try {
+    // Port 1 on loopback: nothing listens, so a connection attempt would fail with ECONNREFUSED instead.
+    await assert.rejects(
+      createDb({ connectionString: "postgres://nobody@127.0.0.1:1/none", migrate: true }),
+      (e) => e instanceof UnsafeEnvironmentError && /db:migrate/.test(e.message),
+    );
+  } finally {
+    if (saved === undefined) delete process.env.K_SERVICE;
+    else process.env.K_SERVICE = saved;
+  }
+});
+
 const ownedRelations = async (d) => (await d.system.query(`
   SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = 'public' AND pg_has_role(current_user, c.relowner, 'USAGE')`)).rows[0].n;
+  WHERE n.nspname = 'public' AND pg_has_role(current_user, c.relowner, 'MEMBER')`)).rows[0].n;
 
 test("the login's ownership matches the mode; as a non-owner it cannot change any table's security", { skip: !PG && "PGlite always runs as a superuser" }, async () => {
   // The app role never inherits the system role, so a user scope cannot reach the identity tables.

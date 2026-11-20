@@ -127,6 +127,10 @@ async function createPgliteDb({ dataDir } = {}) {
  *   and the login must own nothing.
  */
 async function createPgDb({ connectionString, migrate = !isDeployed(process.env) }) {
+  if (migrate && isDeployed(process.env)) {
+    // The deployed app login must own nothing, so it must never run DDL.
+    throw new UnsafeEnvironmentError("Rolewright does not apply the schema itself on a deployed host. Run `npm run db:migrate` with the owner login before deploying.");
+  }
   const { default: pg } = await import("pg");
   const pool = new pg.Pool({ connectionString });
 
@@ -152,9 +156,8 @@ async function createPgDb({ connectionString, migrate = !isDeployed(process.env)
 
   try {
     if (migrate) await applySchema();
-    // Without a migration the app is in the deployed shape, so the ownership
-    // rules apply; a deployed host never skips them.
-    const problems = await startupProblems(pool, { deployed: !migrate || isDeployed(process.env) });
+    // Without a migration the app is in the deployed shape, so the ownership rules apply.
+    const problems = await startupProblems(pool, { deployed: !migrate });
     if (problems.length) {
       throw new UnsafeEnvironmentError(`Rolewright will not use this database: ${problems.join(" ")}`);
     }
