@@ -9,6 +9,7 @@ import { HttpError, json, route } from "@/lib/server/http";
 import { readLlmHeaders, requireTrialAccess, trialHttpError } from "@/lib/server/llm-key";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
+import { track } from "@/lib/server/track.mjs";
 import { runWithTrial, withReservation } from "@/lib/server/trial.mjs";
 import { en } from "@/i18n/en";
 import { buildSuggestions, countUsable, selectLines } from "@/lib/tailoring.mjs";
@@ -88,5 +89,6 @@ export const POST = route("tailorings.create", async (req, { state }) => {
     throw trialHttpError(err);
   }
   const { id } = created;
+  await track(userId, "tailoring_created", { provider: llm.provider });
   return json({ id });
 });

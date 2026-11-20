@@ -13,6 +13,7 @@
     "test:e2e": "node tests/e2e/run.mjs",
     "test:prod": "node tests/integration/prod-smoke.mjs",
     "purge:inactive": "node scripts/purge-inactive.mjs",
+    "events:report": "node scripts/events-report.mjs",
     "db:migrate": "node scripts/migrate.mjs"
   },
   "engines": {
