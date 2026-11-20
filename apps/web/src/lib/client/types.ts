@@ -163,6 +163,14 @@ export interface Tailoring {
   rewritesReturned?: number | null;
 }
 
+export interface Coverage {
+  before: { covered: number; total: number };
+  after: { covered: number; total: number };
+  missing: string[];
+  /** The count before the list was capped. */
+  missingTotal: number;
+}
+
 export type SuggestionAction =
   | { action: "accept" }
   | { action: "reject" }

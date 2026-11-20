@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, apiBlob, ApiError } from "@/lib/client/api";
-import type { CheckIssue, SuggestionAction, Tailoring } from "@/lib/client/types";
+import type { CheckIssue, Coverage, SuggestionAction, Tailoring } from "@/lib/client/types";
+import { KeywordCoverage } from "@/components/keyword-coverage";
 import { SuggestionCard } from "@/components/suggestion-card";
 import { Button, buttonClass, Card, ErrorBlock, LoadingBlock, Notice, Spinner } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
@@ -77,6 +78,26 @@ export function ReviewView({ id }: { id: string }) {
       });
     return () => controller.abort();
   }, [id, nonce]);
+
+  // Coverage is information only. It is refetched whenever the accepted lines change and a failure here never blocks the page.
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const acceptedKey = useMemo(
+    () => (tailoring?.suggestions ?? []).filter((s) => s.decision === "accepted").map((s) => `${s.ref}:${s.finalText}`).join("\n"),
+    [tailoring],
+  );
+  const loaded = tailoring !== null;
+  // A different tailoring never shows the previous one's numbers.
+  useEffect(() => setCoverage(null), [id]);
+  useEffect(() => {
+    if (!loaded) return;
+    const controller = new AbortController();
+    api<Coverage>(`/api/tailorings/${encodeURIComponent(id)}/coverage`, { signal: controller.signal })
+      .then((res) => setCoverage(res))
+      .catch(() => {
+        if (!controller.signal.aborted) setCoverage(null);
+      });
+    return () => controller.abort();
+  }, [id, loaded, acceptedKey]);
 
   const counts = useMemo(() => {
     const list = tailoring?.suggestions ?? [];
@@ -224,6 +245,7 @@ export function ReviewView({ id }: { id: string }) {
             </div>
           ))}
         </dl>
+        {coverage ? <KeywordCoverage coverage={coverage} /> : null}
       </div>
 
       <Card className="space-y-3">

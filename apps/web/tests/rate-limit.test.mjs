@@ -19,6 +19,7 @@ test("LIMITS match the plan", () => {
   assert.deepEqual(m("ai"), [20, 60_000]);
   assert.deepEqual(m("upload"), [10, 3_600_000]);
   assert.deepEqual(m("tailoring"), [40, 60_000]);
+  assert.deepEqual(m("coverage"), [60, 60_000]);
   assert.deepEqual(m("keyCheck"), [10, 600_000]);
   assert.deepEqual(m("export"), [20, 3_600_000]);
   assert.deepEqual(m("gateMs"), [20_000, 60_000]);

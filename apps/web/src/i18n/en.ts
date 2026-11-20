@@ -397,6 +397,14 @@ export const en = {
   signUpGate: {
     invitationOnly: "Sign-ups are by invitation for now. If you were invited, use the address the invitation was sent to.",
   },
+  // P1-5b
+  coverage: {
+    title: "Keyword coverage",
+    line: (before: number, beforeTotal: number, after: number, afterTotal: number) =>
+      `Job keywords covered: ${before} of ${beforeTotal} before, ${after} of ${afterTotal} with your accepted changes`,
+    missingToggle: (n: number) => `Keywords not in your resume (${n})`,
+    note: "Missing keywords are shown for information. Add one only if it is true for you.",
+  },
 } as const;
 
 export type Strings = typeof en;
