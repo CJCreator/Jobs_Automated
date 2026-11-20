@@ -157,3 +157,52 @@ export function reconcileUpload(existing, proposed, uploadText) {
     { trustConfirmed: true },
   );
 }
+
+/**
+ * The Fact Base without what was read from the user's resume: every item whose
+ * source is not "user" (confirmed or not, upload or model). Items the user
+ * typed or edited stay, with a job that has a user bullet under it. Extras,
+ * the can't-confirm list and the contact stay as they are: the contact has no
+ * source tracking yet.
+ *
+ * @param {any} facts the stored Fact Base
+ * @returns {{ facts: ReturnType<typeof normalizeFacts>, removed: number, kept: number }}
+ *   `removed` and `kept` count summary, jobs, bullets, education and skills
+ */
+export function withoutResumeFacts(facts) {
+  const f = facts && typeof facts === "object" ? facts : {};
+  const mine = (x) => x?.source === "user";
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  let removed = 0;
+  let kept = 0;
+  const keepIf = (x) => (mine(x) ? (kept++, true) : (removed++, false));
+
+  let summary = f.summary ?? { text: "", confirmed: false, source: "upload" };
+  if (summary.text) {
+    if (mine(summary)) kept++;
+    else {
+      removed++;
+      summary = { text: "", confirmed: false, source: "upload" };
+    }
+  }
+
+  const experience = [];
+  for (const job of arr(f.experience)) {
+    const bullets = arr(job.bullets).filter(keepIf);
+    if (mine(job) || bullets.length) {
+      kept++;
+      experience.push({ ...job, bullets });
+    } else {
+      removed++;
+    }
+  }
+
+  const education = arr(f.education).filter(keepIf);
+  const skills = arr(f.skills).filter(keepIf);
+
+  return {
+    facts: normalizeFacts({ ...f, summary, experience, education, skills }, { trustConfirmed: true }),
+    removed,
+    kept,
+  };
+}

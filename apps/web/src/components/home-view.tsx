@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { confirmationCounts } from "@/lib/facts.mjs";
 import { formatDate } from "@/lib/client/format";
 import { useLlmKey } from "@/lib/client/llm-key";
@@ -59,21 +59,40 @@ async function deleteTailoring(id: string): Promise<void> {
   } catch {
     throw new Error(e.failed);
   }
-  if (!res.ok) throw new Error(e.failed);
+  // 404: already gone (deleted in another tab), which is what was wanted.
+  if (!res.ok && res.status !== 404) throw new Error(e.failed);
 }
 
-function DeleteTailoring({ item, onDeleted }: { item: TailoringListItem; onDeleted: () => void }) {
+function DeleteTailoring({ item, onDeleted }: { item: TailoringListItem; onDeleted: (title: string) => void }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const title = item.title || t.untitled;
+  const leadId = useId();
+  // Button takes no ref, so each is wrapped and its button found inside.
+  const trigger = useRef<HTMLSpanElement>(null);
+  const keep = useRef<HTMLSpanElement>(null);
+  const cancelled = useRef(false);
+
+  useEffect(() => {
+    if (confirming) keep.current?.querySelector("button")?.focus();
+    else if (cancelled.current) {
+      cancelled.current = false;
+      trigger.current?.querySelector("button")?.focus();
+    }
+  }, [confirming]);
+
+  const cancel = () => {
+    cancelled.current = true;
+    setConfirming(false);
+  };
 
   const confirm = async () => {
     setBusy(true);
     setError(null);
     try {
       await deleteTailoring(item.id);
-      onDeleted();
+      onDeleted(title);
     } catch (err) {
       setError(err instanceof Error ? err.message : e.failed);
       setBusy(false);
@@ -83,21 +102,27 @@ function DeleteTailoring({ item, onDeleted }: { item: TailoringListItem; onDelet
   return (
     <div className="mt-2 space-y-2">
       {confirming ? (
-        <div role="group" aria-label={e.deleteLabel(title)} className="space-y-2 rounded-xl border border-danger p-3">
-          <p className="max-w-[60ch]">{e.confirmLead(title)}</p>
+        <div role="group" aria-labelledby={leadId} className="space-y-2 rounded-xl border border-danger p-3">
+          <p id={leadId} className="max-w-[60ch]">
+            {e.confirmLead(title)}
+          </p>
           <div className="flex flex-wrap gap-3">
             <Button variant="danger" size="sm" onClick={confirm} loading={busy}>
               {busy ? e.deleting : e.confirmYes}
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setConfirming(false)} disabled={busy}>
-              {e.confirmNo}
-            </Button>
+            <span ref={keep}>
+              <Button variant="secondary" size="sm" onClick={cancel} disabled={busy}>
+                {e.confirmNo}
+              </Button>
+            </span>
           </div>
         </div>
       ) : (
-        <Button variant="ghost" size="sm" aria-label={e.deleteLabel(title)} onClick={() => setConfirming(true)}>
-          {e.delete}
-        </Button>
+        <span ref={trigger} className="inline-block">
+          <Button variant="ghost" size="sm" aria-label={e.deleteLabel(title)} onClick={() => setConfirming(true)}>
+            {e.delete}
+          </Button>
+        </span>
       )}
       <div role="status" aria-live="polite">
         {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -116,9 +141,9 @@ export function HomeView() {
   const factsDone = counts ? counts.total > 0 && counts.confirmed > 0 : false;
   const keyDone = ready && Boolean(llm);
   const listHeading = useRef<HTMLHeadingElement>(null);
-  const [deletedNote, setDeletedNote] = useState(false);
-  const afterDelete = () => {
-    setDeletedNote(true);
+  const [deletedTitle, setDeletedTitle] = useState<{ title: string; n: number } | null>(null);
+  const afterDelete = (title: string) => {
+    setDeletedTitle((d) => ({ title, n: (d?.n ?? 0) + 1 }));
     list.reload();
     // The row that had focus is gone; the list heading is the next stable place.
     listHeading.current?.focus();
@@ -187,7 +212,7 @@ export function HomeView() {
           {t.listTitle}
         </h2>
         <div role="status" aria-live="polite">
-          {deletedNote ? <p className="text-muted">{e.deletedStatus}</p> : null}
+          {deletedTitle !== null ? <p key={deletedTitle.n} className="text-muted">{e.deletedStatus(deletedTitle.title)}</p> : null}
         </div>
         {list.loading ? (
           <LoadingBlock label={en.common.loading} lines={4} />

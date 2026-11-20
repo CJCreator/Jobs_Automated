@@ -5,6 +5,7 @@
 // database, not this file, decides which rows a user can see.
 
 import { emptyFacts } from "../facts.mjs";
+import { withoutResumeFacts } from "../fact-source.mjs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v) => typeof v === "string" && UUID_RE.test(v);
@@ -169,14 +170,21 @@ export function deleteTailoring(db, userId, id) {
 }
 
 /**
- * Deletes the stored text of the user's uploaded resumes. Confirmed facts are
- * a separate table and are not touched.
- * @returns {Promise<number>} how many resume rows were deleted
+ * Deletes the stored text of the user's uploaded resumes. By default the facts
+ * are not touched or locked. With `facts: true`, the facts that were read from
+ * the resume (withoutResumeFacts) are removed in the same transaction.
+ * @returns {Promise<{ deleted: number, factsRemoved: number }>}
  */
-export function deleteResumeTexts(db, userId) {
+export function deleteResumeTexts(db, userId, { facts = false } = {}) {
   return db.withUser(userId, async (tx) => {
     const { rows } = await tx.query("DELETE FROM resumes WHERE user_id = $1 RETURNING id", [userId]);
-    return rows.length;
+    let factsRemoved = 0;
+    if (facts) {
+      const result = withoutResumeFacts(await lockFacts(tx, userId));
+      factsRemoved = result.removed;
+      await writeFacts(tx, userId, result.facts);
+    }
+    return { deleted: rows.length, factsRemoved };
   });
 }
 
