@@ -4,7 +4,7 @@
 resource "google_monitoring_notification_channel" "email" {
   display_name = "Rolewright alerts (${var.environment})"
   type         = "email"
-  labels       = {
+  labels = {
     email_address = var.alert_email
   }
   depends_on = [google_project_service.enabled]
