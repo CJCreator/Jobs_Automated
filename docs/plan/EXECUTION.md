@@ -280,3 +280,26 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - P1-19c also carries the earlier rupee-amount scope.
 - **P1-25** reached 0 engine failures, down from 28; 19,704 tests pass. It is in review round 2 for the id-list message port and the baseline wording.
 - **P1-F (small): last Web CI failure.** `packages/engine/web/tests/lib/status-tone-contrast.test.mjs` fails on `duplex-sparring.tsx:275-287`: `text-emerald-700` on a tint measures 4.34:1, below the required 4.5. Change it to `text-emerald-800` or the shared tone token. This is the only remaining Web CI failure after P1-25.
+- **New wave 2 tasks** (from the advisor's P1-24 review):
+  - **P1-28:** a deployed host refuses to start without `ROLEWRIGHT_RATE_LIMIT_KEY`. Today a missing key makes every sign-in fail with 500. P1-28 also maps that error to 503 or `AuthError`, and adds the app's own "check your email" page carrying the owner's line that links can take a few minutes and requests are limited.
+  - **P1-29:** sweep expired `rate_events` rows, and delete a user's own-id rows with the account.
+  - After P1-29, P1-27 can call the rate-limit records short-lived again.
+- **Launch-gate note:** do not set `ROLEWRIGHT_SIGNUPS=open` before P1-7 and P1-27. `env-guard` allows it once a grievance contact is set, whether or not the purge scheduler runs.
+- **P1-19 merged** with the P1-19d split, approved by the advisor. One exception is recorded and accepted: lakh and crore money can back a count noun one filler word further away than main allowed. On the other side, the merge closes main's larger hole of reading "2 crore customers" as "2 customers". The P1-19c case table is in `p1-19c-cases.md`.
+- **P1-27 notice sentences for rate-limit records**, from the advisor's P1-29 review. They are true only once P1-29 merges and the daily purge is running:
+  - "To limit abuse, we keep a short record of each rate-limited request: the kind of action, the time, and either your account ID or a keyed hash of your IP address or email address. We do not store the IP address or email address itself in these records."
+  - "These records are deleted once they are more than 24 hours old; the clean-up runs at least once a day, so a record can remain for up to about two days."
+  - "When you delete your account, the records stored under your account ID are deleted at the same time. Records stored under a hash of your IP address or email address are not linked to your account and are removed by the same clean-up, within about two days."
+
+  The notice must not say:
+  - "deleted after 24 hours" as a hard limit;
+  - "all rate-limit records are deleted with your account";
+  - that hashed records "cannot be linked" to a person.
+- **Regression from P1-19, caught by engine CI at `107585c`:** `verify-cv-facts-leading-article.test.mjs` blocks "a C-suite narrative" and "a C-suite sponsor", because P1-19 added the c-suite claim family. The fix is added to P1-19c's scope (an audience-noun exemption), and P1-20 must mirror it. Engine CI was at 19,712 pass and 2 fail.
+- **P1-20 review round 1 (CHANGES).** Round 2 goes to Opus, per the plan. Owner decisions: add the new rank, language, credential and tenure words Fable found, and have the unreadable-text message name the exact token. Holes recorded for later:
+  - **Engine coverage-reason masking.** When a line has both a language gap and a count gap, the reason reported is `no-count-claims-recognized`. The language gap should win. This goes to P1-19c.
+  - **Phase 2 gate work:**
+    - Hinglish, French and other Latin-script non-English lines;
+    - seniority words "finance head", "team leader", "supervisor", "in-charge", "partner" and "controller";
+    - accented look-alikes such as "sénior";
+    - a phrase-valued attest for seniority words that appear in the user's own bullet.

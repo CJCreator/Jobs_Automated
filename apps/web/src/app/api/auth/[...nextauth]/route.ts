@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { handlers } from "@/auth";
 import { HttpError, assertSameOrigin, json, withNoStore } from "@/lib/server/http";
 import { takeRateLimit } from "@/lib/server/rate-limit";
+import { RateLimitUnavailableError } from "@/lib/server/rate-limit-core.mjs";
 import { gateSignInPost } from "@/lib/server/signin-limit.mjs";
 
 export const runtime = "nodejs";
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest) {
     if (err instanceof HttpError) {
       console.warn(`[rolewright] auth POST ${err.status} ${err.code} user=-`);
       return json({ error: { code: err.code, message: err.message } }, err.status, err.headers);
+    }
+    // ipSubject throws this before the limiter runs, so takeRateLimit's own mapping never sees it.
+    if (err instanceof RateLimitUnavailableError) {
+      console.warn("[rolewright] auth POST 503 rate_limit_unavailable user=-");
+      return json({ error: { code: "rate_limit_unavailable", message: "Rolewright could not check its usage limits just now. Try again in a moment." } }, 503);
     }
     throw err;
   }

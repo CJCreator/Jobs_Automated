@@ -7,7 +7,51 @@
 // Every allowed take counted all events committed before it, so no more than `max`
 // are ever allowed. Takes racing at the limit may both be refused; that fails closed.
 
-import { decide } from "../server/rate-limit-core.mjs";
+import { LIMITS, decide } from "../server/rate-limit-core.mjs";
+
+// Rows older than the longest window can never count toward any limit. They are
+// swept so that rows for a subject that never returns do not stay forever.
+export const LONGEST_WINDOW_MS = Math.max(...Object.values(LIMITS).map((l) => l.windowMs));
+const SWEEP_EVERY_MS = 10 * 60_000; // opportunistic sweep: at most once per db handle per 10 minutes
+const SWEEP_BATCH = 500;
+const lastSweep = new WeakMap();
+
+/**
+ * Deletes rate_events rows older than the longest window, through db.system (the table is
+ * system-owned). Bounded: at most `batch` rows per statement and `maxBatches` statements,
+ * so a large table cannot stall the caller. Returns the number of rows deleted.
+ */
+export async function sweepRateEvents(db, { nowMs = Date.now(), batch = SWEEP_BATCH, maxBatches = 1 } = {}) {
+  const cutoff = nowMs - LONGEST_WINDOW_MS;
+  let total = 0;
+  for (let i = 0; i < maxBatches; i++) {
+    const { rows } = await db.system.query(
+      `WITH gone AS (
+         DELETE FROM rate_events
+          WHERE id IN (SELECT id FROM rate_events WHERE at <= to_timestamp($1::double precision / 1000) LIMIT $2::int)
+          RETURNING 1
+       )
+       SELECT count(*)::int AS n FROM gone`,
+      [cutoff, batch],
+    );
+    const n = Number(rows[0].n);
+    total += n;
+    if (n < batch) break;
+  }
+  return total;
+}
+
+async function maybeSweep(db, nowMs) {
+  const last = lastSweep.get(db);
+  if (last !== undefined && nowMs - last < SWEEP_EVERY_MS) return;
+  lastSweep.set(db, nowMs);
+  try {
+    await sweepRateEvents(db, { nowMs });
+  } catch {
+    // Housekeeping only: a failed sweep must never fail the request's own check.
+    console.error("rate_events sweep failed");
+  }
+}
 
 /**
  * @param {{ system: { query: Function } }} db
@@ -51,6 +95,7 @@ export async function take(db, bucket, subject, cost, limit, nowMs = Date.now())
   const oldest = rows[0].oldest_ms == null ? null : Number(rows[0].oldest_ms);
   const used = total - c;
   const verdict = decide(limit, used, oldest, nowMs);
+  await maybeSweep(db, nowMs);
   return verdict;
 }
 

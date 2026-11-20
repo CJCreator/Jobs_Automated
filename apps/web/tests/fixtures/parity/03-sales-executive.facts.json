@@ -1,0 +1,81 @@
+{
+  "contact": {
+    "name": "Kavya Iyer",
+    "email": "03@example.com",
+    "phone": "",
+    "location": "Chennai",
+    "links": [],
+    "confirmed": true
+  },
+  "summary": {
+    "text": "Sales executive with 2 years of experience in B2B software and SMB accounts.",
+    "confirmed": true
+  },
+  "experience": [
+    {
+      "id": "exp1",
+      "company": "BrightPath Software",
+      "title": "Sales Executive",
+      "location": "Chennai",
+      "start": "2022",
+      "end": "2024",
+      "confirmed": true,
+      "bullets": [
+        {
+          "id": "b1",
+          "text": "Closed 18 new SMB accounts in the first year",
+          "confirmed": true
+        },
+        {
+          "id": "b2",
+          "text": "Maintained a CRM pipeline in Salesforce and reported weekly forecasts",
+          "confirmed": true
+        },
+        {
+          "id": "b3",
+          "text": "Ran product demos for 40 prospects a quarter",
+          "confirmed": true
+        },
+        {
+          "id": "b4",
+          "text": "Worked with the marketing team on outbound email campaigns",
+          "confirmed": true
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "ed1",
+      "degree": "BBA",
+      "field": "",
+      "school": "Loyola College",
+      "year": "2022",
+      "confirmed": true
+    }
+  ],
+  "skills": [
+    {
+      "id": "s1",
+      "name": "Salesforce",
+      "confirmed": true
+    },
+    {
+      "id": "s2",
+      "name": "Lead generation",
+      "confirmed": true
+    },
+    {
+      "id": "s3",
+      "name": "Negotiation",
+      "confirmed": true
+    },
+    {
+      "id": "s4",
+      "name": "Excel",
+      "confirmed": true
+    }
+  ],
+  "extras": [],
+  "cannotConfirm": []
+}

@@ -1,0 +1,86 @@
+{
+  "contact": {
+    "name": "Rohan Verma",
+    "email": "02@example.com",
+    "phone": "",
+    "location": "Hyderabad",
+    "links": [],
+    "confirmed": true
+  },
+  "summary": {
+    "text": "Backend engineer with 5 years of experience building APIs and data pipelines.",
+    "confirmed": true
+  },
+  "experience": [
+    {
+      "id": "exp1",
+      "company": "Lumen Labs",
+      "title": "Software Engineer",
+      "location": "Hyderabad",
+      "start": "2019",
+      "end": "2024",
+      "confirmed": true,
+      "bullets": [
+        {
+          "id": "b1",
+          "text": "Built REST APIs in Python and Django serving 3 internal teams",
+          "confirmed": true
+        },
+        {
+          "id": "b2",
+          "text": "Moved a batch job to PostgreSQL and cut run time from 40 minutes to 12 minutes",
+          "confirmed": true
+        },
+        {
+          "id": "b3",
+          "text": "Wrote unit tests with pytest and set up CI in GitHub Actions",
+          "confirmed": true
+        },
+        {
+          "id": "b4",
+          "text": "Mentored 2 junior engineers during onboarding",
+          "confirmed": true
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "ed1",
+      "degree": "B.Tech",
+      "field": "Computer Science",
+      "school": "JNTU Hyderabad",
+      "year": "2019",
+      "confirmed": true
+    }
+  ],
+  "skills": [
+    {
+      "id": "s1",
+      "name": "Python",
+      "confirmed": true
+    },
+    {
+      "id": "s2",
+      "name": "Django",
+      "confirmed": true
+    },
+    {
+      "id": "s3",
+      "name": "PostgreSQL",
+      "confirmed": true
+    },
+    {
+      "id": "s4",
+      "name": "Docker",
+      "confirmed": true
+    },
+    {
+      "id": "s5",
+      "name": "Git",
+      "confirmed": true
+    }
+  ],
+  "extras": [],
+  "cannotConfirm": []
+}

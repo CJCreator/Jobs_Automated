@@ -124,6 +124,7 @@ function startServer(port, dataDir) {
     ROLEWRIGHT_ALLOW_MOCK_LLM: "1",
     ROLEWRIGHT_DATA_DIR: dataDir,
     AUTH_SECRET: "flow-test-secret-not-for-real-use-0123456789abcdef",
+    ROLEWRIGHT_RATE_LIMIT_KEY: "flow-test-rate-limit-key-not-for-real-use-0123456789",
     AUTH_URL: `http://localhost:${port}`,
     // Its own dist directory, so a `next dev` already running here is not disturbed.
     BUILD_DIST: ".next-flow",

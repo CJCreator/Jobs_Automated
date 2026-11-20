@@ -1,7 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createDb } from "../src/lib/db/index.mjs";
-import { spend, take } from "../src/lib/db/rate-events.mjs";
+import { LONGEST_WINDOW_MS, spend, sweepRateEvents, take } from "../src/lib/db/rate-events.mjs";
 import { LIMITS, RateLimitUnavailableError, chargeGate, decide, failClosed } from "../src/lib/server/rate-limit-core.mjs";
 
 let db;
@@ -150,4 +150,80 @@ test("failClosed logs one line without the cause", async () => {
     console.error = orig;
   }
   assert.deepEqual(lines, ["rate limit store unavailable"]);
+});
+
+// ---- sweeping expired rows (P1-29) --------------------------------------------
+
+const DAY = 86_400_000;
+let sdb; // isolated database: the shared one holds rows from earlier tests with fake 1970 clocks
+before(async () => { sdb = await createDb(); });
+after(() => sdb.close());
+const ins = (bucket, subject, atMs) =>
+  sdb.system.query("INSERT INTO rate_events (bucket, subject, cost, at) VALUES ($1, $2, 1, to_timestamp($3::double precision / 1000))", [bucket, subject, atMs]);
+const total = async (prefix) =>
+  Number((await sdb.system.query("SELECT COUNT(*) AS n FROM rate_events WHERE subject LIKE $1", [`${prefix}%`])).rows[0].n);
+
+test("the sweep window is the longest window in LIMITS", () => {
+  assert.equal(LONGEST_WINDOW_MS, Math.max(...Object.values(LIMITS).map((l) => l.windowMs)));
+  assert.equal(LONGEST_WINDOW_MS, 24 * 3_600_000);
+});
+
+test("sweep removes only rows older than the longest window, across buckets and subjects", async () => {
+  const now = 900 * DAY;
+  await ins("ai", "sw-a", now - LONGEST_WINDOW_MS - 1);
+  await ins("export", "sw-b", now - 5 * DAY);
+  await ins("trialIp", "sw-c", now - LONGEST_WINDOW_MS); // exactly at the edge: expired for every limit
+  await ins("ai", "sw-keep1", now - LONGEST_WINDOW_MS + 1);
+  await ins("gateMs", "sw-keep2", now - 1000);
+  assert.equal(await sweepRateEvents(sdb, { nowMs: now, maxBatches: 10 }), 3);
+  assert.equal(await total("sw-a") + (await total("sw-b")) + (await total("sw-c")), 0);
+  assert.equal(await total("sw-keep"), 2);
+});
+
+test("sweep is bounded: one batch deletes at most `batch` rows, and more batches finish the job", async () => {
+  const now = 950 * DAY;
+  await sdb.system.query("DELETE FROM rate_events");
+  for (let i = 0; i < 10; i++) await ins("ai", `bd-${i}`, now - 3 * DAY);
+  assert.equal(await sweepRateEvents(sdb, { nowMs: now, batch: 3 }), 3);
+  assert.equal(await total("bd-"), 7);
+  assert.equal(await sweepRateEvents(sdb, { nowMs: now, batch: 3, maxBatches: 2 }), 6);
+  assert.equal(await total("bd-"), 1);
+  assert.equal(await sweepRateEvents(sdb, { nowMs: now, batch: 3, maxBatches: 5 }), 1);
+});
+
+test("take sweeps expired rows of other subjects by itself, at most once per interval", async () => {
+  const fresh = await createDb();
+  try {
+    const now = 1000 * DAY;
+    const n = async () => Number((await fresh.system.query("SELECT COUNT(*) AS n FROM rate_events WHERE subject LIKE 'op-%'")).rows[0].n);
+    await fresh.system.query("INSERT INTO rate_events (bucket, subject, at) VALUES ('ai', 'op-old1', to_timestamp($1::double precision / 1000))", [now - 3 * DAY]);
+    await take(fresh, "ai", "op-new", 1, limit, now);
+    assert.equal(await n(), 1, "the first take swept op-old1; op-new remains");
+    await fresh.system.query("INSERT INTO rate_events (bucket, subject, at) VALUES ('ai', 'op-old2', to_timestamp($1::double precision / 1000))", [now - 3 * DAY]);
+    await take(fresh, "ai", "op-new", 1, limit, now + 60_000);
+    assert.equal(await n(), 2, "no second sweep within 10 minutes");
+    await take(fresh, "ai", "op-new", 1, limit, now + 11 * 60_000);
+    assert.equal(await n(), 1, "swept again after the interval; op-new's own row stays");
+  } finally {
+    await fresh.close();
+  }
+});
+
+test("take still enforces its limit right after a sweep", async () => {
+  const fresh = await createDb();
+  try {
+    const now = 1100 * DAY;
+    await fresh.system.query("INSERT INTO rate_events (bucket, subject, at) VALUES ('ai', 'lim-old', to_timestamp($1::double precision / 1000))", [now - 3 * DAY]);
+    const out = [];
+    for (let i = 0; i < 7; i++) out.push((await take(fresh, "ai", "lim", 1, limit, now + i)).allowed);
+    assert.deepEqual(out, [true, true, true, true, true, false, false]);
+  } finally {
+    await fresh.close();
+  }
+});
+
+test("a failing sweep does not fail take", async () => {
+  const real = db.system.query.bind(db.system);
+  const flaky = { system: { query: (sql, p) => (/DELETE FROM rate_events\s+WHERE id IN/.test(sql) ? Promise.reject(new Error("boom")) : real(sql, p)) } };
+  assert.equal((await take(flaky, "ai", "flaky", 1, limit, 1200 * DAY)).allowed, true);
 });

@@ -12,6 +12,8 @@
 import { grievanceContact } from "../notice.mjs";
 
 const BUILD_PHASE = "phase-production-build";
+// Same floor client-ip.mjs enforces at run time (kept there too, as a second layer).
+const MIN_RATE_LIMIT_KEY_LENGTH = 32;
 
 /** Thrown at server start or on the first request when the environment is unsafe. */
 export class UnsafeEnvironmentError extends Error {
@@ -74,6 +76,11 @@ export function unsafeEnvProblems(env) {
   if (isDeployed(env) && !(env.DATABASE_URL ?? "").trim()) {
     problems.push(
       "DATABASE_URL is not set, so the app would fall back to the embedded database, which is for development only. Set it to your Postgres connection string.",
+    );
+  }
+  if (String(env.ROLEWRIGHT_RATE_LIMIT_KEY ?? "").trim().length < MIN_RATE_LIMIT_KEY_LENGTH) {
+    problems.push(
+      "ROLEWRIGHT_RATE_LIMIT_KEY is not set or is shorter than 32 characters, so every sign-in and rate-limited request would fail. Generate one with `openssl rand -base64 48`.",
     );
   }
   const signups = String(env.ROLEWRIGHT_SIGNUPS ?? "").trim();

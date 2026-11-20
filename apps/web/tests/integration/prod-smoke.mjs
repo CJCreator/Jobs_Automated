@@ -72,6 +72,7 @@ function serverEnv() {
     NODE_ENV: "production",
     BUILD_DIST: ".next-prod",
     AUTH_SECRET: SECRET,
+    ROLEWRIGHT_RATE_LIMIT_KEY: "prod-smoke-rate-limit-key-not-for-real-use-0123456789",
     AUTH_URL: base,
     ROLEWRIGHT_DATA_DIR: dbDir,
     NEXT_TELEMETRY_DISABLED: "1",
@@ -534,7 +535,7 @@ try {
     page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
 
     // Signed out: the sign-in page and the landing page load and run their scripts.
-    for (const route of ["/sign-in", "/", "/privacy"]) {
+    for (const route of ["/sign-in", "/sign-in/check-email", "/", "/privacy"]) {
       await page.goto(route, { waitUntil: "networkidle" });
       assert.ok(await page.evaluate(() => Boolean(document.querySelector("main"))), `${route} rendered`);
     }
