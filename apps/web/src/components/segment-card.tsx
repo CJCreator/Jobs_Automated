@@ -114,7 +114,7 @@ export function SegmentCard() {
                   checked={picked === id}
                   onChange={() => setPicked(id)}
                   disabled={busy}
-                  className="mt-1.5 size-4"
+                  className="mt-0.5 size-6 shrink-0"
                 />
                 <span>
                   <span className="block font-medium">{t.options[id].label}</span>
