@@ -230,3 +230,7 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - Removing the leftover `/language:go` CodeQL configuration.
   - Whether App CI becomes a required check (default: informative until the Phase 1 exit).
 
+- Recorded for the TEST wave (P1-T1):
+  - **CI at `a71eb19`.** `npm test` passes on both Node legs (452 tests; gate-cost passed on this runner). `test:flow` step 4 (`tests/integration/run.mjs:331`) fails because the consent GET now also returns `storageAccepted`. This is a known stale harness from P1-15's "Harness impact" section.
+  - **P1-17 follow-up.** `tests/consent.test.mjs` should also run on Postgres. It calls `createDb()` with no arguments and belongs to P1-15, so it becomes a P1-F task if the TEST wave confirms the gap.
+- Owner, 2026-11-20: the dependency graph is switched on.
