@@ -9,6 +9,8 @@
 // build machine hold the production secret. Next sets NEXT_PHASE before it
 // starts the build workers, so they inherit it.
 
+import { grievanceContact } from "../notice.mjs";
+
 const BUILD_PHASE = "phase-production-build";
 
 /** Thrown at server start or on the first request when the environment is unsafe. */
@@ -72,6 +74,14 @@ export function unsafeEnvProblems(env) {
   if (isDeployed(env) && !(env.DATABASE_URL ?? "").trim()) {
     problems.push(
       "DATABASE_URL is not set, so the app would fall back to the embedded database, which is for development only. Set it to your Postgres connection string.",
+    );
+  }
+  const signups = String(env.ROLEWRIGHT_SIGNUPS ?? "").trim();
+  if (signups && !["closed", "allowlist", "open"].includes(signups.toLowerCase())) {
+    problems.push("ROLEWRIGHT_SIGNUPS must be closed, allowlist or open.");
+  } else if (signups.toLowerCase() === "open" && !grievanceContact(env).set) {
+    problems.push(
+      "ROLEWRIGHT_SIGNUPS=open needs a grievance contact. Set ROLEWRIGHT_GRIEVANCE_NAME and ROLEWRIGHT_GRIEVANCE_EMAIL.",
     );
   }
   return problems;

@@ -379,6 +379,10 @@ export const en = {
     error: "Tick the box to continue.",
     saveFailed: "Your agreement could not be saved. Try again.",
   },
+  // P1-14
+  signUpGate: {
+    invitationOnly: "Sign-ups are by invitation for now. If you were invited, use the address the invitation was sent to.",
+  },
 } as const;
 
 export type Strings = typeof en;
