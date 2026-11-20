@@ -130,7 +130,7 @@ Schema block (append unchanged):
   CREATE INDEX IF NOT EXISTS rate_events_lookup_idx ON rate_events (bucket, subject, at);
   GRANT SELECT, INSERT, DELETE ON rate_events TO rolewright_system;
   GRANT USAGE, SELECT ON SEQUENCE rate_events_id_seq TO rolewright_system;
-  The subject is a user id, or a SHA-256 hex of an IP or email address. Never a raw IP or address.
+  The subject is a user id, or a keyed HMAC-SHA-256 hex of an IP or email address (key: ROLEWRIGHT_RATE_LIMIT_KEY, owner decision 2026-11-20). Never a raw IP or address.
 Steps:
  1. rate-limit-core.mjs (pure): LIMITS and decide({ max, windowMs }, usedCost, oldestAtMs, nowMs) ->
     { allowed, retryAfterS }. Unit tests for the window edge, Retry-After >= 1, and cost sums.
@@ -151,7 +151,7 @@ Steps:
  6. client-ip.mjs: clientIp(headers, env). Reads x-forwarded-for; takes the entry
     (1 + ROLEWRIGHT_TRUSTED_PROXY_HOPS) from the right; validates it as an IPv4 or IPv6 literal; otherwise
     "unknown". Never trusts the leftmost entry. Tests: spoofed left entries are ignored; hops 0 and 1; junk.
-    Export ipSubject(ip) = SHA-256 hex.
+    Export ipSubject(ip, env) and emailSubject(email, env) = HMAC-SHA-256 hex keyed by ROLEWRIGHT_RATE_LIMIT_KEY (>= 32 chars; strict env without it -> 503 rate_limit_unavailable).
  7. Routes you own: `await takeRateLimit(...)`. keys/verify uses "keyCheck". export uses "export" and
     "tailoring". In tailorings/[id] GET, the suggestions PATCH and export: measure the gate work with
     performance.now() and call spendRateLimit("gateMs", userId, ms) afterwards; call
@@ -349,7 +349,7 @@ Steps:
  7. consent.test.mjs: a row for gemini does not satisfy anthropic; legacy rows (provider '') do not satisfy a
     named provider; PUT /api/facts logic refuses without storage consent (test requireStorageConsent and the
     db functions; no server); user A's rows are invisible to user B.
- 8. notice-lock.test.mjs: SHA-256 over JSON.stringify of en.app.privacy, en.notice and en.consent, compared
+ 8. notice-lock.test.mjs: SHA-256 over JSON.stringify (functions rendered) of en.app.privacy, en.notice, en.consent and en.consentStorage, compared
     with tests/fixtures/notice-lock.json { "version": NOTICE_VERSION, "sha256": … }. Fails with the message
     "The notice text changed. Bump NOTICE_VERSION in src/lib/notice.mjs and update notice-lock.json." Also
     fails if the version in the lock differs from NOTICE_VERSION.
@@ -778,7 +778,7 @@ Steps:
     await takeRateLimit("signInIp", ipSubject(clientIp(req.headers, process.env))). On refusal answer 429 with
     Retry-After and a plain message. GET is untouched (session reads, callbacks).
  2. auth.ts adapter.createVerificationToken: before storing, await takeRateLimit("emailSend",
-    ipSubject(identifier.toLowerCase())) (the same hashing helper; the subject is a hash of the address).
+    emailSubject(identifier)) (the keyed hashing helper; it trims and lower-cases; the subject is a hash of the address).
     This runs after P1-14's allowlist refusal, so a refused address spends nothing. Confirm in the report that
     Auth.js stores the token before it sends, so a throw here sends no email.
  3. Tests: the 21st POST in 10 minutes from one IP is 429 and the handler is not called; a spoofed leftmost
