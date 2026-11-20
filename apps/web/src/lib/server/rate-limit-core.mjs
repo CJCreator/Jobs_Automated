@@ -13,7 +13,7 @@ export const LIMITS = {
   export: { max: 20, windowMs: HOUR, message: "Too many exports in the last hour. Try again later." },
   // Milliseconds of fact-gate work per minute. Charged after the work; a take only checks.
   gateMs: { max: 20_000, windowMs: MIN, message: "Too many requests in a short time. Wait a minute and try again.", checkOnly: true },
-  trialIp: { max: 10, windowMs: 24 * HOUR, message: "Too many free-trial requests from this network today. Try again tomorrow." },
+  trialIp: { max: 50, windowMs: 24 * HOUR, message: "Too many free-trial requests from this network today. Try again tomorrow." },
   signInIp: { max: 20, windowMs: 10 * MIN, message: "Too many sign-in attempts. Wait a few minutes and try again." },
   emailSend: { max: 5, windowMs: HOUR, message: "Too many sign-in emails sent. Try again in an hour." },
 };
