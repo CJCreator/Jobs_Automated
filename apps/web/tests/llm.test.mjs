@@ -76,6 +76,13 @@ test("Gemini 429 is quota only when the body says so; otherwise rate_limited", a
 
   stubFetch({ status: 429, body: { error: { status: "RESOURCE_EXHAUSTED", message: "slow down" } } });
   assert.equal((await verifyKey({ provider: "gemini", key: KEY }).catch((e) => e)).code, "rate_limited");
+  const quotaFailure = (...violations) => ({ error: { status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations }] } });
+  stubFetch({ status: 429, body: quotaFailure({ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" }) });
+  assert.equal((await verifyKey({ provider: "gemini", key: KEY }).catch((e) => e)).code, "rate_limited");
+  stubFetch({ status: 429, body: quotaFailure({ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }, { quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" }) });
+  assert.equal((await verifyKey({ provider: "gemini", key: KEY }).catch((e) => e)).code, "rate_limited");
+  stubFetch({ status: 429, body: quotaFailure() });
+  assert.equal((await verifyKey({ provider: "gemini", key: KEY }).catch((e) => e)).code, "rate_limited");
   stubFetch({ status: 429, body: {} });
   assert.equal((await verifyKey({ provider: "gemini", key: KEY }).catch((e) => e)).code, "rate_limited");
   globalThis.fetch = async () => new Response("not json", { status: 429 });
@@ -122,6 +129,7 @@ test("mock provider is gated by the env flag and production", async () => {
   assert.deepEqual(v.models, [{ id: "mock-1", label: "Mock model" }]);
   await rejectsCode(verifyKey({ provider: "mock", key: "wrong" }), "invalid_key");
   assert.equal(isProviderAllowed("openai"), false);
+  assert.equal(isProviderAllowed("gemini"), true);
   assert.equal(isProviderAllowed("nope"), false);
 });
 

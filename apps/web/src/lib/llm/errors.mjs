@@ -52,7 +52,7 @@ export function errorForStatus(status, providerLabel = "The provider", reportedS
 /**
  * Map a failed Response. Like errorForStatus, but a Gemini 429 is a quota error
  * (not a rate limit) when its JSON body says error.status is RESOURCE_EXHAUSTED
- * with a QuotaFailure detail that is not a per-minute or per-second limit. Only
+ * with a QuotaFailure detail whose quota ids are present and none is per-minute or per-second. Only
  * those fixed fields are read; no text from the body is ever copied.
  */
 export async function errorForResponse(res, providerLabel = "The provider") {
@@ -62,8 +62,8 @@ export async function errorForResponse(res, providerLabel = "The provider") {
       if (err?.status === "RESOURCE_EXHAUSTED" && Array.isArray(err.details)) {
         const failures = err.details.filter((d) => typeof d?.["@type"] === "string" && d["@type"].endsWith("google.rpc.QuotaFailure"));
         const violations = failures.flatMap((d) => (Array.isArray(d.violations) ? d.violations : []));
-        const perWindow = violations.some((v) => typeof v?.quotaId === "string" && /PerMinute|PerSecond/i.test(v.quotaId));
-        if (failures.length > 0 && !perWindow) return errorForStatus(402, providerLabel, 429);
+        const ids = violations.map((v) => v?.quotaId).filter((q) => typeof q === "string");
+        if (ids.length > 0 && !ids.some((q) => /PerMinute|PerSecond/i.test(q))) return errorForStatus(402, providerLabel, 429);
       }
     } catch { /* body is not JSON: treat it as a plain rate limit */ }
   }
