@@ -457,7 +457,7 @@ export const en = {
   // P1-28
   checkEmail: {
     title: "Check your email",
-    body: "If that address can sign in, a link is on its way. Open it on this device to finish signing in.",
+    body: "If that address can sign in, a link is on its way. The link signs you in on the device where you open it.",
     delay: "The link can take a few minutes to arrive. Look in your spam folder too.",
     limited: "Sign-in requests are limited, so asking for several links in a row may not send more. Wait a few minutes before you try again.",
     back: "Back to sign in",

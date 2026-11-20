@@ -42,10 +42,13 @@ test("signIn() turns RateLimitUnavailableError into the bare AuthError", () => {
 test("every email-link outcome lands on the app's own page, not Auth.js's built-in one", () => {
   assert.match(auth, /const CHECK_EMAIL_PATH = "\/sign-in\/check-email";/);
   assert.match(auth, /pages: \{[^}]*verifyRequest: CHECK_EMAIL_PATH/);
-  assert.doesNotMatch(auth, /\/api\/auth\/verify-request/);
+  // Must equal Auth.js's sent-path redirect (`${baseUrl}/verify-request?provider&type`, which
+  // pages.verifyRequest then forwards), so the not-sent paths cannot be told apart by the first hop.
+  assert.ok(
+    auth.includes("`/api/auth/verify-request?${new URLSearchParams({ provider: account.provider, type: \"email\" })}`"),
+  );
   // One redirect value serves the closed-mode unknown address, the rate-limited address and the
   // limiter-down paths, and they all return it.
-  assert.equal([...auth.matchAll(/`\$\{CHECK_EMAIL_PATH\}\?/g)].length, 1);
   assert.equal([...auth.matchAll(/return verifyRequest;/g)].length, 3);
   assert.ok(existsPage());
 });

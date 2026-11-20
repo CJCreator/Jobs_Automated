@@ -535,7 +535,7 @@ try {
     page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
 
     // Signed out: the sign-in page and the landing page load and run their scripts.
-    for (const route of ["/sign-in", "/", "/privacy"]) {
+    for (const route of ["/sign-in", "/sign-in/check-email", "/", "/privacy"]) {
       await page.goto(route, { waitUntil: "networkidle" });
       assert.ok(await page.evaluate(() => Boolean(document.querySelector("main"))), `${route} rendered`);
     }

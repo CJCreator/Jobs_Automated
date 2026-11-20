@@ -36,12 +36,12 @@ const devLogin = devLoginEnabled(process.env);
 const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const emailEnabled = Boolean(process.env.AUTH_RESEND_KEY && process.env.EMAIL_FROM);
 
-// Development only: in production assertSafeEnv above has already refused to
-// run without AUTH_SECRET.
-// The app's own "check your email" page. Every email-link answer (sent, unknown address in closed
+// The app's own "check your email" page. Every email-link request the sign-in page accepts (sent, unknown address in closed
 // mode, rate-limited, limiter down) ends here, so the page cannot tell them apart.
 const CHECK_EMAIL_PATH = "/sign-in/check-email";
 
+// Development only: in production assertSafeEnv above has already refused to
+// run without AUTH_SECRET.
 const DEV_ONLY_SECRET = "rolewright-development-only-secret-never-use-in-production";
 
 // A stolen or copied cookie works until it expires (signing out does not
@@ -189,7 +189,7 @@ const config: NextAuthConfig = {
       // account. Returning a string makes Auth.js redirect before it creates
       // a token or sends an email.
       const verifyRequest = account
-        ? `${CHECK_EMAIL_PATH}?${new URLSearchParams({ provider: account.provider, type: "email" })}`
+        ? `/api/auth/verify-request?${new URLSearchParams({ provider: account.provider, type: "email" })}`
         : null;
       if (!allowed && verifyRequest && emailStep?.verificationRequest && signupMode(process.env) === "closed") {
         return verifyRequest;
