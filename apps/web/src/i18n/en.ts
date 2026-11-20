@@ -397,6 +397,29 @@ export const en = {
   signUpGate: {
     invitationOnly: "Sign-ups are by invitation for now. If you were invited, use the address the invitation was sent to.",
   },
+  // P1-18
+  erasure: {
+    delete: "Delete",
+    deleteLabel: (title: string) => `Delete tailored resume: ${title}`,
+    confirmLead: (title: string) =>
+      `Delete "${title}" and its job description? Your confirmed facts stay. This cannot be undone.`,
+    confirmYes: "Yes, delete it",
+    confirmNo: "Keep it",
+    deleting: "Deleting...",
+    deletedStatus: "Tailored resume deleted.",
+    failed: "That could not be deleted. Try again.",
+    resumeTitle: "Delete my uploaded resume text",
+    resumeBody:
+      "This removes the text we kept from the resumes you uploaded. It does not delete your account, your confirmed facts or your tailored resumes. Your confirmed facts stay, so you can still tailor resumes from them.",
+    resumeAccountNote: "To remove everything, delete your account below instead.",
+    resumeButton: "Delete resume text",
+    resumeConfirm: "Yes, delete the resume text",
+    resumeDone: (n: number) =>
+      n === 0
+        ? "There was no resume text to delete."
+        : `Deleted the text of ${n} uploaded resume${n === 1 ? "" : "s"}. Your confirmed facts are unchanged.`,
+    resumeFailed: "The resume text could not be deleted. Try again.",
+  },
 } as const;
 
 export type Strings = typeof en;

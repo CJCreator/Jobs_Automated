@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { signOut } from "@/auth";
 import { DeleteAccount } from "@/components/delete-account";
+import { DeleteResumeText } from "@/components/delete-resume-text";
 import { PrivacyNotice } from "@/components/privacy-notice";
 
 export const metadata: Metadata = { title: "Privacy notice" };
@@ -15,6 +16,8 @@ export default function PrivacyPage() {
   return (
     <div className="space-y-8">
       <PrivacyNotice />
+
+      <DeleteResumeText />
 
       <DeleteAccount signOutAction={signOutAction} />
     </div>

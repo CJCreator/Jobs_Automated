@@ -149,6 +149,37 @@ export function createJob(db, userId, { title, company, jdText }) {
   });
 }
 
+/**
+ * Deletes one tailoring (its suggestions are a column of it), then its job
+ * description when no other tailoring still uses it. Runs under row-level
+ * security, so another user's id deletes nothing.
+ * @returns {Promise<boolean>} whether a tailoring was deleted
+ */
+export function deleteTailoring(db, userId, id) {
+  if (!isUuid(id)) return Promise.resolve(false);
+  return db.withUser(userId, async (tx) => {
+    const { rows } = await tx.query("DELETE FROM tailorings WHERE id = $1 RETURNING job_id", [id]);
+    if (!rows.length) return false;
+    await tx.query(
+      "DELETE FROM jobs WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM tailorings WHERE job_id = $1)",
+      [rows[0].job_id],
+    );
+    return true;
+  });
+}
+
+/**
+ * Deletes the stored text of the user's uploaded resumes. Confirmed facts are
+ * a separate table and are not touched.
+ * @returns {Promise<number>} how many resume rows were deleted
+ */
+export function deleteResumeTexts(db, userId) {
+  return db.withUser(userId, async (tx) => {
+    const { rows } = await tx.query("DELETE FROM resumes WHERE user_id = $1 RETURNING id", [userId]);
+    return rows.length;
+  });
+}
+
 /** A count that is absent (null) or a non-negative integer; anything else is a bug in the caller. */
 function optionalCount(n) {
   if (n === undefined || n === null) return null;
