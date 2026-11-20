@@ -25,6 +25,7 @@ const { MOCK_RESUME, MOCK_KEY } = await load("src/lib/llm/mock.mjs");
 const { emptyFacts } = await load("src/lib/facts.mjs");
 const { createDb } = await load("src/lib/db/index.mjs");
 const { NOTICE_VERSION } = await load("src/lib/notice.mjs");
+const { crc32 } = await load("src/lib/server/zip.mjs");
 
 const SENTINEL = "sentinel-KEY-9f3b2c7d1e";
 const JD = [
@@ -89,6 +90,46 @@ async function request(jar, method, route, { json, form, headers = {} } = {}) {
   else if (type.includes("application/pdf")) data = Buffer.from(await res.arrayBuffer());
   else data = await res.text();
   return { status: res.status, headers: res.headers, data };
+}
+
+// A raw response body, for binary downloads that `request` would read as text.
+async function requestBytes(jar, method, route, { headers = {} } = {}) {
+  const h = { ...headers };
+  if (jar && jar.cookies.size) h.cookie = jar.header();
+  const res = await fetch(base + route, { method, headers: h, redirect: "manual", signal: AbortSignal.timeout(240_000) });
+  return { status: res.status, headers: res.headers, bytes: Buffer.from(await res.arrayBuffer()) };
+}
+
+// A minimal zip reader: finds the end record, walks the central directory and checks each CRC.
+// zip.mjs only writes; this is the independent read side.
+function readZip(buf, crc32) {
+  let end = -1;
+  for (let i = buf.length - 22; i >= 0; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { end = i; break; }
+  }
+  assert.ok(end >= 0, "zip has an end record");
+  const count = buf.readUInt16LE(end + 10);
+  let p = buf.readUInt32LE(end + 16);
+  const out = new Map();
+  for (let n = 0; n < count; n++) {
+    assert.equal(buf.readUInt32LE(p), 0x02014b50, "central directory signature");
+    const method = buf.readUInt16LE(p + 10);
+    const crc = buf.readUInt32LE(p + 16);
+    const size = buf.readUInt32LE(p + 24);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const local = buf.readUInt32LE(p + 42);
+    const name = buf.subarray(p + 46, p + 46 + nameLen).toString("ascii");
+    assert.equal(method, 0, "stored entry");
+    assert.equal(buf.readUInt32LE(local), 0x04034b50, "local header signature");
+    const dataStart = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+    const data = buf.subarray(dataStart, dataStart + size);
+    assert.equal(crc32(data), crc, `CRC of ${name}`);
+    out.set(name, data);
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
 }
 
 const squash = (s) => s.replace(/\s+/g, "");
@@ -558,6 +599,73 @@ try {
     assert.equal(same.status, 200);
     // A's account survived the forged delete.
     assert.equal((await request(state.A, "GET", "/api/facts")).status, 200);
+  });
+
+  await step("10b. profile segment, data export (JSON and PDF bundle) for A", async () => {
+    // PUT/GET /api/profile round trip; invalid values are refused; clearing works.
+    assert.deepEqual((await request(state.A, "GET", "/api/profile")).data, { segment: null });
+    assert.deepEqual((await request(state.A, "PUT", "/api/profile", { json: { segment: "switcher" } })).data, { segment: "switcher" });
+    assert.deepEqual((await request(state.A, "GET", "/api/profile")).data, { segment: "switcher" });
+    assertError(await request(state.A, "PUT", "/api/profile", { json: { segment: "astronaut" } }), 400, "invalid_segment");
+    assertError(await request(state.A, "PUT", "/api/profile", { json: {} }), 400, "invalid_segment");
+    assert.equal((await request(state.A, "GET", "/api/profile")).data.segment, "switcher", "a refused value changes nothing");
+    assertError(await request(state.A, "PUT", "/api/profile", { json: { segment: "fresher" }, headers: { origin: "https://evil.example" } }), 403, "cross_site");
+    assert.deepEqual((await request(state.A, "PUT", "/api/profile", { json: { segment: null } })).data, { segment: null });
+    assertError(await request(null, "GET", "/api/profile"), 401, "unauthorized");
+
+    // A second tailoring that has nothing accepted passes the gate; the first one is now blocked by the
+    // honest edit of step 8. Making it and exporting it gives one more tailoring_created and export_succeeded.
+    const made = await request(state.A, "POST", "/api/tailorings", { json: { title: "Senior Analyst", company: "Eta Bank", jdText: JD }, headers: ai() });
+    assert.equal(made.status, 200, JSON.stringify(made.data).slice(0, 300));
+    state.tid2 = made.data.id;
+    await exportText(state.A, state.tid2);
+
+    // Cross-site and signed-out refusals, for both export routes.
+    for (const route of ["/api/account/export", "/api/account/export/pdfs"]) {
+      assertError(await request(state.A, "POST", route, { headers: { origin: "https://evil.example" } }), 403, "cross_site");
+      assertError(await request(state.A, "POST", route, { headers: { "sec-fetch-site": "cross-site" } }), 403, "cross_site");
+      assertError(await request(null, "POST", route), 401, "unauthorized");
+    }
+
+    // JSON export.
+    const res = await requestBytes(state.A, "POST", "/api/account/export");
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /^application\/json/);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    assert.match(res.headers.get("content-disposition") ?? "", /^attachment; filename="rolewright-data-\d{4}-\d{2}-\d{2}\.json"$/);
+    const text = res.bytes.toString("utf8");
+    const data = JSON.parse(text);
+    assert.equal(data.format, "rolewright-export");
+    assert.equal(data.account.email, "asha.flow@example.com");
+    assert.ok(data.tailorings.length >= 2 && data.facts && data.resumes.length >= 1);
+    const names = data.events.map((e) => e.name);
+    for (const n of ["resume_uploaded", "tailoring_created", "export_succeeded", "export_blocked"]) assert.ok(names.includes(n), `event ${n} is in the export`);
+    const allowedKeys = new Set(["provider", "reason", "coverage_before", "coverage_after"]);
+    for (const e of data.events) {
+      assert.deepEqual(Object.keys(e).sort(), ["at", "name", "props"], "an event holds a name, time and props only");
+      for (const k of Object.keys(e.props)) assert.ok(allowedKeys.has(k), `prop ${k} is allowed`);
+    }
+    const blocked = data.events.find((e) => e.name === "export_blocked");
+    assert.equal(blocked.props.reason, "fact_gate");
+    assert.ok(!text.includes("bala.flow@example.com") && !text.includes(state.bId), "B's marker is not in A's file");
+
+    // PDF bundle: one PDF for the passing tailoring, README.txt naming the blocked one by reason code only.
+    const zipRes = await requestBytes(state.A, "POST", "/api/account/export/pdfs");
+    assert.equal(zipRes.status, 200);
+    assert.equal(zipRes.headers.get("content-type"), "application/zip");
+    assert.equal(zipRes.headers.get("cache-control"), "no-store");
+    assert.match(zipRes.headers.get("content-disposition") ?? "", /^attachment; filename="rolewright-resumes-\d{4}-\d{2}-\d{2}\.zip"$/);
+    const entries = readZip(zipRes.bytes, crc32);
+    const pdfs = [...entries.keys()].filter((n) => n.endsWith(".pdf"));
+    assert.equal(pdfs.length, 1, `one PDF in the bundle: ${[...entries.keys()].join(", ")}`);
+    assert.ok(pdfs[0].startsWith("rolewright-Senior-Analyst-"), pdfs[0]);
+    assert.equal(entries.get(pdfs[0]).subarray(0, 5).toString("latin1"), "%PDF-");
+    const readme = entries.get("README.txt")?.toString("utf8");
+    assert.ok(readme, "README.txt is in the bundle");
+    assert.match(readme, /Finance-Analyst-\d+\.pdf: fact_gate/);
+    assert.ok(!readme.includes("Zeta") && !readme.includes("30%"), "the README holds a reason code, not content");
+    assert.equal(entries.size, 2);
+    assertError(await request(state.B, "GET", `/api/tailorings/${state.tid2}`), 404, "not_found");
   });
 
   await step("13. gate cost: an over-cap fact base is refused at save, and the tailoring routes are rate limited per user", async () => {

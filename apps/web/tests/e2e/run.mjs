@@ -799,7 +799,7 @@ try {
     const text = await lines.filter({ hasText: "portfolios" }).first().innerText();
     assert.match(text, /^Suggestion \d+: /, `the line is numbered:\n${text}`);
     assert.ok(text.includes("portfolios"), `the failing line's own text is shown:\n${text}`);
-    assert.ok(/Not in your facts:\s*₹?5 crore\s*(\n|$)/.test(text), `the failing words are shown:\n${text}`);
+    assert.ok(/Not in your facts:\s*₹?5 ?crore(, ₹?5 ?crore)?\s*(\n|$)/.test(text), `the failing words are shown:\n${text}`);
     const tableauText = await lines.filter({ hasText: "Tableau" }).first().innerText();
     assert.match(tableauText, /Not in your facts:\s*(Tableau, Google|Google, Tableau)\s*(\n|$)/, `both words sit on one line:\n${tableauText}`);
     await checkpoint(page, "review-export-refused");
@@ -867,6 +867,8 @@ try {
       await p.locator('button[id^="add-bullet-"]').click();
       await p.locator('textarea[id^="bullet-"]').fill("Prepared monthly bank reconciliations");
       await p.locator('input[id^="bullet-"][id$="-confirmed"]').check();
+      // Saving needs the storage consent (P1-15); the AI-processing consent is still asked on the tailor form.
+      await p.locator("#storage-consent").check();
       await p.locator("#save-facts").click();
       await p.getByText("Facts saved.").waitFor();
 
@@ -1205,6 +1207,26 @@ try {
       assert.equal(await menu.getAttribute("aria-expanded"), "false", `${label}: aria-expanded false when closed`);
     }
 
+    // The home segment card saved (the loop above saw it unset), and the privacy screen's export card.
+    const putSegment = (segment) =>
+      page.evaluate((seg) => fetch("/api/profile", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ segment: seg }) }).then((r) => r.status), segment);
+    assert.equal(await putSegment("fresher"), 200);
+    try {
+      await go(page, "/app");
+      await page.getByRole("heading", { name: /^Your situation: Fresher$/ }).waitFor();
+      const m = await noHorizontalScroll(page);
+      assert.ok(m.scroll <= m.client, `home-segment-saved: no horizontal scroll (${m.scroll} > ${m.client})`);
+      await assertTargets(page, "home segment card (saved) at 360");
+      await shot(page, "home-segment-saved", { dark: false });
+    } finally {
+      assert.equal(await putSegment(null), 200);
+    }
+    await go(page, "/app/privacy");
+    await page.getByRole("heading", { name: "Download your data" }).waitFor();
+    await page.getByRole("button", { name: "Download your tailored resumes (PDF)" }).waitFor();
+    assert.ok((await noHorizontalScroll(page)).scroll <= 360, "privacy export card: no horizontal scroll at 360");
+    await assertTargets(page, "privacy export card at 360");
+
     // Every button in every review card can be scrolled to, is inside the screen width and is not covered.
     await go(page, state.reviewUrl);
     await findCards(page);
@@ -1275,6 +1297,71 @@ try {
       await second.ctx.close();
       currentPage = page;
     }
+  });
+
+  await step("q. home segment card (unset, saved, cleared) and the privacy export card: axe, keyboard, downloads", async () => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await go(page, "/app");
+    const card = page.locator('[aria-labelledby="segment-title"]');
+    await card.getByText("Which sounds most like you?").waitFor();
+    assert.equal(await card.getByRole("radio").count(), 3);
+    assert.equal(await card.getByRole("radio", { checked: true }).count(), 0, "nothing is chosen at first");
+    assert.equal(await card.getByRole("button", { name: "Save" }).isDisabled(), true, "Save waits for a choice");
+    await checkpoint(page, "home-segment-unset");
+
+    // Keyboard only: Tab to the radio group, pick with an arrow key, Tab to Save, press Enter.
+    await page.evaluate(() => document.querySelector(".skip-link")?.focus());
+    await tabTo(page, 'input[name="segment"]');
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("value")), "fresher", "Tab enters the group at its first radio");
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await card.getByRole("radio", { name: /Experienced/ }).isChecked(), true);
+    await tabTo(page, "button[type=submit]");
+    await page.keyboard.press("Enter");
+    await card.getByText("Saved.").waitFor();
+    const heading = card.getByRole("heading", { name: "Your situation: Experienced" });
+    await heading.waitFor();
+    await poll(() => page.evaluate(() => document.activeElement?.id === "segment-title"), "focus moves to the tip heading after saving");
+    await card.getByText("Upload your resume, confirm what it says, then tailor it to each job.").waitFor();
+    assert.equal((await page.evaluate(() => fetch("/api/profile").then((r) => r.json()))).segment, "experienced", "saved on the server");
+    await checkpoint(page, "home-segment-saved");
+
+    // Change, then clear: back to the unset form.
+    await card.getByRole("button", { name: "Change" }).click();
+    await poll(() => page.evaluate(() => document.activeElement?.matches("input[type=radio]")), "focus lands on the chosen radio");
+    await card.getByRole("button", { name: "Clear my choice" }).click();
+    await card.getByText("Choice cleared.").waitFor();
+    assert.equal((await page.evaluate(() => fetch("/api/profile").then((r) => r.json()))).segment, null);
+    // Leave it chosen, as a user would, so the card shows its tip on reload.
+    await card.getByRole("radio", { name: /Career switcher/ }).check();
+    await card.getByRole("button", { name: "Save" }).click();
+    await card.getByRole("heading", { name: "Your situation: Career switcher" }).waitFor();
+
+    // The privacy screen's export card: axe and targets, then both downloads by keyboard.
+    await go(page, "/app/privacy");
+    const exportCard = page.locator('[aria-labelledby="export-data-title"]');
+    await exportCard.waitFor();
+    await checkpoint(page, "privacy-export-card");
+    await page.evaluate(() => document.querySelector(".skip-link")?.focus());
+    await tabTo(page, "#export-data-title ~ button");
+    const [json] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.keyboard.press("Enter")]);
+    assert.match(json.suggestedFilename(), /^rolewright-data-\d{4}-\d{2}-\d{2}\.json$/);
+    const jsonFile = path.join(dataDir, `data-export-${Date.now()}.json`);
+    await json.saveAs(jsonFile);
+    const exported = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+    assert.equal(exported.format, "rolewright-export");
+    assert.equal(exported.account.email, "asha.e2e@example.com");
+    assert.ok(exported.events.some((e) => e.name === "export_succeeded"), "the export holds the events");
+    await exportCard.getByText("Your data file has been downloaded.").waitFor();
+
+    const [zip] = await Promise.all([
+      page.waitForEvent("download", { timeout: 180_000 }),
+      exportCard.getByRole("button", { name: "Download your tailored resumes (PDF)" }).click(),
+    ]);
+    assert.match(zip.suggestedFilename(), /^rolewright-resumes-\d{4}-\d{2}-\d{2}\.zip$/);
+    const zipFile = path.join(dataDir, `bundle-${Date.now()}.zip`);
+    await zip.saveAs(zipFile);
+    assert.equal(fs.readFileSync(zipFile).subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+    await exportCard.getByText("Your resumes have been downloaded.").waitFor();
   });
 
   await step("h. privacy: Delete stays off until DELETE is typed; deleting signs out and /app asks for sign-in", async () => {
