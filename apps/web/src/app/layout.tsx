@@ -7,12 +7,14 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Rolewright", template: "%s | Rolewright" },
   description: "Tailor your resume to each job. Every change is checked against facts you confirmed.",
+  appleWebApp: { title: "Rolewright" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   colorScheme: "light dark",
+  themeColor: "#2f3a8f",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
