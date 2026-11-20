@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { UnsafeEnvironmentError, assertSafeEnv, devLoginEnabled, isDeployed, strictEnv, unsafeEnvProblems } from "../src/lib/server/env-guard.mjs";
 
 const SECRET = "a-real-secret-0123456789abcdef0123456789";
-const prod = (extra = {}) => ({ NODE_ENV: "production", AUTH_SECRET: SECRET, ...extra });
+const RATE_KEY = "r".repeat(48);
+const prod = (extra = {}) => ({ NODE_ENV: "production", AUTH_SECRET: SECRET, ROLEWRIGHT_RATE_LIMIT_KEY: RATE_KEY, ...extra });
 
 test("a normal production environment passes", () => {
   assert.doesNotThrow(() => assertSafeEnv(prod()));
@@ -23,13 +24,13 @@ test("the mock AI provider is refused in production", () => {
 });
 
 test("a missing or blank AUTH_SECRET is refused in production", () => {
-  assert.throws(() => assertSafeEnv({ NODE_ENV: "production" }), /AUTH_SECRET/);
+  assert.throws(() => assertSafeEnv({ NODE_ENV: "production", ROLEWRIGHT_RATE_LIMIT_KEY: RATE_KEY }), /AUTH_SECRET/);
   assert.throws(() => assertSafeEnv(prod({ AUTH_SECRET: "   " })), /AUTH_SECRET/);
 });
 
 test("every problem is named at once, so one restart fixes them all", () => {
   const problems = unsafeEnvProblems({ NODE_ENV: "production", ROLEWRIGHT_DEV_LOGIN: "1", ROLEWRIGHT_ALLOW_MOCK_LLM: "1" });
-  assert.equal(problems.length, 3);
+  assert.equal(problems.length, 4);
 });
 
 test("development and test runs are not affected by the flags or a missing secret", () => {
@@ -72,13 +73,13 @@ test("deployed host x NODE_ENV x flag table", () => {
       const base = { NODE_ENV, ...deploy };
       const where = `${NODE_ENV} / ${label}`;
       const has = (env, re) => unsafeEnvProblems(env).some((p) => re.test(p));
-      const safe = { ...base, AUTH_SECRET: SECRET, DATABASE_URL: DB };
+      const safe = { ...base, AUTH_SECRET: SECRET, DATABASE_URL: DB, ROLEWRIGHT_RATE_LIMIT_KEY: RATE_KEY };
       assert.equal(isDeployed(base), deployed, where);
       assert.equal(strictEnv(base), deployed || NODE_ENV === "production", where);
       assert.equal(has({ ...safe, ROLEWRIGHT_DEV_LOGIN: "1" }, /ROLEWRIGHT_DEV_LOGIN/), strictEnv(base), where);
       assert.equal(has({ ...safe, ROLEWRIGHT_ALLOW_MOCK_LLM: "1" }, /ROLEWRIGHT_ALLOW_MOCK_LLM/), strictEnv(base), where);
-      assert.equal(has({ ...base, DATABASE_URL: DB }, /AUTH_SECRET/), strictEnv(base), where);
-      assert.equal(has({ ...base, AUTH_SECRET: SECRET }, /DATABASE_URL/), deployed, where);
+      assert.equal(has({ ...base, DATABASE_URL: DB, ROLEWRIGHT_RATE_LIMIT_KEY: RATE_KEY }, /AUTH_SECRET/), strictEnv(base), where);
+      assert.equal(has({ ...base, AUTH_SECRET: SECRET, ROLEWRIGHT_RATE_LIMIT_KEY: RATE_KEY }, /DATABASE_URL/), deployed, where);
       assert.equal(devLoginEnabled({ ...base, ROLEWRIGHT_DEV_LOGIN: "1" }), !strictEnv(base), where);
       assert.equal(devLoginEnabled(base), false, where);
     }
@@ -91,14 +92,14 @@ test("the reported repro: development NODE_ENV on a deployed host is refused", (
   assert.throws(() => assertSafeEnv(env), /ROLEWRIGHT_DEV_LOGIN/);
 });
 
-test("production that is not deployed has today's three problems and no DATABASE_URL problem", () => {
+test("production that is not deployed has four problems and no DATABASE_URL problem", () => {
   const problems = unsafeEnvProblems({ NODE_ENV: "production", ROLEWRIGHT_DEV_LOGIN: "1", ROLEWRIGHT_ALLOW_MOCK_LLM: "1" });
-  assert.equal(problems.length, 3);
+  assert.equal(problems.length, 4);
   assert.ok(!problems.some((p) => /DATABASE_URL/.test(p)));
 });
 
-test("deployed with nothing set reports all four problems", () => {
-  assert.equal(unsafeEnvProblems({ K_SERVICE: "web", ROLEWRIGHT_DEV_LOGIN: "1", ROLEWRIGHT_ALLOW_MOCK_LLM: "1" }).length, 4);
+test("deployed with nothing set reports all five problems", () => {
+  assert.equal(unsafeEnvProblems({ K_SERVICE: "web", ROLEWRIGHT_DEV_LOGIN: "1", ROLEWRIGHT_ALLOW_MOCK_LLM: "1" }).length, 5);
 });
 
 test("the build phase is still skipped, even when deployed", () => {
@@ -140,4 +141,30 @@ test("staging values start: allowlist or closed without a grievance contact, or 
     assert.deepEqual(unsafeEnvProblems(prod({ ROLEWRIGHT_SIGNUPS })), []);
   }
   assert.deepEqual(unsafeEnvProblems(prod({ ROLEWRIGHT_SIGNUPS: "allowlist", ROLEWRIGHT_SIGNUP_ALLOWLIST: "@example.com" })), []);
+});
+
+// P1-28: the rate-limit key is checked at start-up, not on the first sign-in.
+test("a missing, blank or short ROLEWRIGHT_RATE_LIMIT_KEY is a start-up problem under strictEnv", () => {
+  const noKey = { NODE_ENV: "production", AUTH_SECRET: SECRET };
+  for (const key of [undefined, "", "   ", "x".repeat(31), `  ${"x".repeat(31)}  `]) {
+    const env = { ...noKey, ROLEWRIGHT_RATE_LIMIT_KEY: key };
+    assert.ok(unsafeEnvProblems(env).some((p) => /ROLEWRIGHT_RATE_LIMIT_KEY/.test(p)), JSON.stringify(key));
+    assert.throws(() => assertSafeEnv(env), /ROLEWRIGHT_RATE_LIMIT_KEY/);
+  }
+  for (const key of ["x".repeat(32), `  ${"x".repeat(32)}  `]) {
+    assert.deepEqual(unsafeEnvProblems({ ...noKey, ROLEWRIGHT_RATE_LIMIT_KEY: key }), [], JSON.stringify(key));
+  }
+});
+
+test("a deployed host without the key refuses to start; development and the build phase do not", () => {
+  const deployed = { K_SERVICE: "web", AUTH_SECRET: SECRET, DATABASE_URL: DB };
+  assert.throws(() => assertSafeEnv(deployed), /ROLEWRIGHT_RATE_LIMIT_KEY/);
+  assert.doesNotThrow(() => assertSafeEnv({ ...deployed, ROLEWRIGHT_RATE_LIMIT_KEY: RATE_KEY }));
+  assert.doesNotThrow(() => assertSafeEnv({ NODE_ENV: "development" }));
+  assert.deepEqual(unsafeEnvProblems({ ...deployed, NEXT_PHASE: "phase-production-build" }), []);
+});
+
+test("the message never repeats the key", () => {
+  const short = "short-key-value";
+  assert.throws(() => assertSafeEnv(prod({ ROLEWRIGHT_RATE_LIMIT_KEY: short })), (err) => !err.message.includes(short));
 });

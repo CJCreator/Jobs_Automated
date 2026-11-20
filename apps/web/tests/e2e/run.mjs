@@ -90,6 +90,7 @@ function startServer() {
     ROLEWRIGHT_ALLOW_MOCK_LLM: "1",
     ROLEWRIGHT_DATA_DIR: path.join(dataDir, "pglite"),
     AUTH_SECRET: "e2e-test-secret-not-for-real-use-0123456789abcdef",
+    ROLEWRIGHT_RATE_LIMIT_KEY: "e2e-test-rate-limit-key-not-for-real-use-0123456789",
     AUTH_URL: base,
     NEXT_TELEMETRY_DISABLED: "1",
   };
