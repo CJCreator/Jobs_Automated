@@ -29,3 +29,7 @@ Resumes are personal data. India's Digital Personal Data Protection Act 2023 exp
 
 - **2026-11-20:** The purge is run by Google Cloud Scheduler, which calls `POST /api/internal/purge` once a day with an OIDC token (see `apps/web/README.md`). `npm run purge:inactive` in `apps/web` is the fallback. The retention decision above is unchanged.
 - **2026-11-20:** The `DATABASE_URL` refusal applies on a deployed host (`K_SERVICE` set, or `ROLEWRIGHT_DEPLOYED=1`); with `NODE_ENV=production` elsewhere the embedded database is allowed and logs a warning.
+
+## Amendment 2026-11-20 (owner)
+
+At launch the export is one JSON file of everything stored for the user, plus a separate zip of one PDF per tailoring that passes the fact gate at the time of export. A tailoring the gate blocks is listed in the zip by reason code only. Rate-limit records are not included.

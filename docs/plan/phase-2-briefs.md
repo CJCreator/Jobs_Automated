@@ -179,3 +179,31 @@ Match the existing schema's conventions (how other tables set `app.user_id`, rol
 - **Schema:** running `db:migrate` twice is idempotent with the P2 blocks.
 - **Notice:** the lock matches `2026-11-21.1`, and harness consent steps use the live version.
 - **Owner gate (manual):** install from staging on an Android phone and confirm it opens at `/app`.
+
+## P2-6 PDF bundle in the data export (owner decision, ADR 0004)
+
+The owner chose JSON plus a PDF bundle for launch. It is a separate task because it needs the fact gate and a Chromium render for each tailoring, and it touches files that P2-1 and P2-2 edit.
+
+| ID | Title | Model | Touches | Depends on |
+|---|---|---|---|---|
+| P2-6 | PDF bundle | Sonnet | `src/lib/server/zip.mjs` (new), `src/lib/server/pdf-bundle.mjs` (new), `src/app/api/account/export/pdfs/route.ts` (new), `src/app/api/tailorings/[id]/export/route.ts` (extract the gate-and-render step into `pdf-bundle.mjs` only if it is inline), `src/components/export-data.tsx`, `en.ts` (append `en.dataExport`), `tests/zip.test.mjs` (new), `tests/pdf-bundle.test.mjs` (new) | P2-1, P2-2 |
+
+**Goal:** a second button on the privacy screen downloads a `.zip` with one PDF per tailoring that passes the fact gate today.
+
+**Steps**
+1. `zip.mjs`: a minimal writer for stored (uncompressed) entries, with CRC-32, local headers, a central directory and an end record. No new dependency; PDFs are already compressed. Entry names are ASCII only, sanitised, and never contain `/` or `..`.
+2. `pdf-bundle.mjs`: for each of the user's tailorings, run the same gate and render path as the single-PDF export, using the same function and not a copy. Each tailoring that passes is added as `rolewright-<job-title-slug>-<n>.pdf`. Each one that is blocked or has nothing accepted is listed in a `README.txt` inside the zip with the reason code only. Render one at a time, cap at 20 tailorings per bundle, and stop with a safe error if the total passes 25 MB.
+3. Route `POST /api/account/export/pdfs`: `requireUser`, the same-origin check, and `await takeRateLimit("export", userId)` charged once per bundle, plus one more per rendered PDF beyond the first if the limiter supports a cost. Otherwise charge once and rely on the 20-tailoring cap. Response headers: `application/zip`, an attachment filename and `no-store`.
+4. `export-data.tsx`: a second button, "Download your tailored resumes (PDF)", with the same live-region status.
+
+**Tests**
+- `zip.test.mjs`: a zip with two entries can be read back. Parse it in the test with the central directory and CRC checks, or with `unzip -l` if it is present. Names are sanitised.
+- `pdf-bundle.test.mjs`, with the PDF renderer stubbed:
+  - Only passing tailorings are rendered.
+  - A blocked tailoring appears in `README.txt` with its reason and no content.
+  - B's tailorings are never in A's bundle.
+  - The cap and size limit hold.
+
+**Done when:** both test files and typecheck pass. The real Chromium render is proven in the test wave.
+
+**Harness impact:** `test:flow` adds a bundle step (a zip with one PDF and a README line for the blocked tailoring).
