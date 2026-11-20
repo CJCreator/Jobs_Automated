@@ -48,7 +48,8 @@ async function maybeSweep(db, nowMs) {
   try {
     await sweepRateEvents(db, { nowMs });
   } catch {
-    // Housekeeping only: a failed sweep must never fail or slow the request's own check.
+    // Housekeeping only: a failed sweep must never fail the request's own check.
+    console.error("rate_events sweep failed");
   }
 }
 

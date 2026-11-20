@@ -430,13 +430,15 @@ export async function purgeInactiveUsers(db, { months = 12, now = new Date() } =
 /** Deletes the user row (every table's user_id foreign key cascades) and their email-link tokens. */
 export async function deleteUserData(db, userId) {
   if (!isUuid(userId)) return false;
+  // Rate-limit rows keyed by this user's id go in the same statement. Rows keyed by a keyed hash of an
+  // IP or email address are not deleted here; they stop counting within their window and the sweep
+  // removes them once they are 24 hours old.
   const { rows } = await db.system.query(
-    `WITH gone AS (DELETE FROM users WHERE id = $1 RETURNING id, email),
-     tokens AS (DELETE FROM verification_tokens WHERE identifier IN (SELECT email FROM gone))
+    `WITH gone AS (DELETE FROM users WHERE id = $1::uuid RETURNING id, email),
+     tokens AS (DELETE FROM verification_tokens WHERE identifier IN (SELECT email FROM gone)),
+     rate AS (DELETE FROM rate_events WHERE subject = $1::uuid::text)
      SELECT id FROM gone`,
     [userId],
   );
-  // Rate-limit rows keyed by this user's id (hashed IP and email subjects cannot be linked to a user).
-  await db.system.query("DELETE FROM rate_events WHERE subject = $1", [userId]);
   return rows.length > 0;
 }

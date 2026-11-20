@@ -850,6 +850,12 @@ test("deleteUserData removes that user's id-subject rate_events rows, not anothe
   assert.equal(await rateRows(d, a), 0);
   assert.equal(await rateRows(d, b), 1);
   assert.equal(await rateRows(d, "f".repeat(64)), 1);
+
+  // An uppercase id still removes the id-keyed rows (the id is normalised to lower-case text).
+  const c = await seedEverything(d, "rate-c@example.com");
+  await d.system.query("INSERT INTO rate_events (bucket, subject) VALUES ('ai', $1)", [c]);
+  assert.equal(await repo.deleteUserData(d, c.toUpperCase()), true);
+  assert.equal(await rateRows(d, c), 0);
 });
 
 test("purgeInactiveUsers sweeps expired rate_events rows and keeps recent ones", async () => {
