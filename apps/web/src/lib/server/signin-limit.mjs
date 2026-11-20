@@ -28,3 +28,11 @@ export async function allowEmailLink({ email, env = process.env, take }) {
     throw err;
   }
 }
+
+/**
+ * The same per-IP count for the sign-in page's server actions, which run Auth.js in-process and
+ * never reach the route. Throws when refused or when the limiter is unavailable.
+ */
+export async function gateSignInAction({ headers, env = process.env, take }) {
+  await take("signInIp", ipSubject(clientIp(headers, env), env));
+}

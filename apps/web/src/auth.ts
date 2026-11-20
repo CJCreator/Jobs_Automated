@@ -5,7 +5,8 @@
 // Providers are switched on by environment variables, so a deployment only
 // offers what it has credentials for.
 
-import NextAuth, { type DefaultSession, type NextAuthConfig } from "next-auth";
+import { headers } from "next/headers";
+import NextAuth, { AuthError, type DefaultSession, type NextAuthConfig } from "next-auth";
 import type { Adapter, AdapterUser } from "next-auth/adapters";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -14,7 +15,8 @@ import { getDb } from "@/lib/db/index.mjs";
 import * as repo from "@/lib/db/repo.mjs";
 import { assertSafeEnv, devLoginEnabled, strictEnv } from "@/lib/server/env-guard.mjs";
 import { takeRateLimit } from "@/lib/server/rate-limit";
-import { allowEmailLink } from "@/lib/server/signin-limit.mjs";
+import { HttpError } from "@/lib/server/http";
+import { allowEmailLink, gateSignInAction } from "@/lib/server/signin-limit.mjs";
 import { maySignIn, signupMode } from "@/lib/server/signup-gate.mjs";
 
 declare module "next-auth" {
@@ -193,7 +195,14 @@ const config: NextAuthConfig = {
       // adapter would not stop the email. Only addresses the gate admitted spend a send, and a
       // limited address gets the same "check your email" page as any other.
       if (allowed && verifyRequest && emailStep?.verificationRequest) {
-        if (!(await allowEmailLink({ email, take: takeRateLimit }))) return verifyRequest;
+        try {
+          if (!(await allowEmailLink({ email, take: takeRateLimit }))) return verifyRequest;
+        } catch {
+          // Limiter unavailable: send nothing, and answer as for any other address (a thrown
+          // error would read as AccessDenied and show which addresses are known).
+          console.warn("[auth] email-link limiter unavailable");
+          return verifyRequest;
+        }
       }
       return allowed;
     },
@@ -220,4 +229,24 @@ const config: NextAuthConfig = {
   },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(config);
+const nextAuth = NextAuth(config);
+export const { handlers, auth, signOut } = nextAuth;
+
+/**
+ * The sign-in page's server actions call this, and Auth.js runs in-process on that path, so the
+ * route's POST gate never sees them: count them here. The route calls handlers.POST, not this,
+ * so nothing is counted twice. A refusal becomes a bare AuthError (no cause), which the page
+ * turns into its generic "sign-in failed" redirect.
+ */
+export async function signIn(...args: Parameters<typeof nextAuth.signIn>): ReturnType<typeof nextAuth.signIn> {
+  try {
+    await gateSignInAction({ headers: await headers(), take: takeRateLimit });
+  } catch (err) {
+    if (err instanceof HttpError) {
+      console.warn(`[rolewright] sign-in action ${err.status} ${err.code}`);
+      throw new AuthError("Sign-in limited.");
+    }
+    throw err;
+  }
+  return nextAuth.signIn(...args);
+}

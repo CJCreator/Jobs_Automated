@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createDb } from "../src/lib/db/index.mjs";
 import { take as dbTake } from "../src/lib/db/rate-events.mjs";
 import { LIMITS } from "../src/lib/server/rate-limit-core.mjs";
-import { allowEmailLink, gateSignInPost } from "../src/lib/server/signin-limit.mjs";
+import { allowEmailLink, gateSignInAction, gateSignInPost } from "../src/lib/server/signin-limit.mjs";
 
 // auth.ts and the route import next-auth and "@/" aliases, which node --test cannot load, so the
 // logic lives in signin-limit.mjs (pure, takes the limiter as an argument) and is tested here
@@ -61,6 +61,14 @@ test("a spoofed leftmost x-forwarded-for does not get a fresh bucket", async () 
   assert.equal(calls, 20);
 });
 
+test("the 21st sign-in server action from one IP is refused (form path, not the route)", async () => {
+  const headers = new Headers({ "x-forwarded-for": "192.0.2.44" });
+  for (let i = 0; i < 20; i++) await gateSignInAction({ headers, env, take });
+  await assert.rejects(gateSignInAction({ headers, env, take }), (e) => e.status === 429);
+  // a different IP is unaffected
+  await gateSignInAction({ headers: new Headers({ "x-forwarded-for": "192.0.2.45" }), env, take });
+});
+
 test("the 6th email link for one address in an hour is refused, whatever the case", async () => {
   for (let i = 0; i < 5; i++) assert.equal(await allowEmailLink({ email: "Asha@Example.com", take, env }), true);
   assert.equal(await allowEmailLink({ email: " asha@example.COM ", take, env }), false);
@@ -94,5 +102,10 @@ test("wiring: route gates POST before the handler; the signIn callback limits on
   const gate = auth.indexOf("maySignIn({ email, existingUser");
   const limit = auth.indexOf("allowEmailLink(");
   assert.ok(gate > 0 && limit > gate, "email limit runs after maySignIn");
+  assert.match(auth, /export async function signIn\(/, "auth.ts exports the wrapped signIn");
+  assert.match(auth, /gateSignInAction\(/);
+  assert.doesNotMatch(auth, /export const \{[^}]*\bsignIn\b/, "NextAuth's signIn is not exported directly");
+  const page = readFileSync(new URL("../src/app/sign-in/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /import \{[^}]*\bsignIn\b[^}]*\} from "@\/auth"/);
   assert.match(auth, /emailStep\?\.verificationRequest/);
 });
