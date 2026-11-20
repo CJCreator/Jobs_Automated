@@ -24,3 +24,8 @@ Resumes are personal data. India's Digital Personal Data Protection Act 2023 exp
 - The purge job needs a scheduler on whatever host ADR 0009 picks.
 - Uploads keep the size cap. A decompressed-size cap is added before PDF parsing (the review reproduced a 175 KB file producing 60 MB of text).
 - Production refuses to start without `DATABASE_URL`, so data never silently falls back to local disk.
+
+## Amended
+
+- **2026-11-20:** The purge is run by Google Cloud Scheduler, which calls `POST /api/internal/purge` once a day with an OIDC token (see `apps/web/README.md`). `npm run purge:inactive` in `apps/web` is the fallback. The retention decision above is unchanged.
+- **2026-11-20:** The `DATABASE_URL` refusal applies on a deployed host (`K_SERVICE` set, or `ROLEWRIGHT_DEPLOYED=1`); with `NODE_ENV=production` elsewhere the embedded database is allowed and logs a warning.

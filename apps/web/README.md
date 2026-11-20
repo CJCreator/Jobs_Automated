@@ -6,7 +6,7 @@ Based on the open-source career-ops project (MIT licence).
 
 ## Run it locally
 
-Needs Node 22.18 or later (the tests import TypeScript files directly, which Node runs without a flag from 22.18). Dependencies for this app are in `apps/web/node_modules`; the PDF export also needs the engine package (`packages/engine`) with its own `node_modules` and Playwright's Chromium installed (`npx playwright install chromium` in that folder).
+Needs Node 22.18 or later (24 recommended). The tests import TypeScript files directly, which Node runs without a flag from 22.18. Dependencies for this app are in `apps/web/node_modules`; the PDF export also needs the engine package (`packages/engine`) with its own `node_modules` and Playwright's Chromium installed (`npx playwright install chromium` in that folder).
 
 Two development flags turn on a sign-in that needs no email or Google account, and a fake AI provider that needs no key:
 
@@ -22,7 +22,7 @@ $env:ROLEWRIGHT_DEV_LOGIN="1"; $env:ROLEWRIGHT_ALLOW_MOCK_LLM="1"; npm run dev
 
 Open http://localhost:3100. With no `DATABASE_URL`, data is kept in an embedded database at `apps/web/.data/pglite`. To use the fake provider, choose provider `mock` with the key `mock-valid-key`. It deliberately invents figures, tools and employers so you can see the fact check stop them.
 
-Both flags are refused on a **deployed host** and when `NODE_ENV` is `production`, and so is a missing `AUTH_SECRET`. A host counts as deployed when `ROLEWRIGHT_DEPLOYED=1` or when `K_SERVICE` is set to any non-empty value (Cloud Run and Knative set it), whatever `NODE_ENV` says; it is read from the process environment, never from a request. On a deployed host a missing `DATABASE_URL` is also refused, and the embedded database is never opened. The server checks this when it starts (`src/instrumentation.ts`): it logs every problem and exits with code 1, so nothing listens. The first-use checks in the sign-in module and the API routes remain as a second layer. With `NODE_ENV=production` on a machine that is not deployed (the production smoke test), the embedded database is allowed but logs one warning naming its directory. The check is skipped while `next build` runs (Next sets `NEXT_PHASE=phase-production-build`), so building needs neither the secret nor any flag. The rule lives in `src/lib/server/env-guard.mjs`.
+Both flags are refused on a **deployed host** and when `NODE_ENV` is `production`, and so is a missing `AUTH_SECRET`. A host counts as deployed when `ROLEWRIGHT_DEPLOYED=1` or when `K_SERVICE` is set to any non-empty value (Cloud Run and Knative set it), whatever `NODE_ENV` says; it is read from the process environment, never from a request. On a deployed host a missing `DATABASE_URL` is also refused, and the embedded database is never opened. The server checks this when it starts (`src/instrumentation.ts`): it logs every problem and exits with code 1, so nothing listens. The first-use checks in the sign-in module and the API routes remain as a second layer. The embedded database is refused only on a deployed host (`K_SERVICE` set, or `ROLEWRIGHT_DEPLOYED=1`). With `NODE_ENV=production` on a machine that is not deployed (the production smoke test), it is allowed but logs one warning naming its directory. Do not run a public server that way. The check is skipped while `next build` runs (Next sets `NEXT_PHASE=phase-production-build`), so building needs neither the secret nor any flag. The rule lives in `src/lib/server/env-guard.mjs`.
 
 ## Commands
 
