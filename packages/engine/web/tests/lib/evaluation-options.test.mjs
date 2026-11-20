@@ -59,13 +59,14 @@ test("full and focused prompts keep posting URLs inside JSON data", () => {
 });
 
 test("market-specific instructions and language composition survive scoped evaluation", () => {
-  const instructions = selectedEvaluationInstructions({ ...source, mode: read("modes/de/angebot.md"), sections: ["summary", "strategy"] });
-  assert.match(instructions, /Rollen-Zusammenfassung/);
-  assert.match(instructions, /Level und Strategie/);
-  assert.ok(!instructions.includes("Vorstellungsgesprächs-Plan"));
-  const prompt = buildPrompt({ kind: "evaluate", input: "https://jobs.example.test/1", today: "2026-10-25", memory: "", lang: { output: "en", modesDir: "modes/de", evalModeFile: "modes/de/angebot.md" }, evaluationInstructions: instructions });
+  // modes/hi is the one market mode set this fork ships (the others were removed, ADR 0013)
+  const instructions = selectedEvaluationInstructions({ ...source, mode: read("modes/hi/naukri.md"), sections: ["summary", "strategy"] });
+  assert.match(instructions, /भूमिका का सारांश/);
+  assert.match(instructions, /Level और Strategy/);
+  assert.ok(!instructions.includes("साक्षात्कार योजना"));
+  const prompt = buildPrompt({ kind: "evaluate", input: "https://jobs.example.test/1", today: "2026-10-25", memory: "", lang: { output: "en", modesDir: "modes/hi", evalModeFile: "modes/hi/naukri.md" }, evaluationInstructions: instructions });
   assert.match(prompt, /Write all human-facing output in "en"/);
-  assert.match(prompt, /modes\/de\/_shared.md/);
+  assert.match(prompt, /modes\/hi\/_shared.md/);
 });
 
 test("missing canonical instructions fail before a model can run", () => {
@@ -91,7 +92,7 @@ test("focused reports retain the existing envelope and expose scope in the heade
 });
 
 test("focused market runs retain canonical importance gates and summary semantics", () => {
-  const instructions = selectedEvaluationInstructions({ ...source, mode: read("modes/de/angebot.md"), sections: [] });
+  const instructions = selectedEvaluationInstructions({ ...source, mode: read("modes/hi/naukri.md"), sections: [] });
   for (const term of ["Two-pass rule", "Work-authorization check", "Company Type and Compensation Reliability", "Archetype Detection", "#### Score Evidence", "### Evidence confidence", "`advertised_comp` is the JD's", "`risk_summary` mirrors"]) assert.ok(instructions.includes(term), term);
   const application = selectedEvaluationInstructions({ ...source, sections: ["application"] });
   assert.match(application, /## H\) Draft Application Answers\n\(only if score >= 4\.5/);

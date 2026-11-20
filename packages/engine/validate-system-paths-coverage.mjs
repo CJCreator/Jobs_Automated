@@ -70,6 +70,9 @@ const EXCLUDES = [
   'batch/logs/.gitkeep',
   'batch/tracker-additions/.gitkeep',
   'interview-prep/.gitkeep',
+  // The fork marker that disables upstream updates (ADR 0013). Repo-only: it
+  // must never ship to or be pruned from an install by the updater.
+  '.no-upstream-updates',
   // The declaration file itself. Normally untracked, so normally invisible to
   // this check — but a FORK that runs this suite in CI has to commit it, or CI
   // checks out the repo without it, every declared path is an orphan there, and

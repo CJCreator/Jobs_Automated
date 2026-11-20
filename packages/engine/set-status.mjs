@@ -283,6 +283,9 @@ if (flags.json) {
 } else {
   const verb = flags.undo ? (flags.dryRun ? 'would undo' : 'undid') : flags.dryRun ? 'would set' : result.changed ? 'set' : 'already';
   console.log(`✅ #${result.num} ${result.company} — ${result.role}: ${verb} ${result.oldStatus} → ${result.newStatus}${result.note ? ` (note: ${result.note})` : ''}`);
+  if (result.followupSeeded?.seeded) {
+    console.log(`📅 Follow-up ${flags.dryRun ? 'would be seeded' : 'seeded'} for #${result.num}: next ${result.followupSeeded.nextDate}`);
+  }
   if (!flags.undo && result.changed && !flags.dryRun && result.newStatus === 'Applied' && !result.followupSeeded?.seeded && result.followupSeeded?.reason !== 'disabled') {
     console.error('ℹ️  Status is Applied — consider seeding follow-ups in data/follow-ups.md (#1430: node followup-cadence.mjs)');
   }

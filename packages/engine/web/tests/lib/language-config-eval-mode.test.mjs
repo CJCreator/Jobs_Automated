@@ -39,8 +39,9 @@ function withMarket(market, fn) {
   }
 }
 
+// This fork keeps modes/hi only; the other market sets were removed (ADR 0013).
 test("the repo ships market directories to check", () => {
-  assert.ok(MARKETS.length >= 10, `found only ${MARKETS.length}: ${MARKETS.join(", ")}`);
+  assert.ok(MARKETS.length >= 1, `found only ${MARKETS.length}: ${MARKETS.join(", ")}`);
 });
 
 for (const market of MARKETS) {
@@ -53,9 +54,8 @@ for (const market of MARKETS) {
   });
 }
 
-// Their evaluation modes title themselves "A-H", which the A-F/A-G title match
-// used to miss, so both fell back to modes/oferta.md.
-test("modes/sg and modes/vi resolve to their A-H evaluation modes", () => {
-  withMarket("sg", () => assert.equal(readLanguageConfig().evalModeFile, "modes/sg/offer.md"));
-  withMarket("vi", () => assert.equal(readLanguageConfig().evalModeFile, "modes/vi/tuyen-dung.md"));
+// Its evaluation mode titles itself "A-H", which the A-F/A-G title match used
+// to miss, so it fell back to modes/oferta.md.
+test("modes/hi resolves to its A-H evaluation mode", () => {
+  withMarket("hi", () => assert.equal(readLanguageConfig().evalModeFile, "modes/hi/naukri.md"));
 });

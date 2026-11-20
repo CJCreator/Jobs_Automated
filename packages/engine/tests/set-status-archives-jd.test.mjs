@@ -57,7 +57,7 @@ function fakeArchiveCodeRoot() {
   // scratch prefix, so that nothing walking the repo meanwhile takes these
   // copies for part of it.
   const codeRoot = mkdtempSync(join(ROOT, `${SCRATCH_PREFIX}set-status-archive-`));
-  for (const sub of ['lib', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
+  for (const sub of ['lib', 'lib/services', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
   for (const file of [
     'set-status.mjs', 'path-resolver.mjs', 'tracker-utils.mjs', 'pipeline-lock.mjs',
     'tracker-parse.mjs', 'lib/local-today.mjs', 'role-matcher.mjs',
@@ -65,7 +65,7 @@ function fakeArchiveCodeRoot() {
     'jd-capture.mjs', 'lib/cli-flags.mjs', 'lib/jd-archive-section.mjs', 'templates/states.yml',
     'tracker-aliases.json', 'lib/dir-lock.mjs', 'lib/run-bounded.mjs', 'lib/status-hooks.mjs',
     'lib/yaml-document.mjs', 'funnel-velocity.mjs', 'stats.mjs', 'followup-cadence.mjs', 'funnel-stages.mjs',
-    'lib/scan-history-columns.mjs', 'lib/tsv-formula-escape.mjs',
+    'lib/scan-history-columns.mjs', 'lib/tsv-formula-escape.mjs', 'lib/services/tracker-service.mjs',
   ]) copyFileSync(join(ROOT, file), join(codeRoot, file));
   writeFileSync(join(codeRoot, 'archive-posting.mjs'), [
     "import { writeFileSync } from 'node:fs';",

@@ -223,7 +223,7 @@ export function DuplexSparring({
           <div className="rounded-xl border border-border/80 bg-background/50 p-4">
             <div className="flex items-center justify-between text-xs text-muted mb-2">
               <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <Volume2 className={`size-3.5 ${isSpeaking ? "animate-pulse text-brand" : "text-muted"}`} />
+                <Volume2 className={`size-3.5 ${isSpeaking ? "animate-pulse text-brand-text" : "text-muted"}`} />
                 Bar Raiser Question #{currentQuestionIndex + 1}
               </span>
               <span className="font-mono text-faint">

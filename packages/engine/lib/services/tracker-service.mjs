@@ -209,10 +209,19 @@ export async function executeSetStatus(options = {}) {
   if (selector !== null) {
     const idList = trackerIdList(selector);
     if (idList) {
-      throw new TrackerServiceError('Multiple tracker IDs passed in selector. Update one row per command.', {
-        code: 'id-list-passed',
-        exitCode: EXIT_USAGE,
-      });
+      const nums = idList.filter((part) => /^\d+$/.test(part));
+      const shown = nums.slice(0, 8);
+      const action = undo ? '--undo' : requestedStatus;
+      // These numbers are tracker rows. A bare `14 Applied` is rejected when that
+      // row's report id differs, so the command that means "tracker row" is --row.
+      const lines = shown.map((id) => `node set-status.mjs --row ${id} ${action}`);
+      const extra = nums.length - shown.length;
+      const more = extra > 0 ? `\n... and ${extra} more` : '';
+      const empty = idList.some((part) => part === '') ? ' The list has an empty slot.' : '';
+      throw new TrackerServiceError(
+        `set-status updates one row.${empty} Run one command per tracker number:\n${lines.join('\n')}${more}`,
+        { code: 'usage', exitCode: EXIT_USAGE },
+      );
     }
   }
 
@@ -395,7 +404,11 @@ export async function executeSetStatus(options = {}) {
           {
             code: 'report-number-ambiguous',
             exitCode: EXIT_AMBIGUOUS,
-            details: { trackerNum: target.num, reportNum: num },
+            details: {
+              trackerNum: target.num,
+              reportNum: num,
+              linkedBy: linkers.map((r) => ({ num: r.num, company: r.company, role: r.role })),
+            },
           },
         );
       }

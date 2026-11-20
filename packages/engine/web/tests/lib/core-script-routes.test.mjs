@@ -1,6 +1,6 @@
 // The routes that execFile a core script directly bypass spawnHeadlessCli, so
 // its windowsHide does not reach them (#3809). Each has to spell the
-// Windows-safe launch itself, and two of them (doctor, portals/verify) have to
+// Windows-safe launch itself, and one of them (portals/verify) has to
 // report a failed child as a failure. #4253 fixed four of these routes and
 // missed six (stats, patterns, upskill, quiet-companies, company-history,
 // keyword-match), which kept launching bare "node" with an inherited console,
@@ -85,20 +85,18 @@ const route = (p) => import(`@/app/api/${p}/route.ts`);
 // Launch: the very Node serving the page, never a console it could inherit.
 // ---------------------------------------------------------------------------
 
-test("all four core-script routes launch with process.execPath and windowsHide", async () => {
-  // Given each core script answers normally
-  standIn("doctor", 'console.log(JSON.stringify({ onboardingNeeded: false, missing: [], warnings: [] }));');
+test("all three core-script routes launch with process.execPath and windowsHide", async () => {
+  // Given each core script answers normally (doctor is not here: its route
+  // reads doctorState() in process and launches nothing)
   standIn("followup-cadence", 'console.log(JSON.stringify({ entries: [], metadata: {}, cadenceDefaults: {} }));');
   standIn("verify-portals", 'console.log("  ✅ Acme — greenhouse/acme (3 live)");');
 
-  const { GET: doctor } = await route("doctor");
   const { GET: followups } = await route("followups");
   const { GET: cadence } = await route("followups/cadence");
   const { GET: verify } = await route("portals/verify");
 
   // When each route runs
   const runs = [
-    ["doctor", await call(doctor)],
     ["followup-cadence", await call(followups, new Request("http://localhost/api/followups"))],
     ["followup-cadence", await call(cadence)],
     ["verify-portals", await call(verify)],
@@ -155,7 +153,6 @@ test("the six analytics routes launch with process.execPath and windowsHide", as
 // script fails here until it is driven there too.
 const DRIVEN_ROUTES = [
   "company-history",
-  "doctor",
   "followups",
   "followups/cadence",
   "keyword-match",
@@ -172,64 +169,23 @@ test("census: the routes driven above are every route that calls execFile", () =
     .filter((f) => /\bexecFile\(/.test(readFileSync(f, "utf8")))
     .map((f) => relative(apiRoot, dirname(f)).split(sep).join("/"));
   // Premise: the walk sees the route tree at all
-  assert.ok(found.includes("doctor"), `the census walk found no doctor route under ${apiRoot}`);
+  assert.ok(found.includes("portals/verify"), `the census walk found no portals/verify route under ${apiRoot}`);
   assert.deepEqual(found.sort(), DRIVEN_ROUTES);
 });
 
 // ---------------------------------------------------------------------------
-// doctor: "the check didn't answer" is never "you're all set up".
+// doctor: answered in process, so there is no child to fail silently.
 // ---------------------------------------------------------------------------
 
-const UNAVAILABLE = { available: false, onboardingNeeded: false, missing: [], warnings: [] };
-
-test("doctor reports unavailable when its child fails without output", async () => {
-  // Given the doctor dies the way 0xC0000142 kills it: non-zero, nothing printed
-  standIn("doctor", "process.exit(1);");
+test("doctor answers in process: it launches nothing and reports what is missing", async () => {
+  // Given an empty data root, with no cv.md or profile
   const { GET } = await route("doctor");
-  // Then that is not a verdict, and certainly not "fully set up"
-  assert.deepEqual((await call(GET)).body, UNAVAILABLE);
-});
-
-test("doctor reports unavailable when its child exits cleanly but prints nothing", async () => {
-  standIn("doctor", "process.exit(0);");
-  const { GET } = await route("doctor");
-  assert.deepEqual((await call(GET)).body, UNAVAILABLE);
-});
-
-test("doctor reports unavailable when its child prints a verdict and then fails", async () => {
-  // Given a well-formed verdict followed by a non-zero exit: the error alone
-  // must decide, not the fact that the output happens to parse
-  standIn(
-    "doctor",
-    'console.log(JSON.stringify({ onboardingNeeded: false, missing: [], warnings: [] })); process.exit(1);',
-  );
-  const { GET } = await route("doctor");
-  assert.deepEqual((await call(GET)).body, UNAVAILABLE);
-});
-
-test("doctor reports unavailable when the payload carries no onboarding verdict", async () => {
-  // Given JSON that parses but says nothing: `!!undefined` used to read it as
-  // onboardingNeeded:false — the same false all-clear by another road
-  standIn("doctor", 'console.log("{}");');
-  const { GET } = await route("doctor");
-  assert.deepEqual((await call(GET)).body, UNAVAILABLE);
-});
-
-test("doctor still relays a real verdict, including that onboarding is needed", async () => {
-  // Given a healthy doctor that finds cv.md missing (a banner line before the
-  // payload must not matter: the verdict is the last line)
-  standIn(
-    "doctor",
-    'console.log("banner");' +
-      'console.log(JSON.stringify({ onboardingNeeded: true, missing: ["cv.md"], warnings: ["w"] }));',
-  );
-  const { GET } = await route("doctor");
-  assert.deepEqual((await call(GET)).body, {
-    available: true,
-    onboardingNeeded: true,
-    missing: ["cv.md"],
-    warnings: ["w"],
-  });
+  const { body, launches: made } = await call(GET);
+  // Then the verdict comes from doctorState(), not from a spawned doctor.mjs
+  assert.equal(made.length, 0, "doctor must not spawn a process");
+  assert.equal(body.available, true);
+  assert.equal(body.onboardingNeeded, true);
+  assert.ok(body.missing.includes("cv.md"), `missing: ${JSON.stringify(body.missing)}`);
 });
 
 // ---------------------------------------------------------------------------

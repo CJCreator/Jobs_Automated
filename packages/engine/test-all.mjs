@@ -2182,6 +2182,7 @@ try {
 // cloud metadata endpoint straight into a PDF. It now wires up the *same*
 // two-layer guard liveness-browser.mjs exports rather than carrying a second
 // implementation, so these tests pin the wiring, not a copy of the guard logic.
+let restoreArchiveDefaultResolver = null;
 try {
   const { archiveUrl, installEgressGuard } = await import(
     pathToFileURL(join(ROOT, 'archive-posting.mjs')).href
@@ -2240,6 +2241,13 @@ try {
     });
     return { registered: true, verdict, pattern: state.pattern };
   }
+
+  // Hermetic DNS: the guard resolves hostnames, so without a stub a run with no
+  // network (a sandbox, CI egress rules) blocks example.com and the "allows
+  // legitimate requests" check fails for a reason that has nothing to do with
+  // the guard. Every hostname resolves to a public address unless a check
+  // below installs its own resolver.
+  restoreArchiveDefaultResolver = setHostResolver(async () => ['93.184.216.34']);
 
   // 1. Pre-navigation refusal — an obviously-internal target must not reach
   //    Playwright at all, so no context is ever created.
@@ -2312,6 +2320,8 @@ try {
   }
 } catch (e) {
   fail(`archive-posting egress guard tests crashed: ${e.message}`);
+} finally {
+  restoreArchiveDefaultResolver?.();
 }
 
 // ── 4. DASHBOARD BUILD ──────────────────────────────────────────
