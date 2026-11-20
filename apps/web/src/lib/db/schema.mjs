@@ -144,4 +144,21 @@ CREATE POLICY consents_isolation ON consents
 -- Privileges: user-data tables only. Nothing on users, accounts or verification_tokens.
 GRANT SELECT, INSERT, UPDATE, DELETE ON resumes, fact_bases, jobs, tailorings TO rolewright_app;
 GRANT SELECT, INSERT ON consents TO rolewright_app;
+
+-- P1-3
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'rolewright_system') THEN
+    CREATE ROLE rolewright_system NOLOGIN;
+  END IF;
+END $$;
+CREATE TABLE IF NOT EXISTS rate_events (
+  id bigserial PRIMARY KEY,
+  bucket text NOT NULL,
+  subject text NOT NULL,
+  cost integer NOT NULL DEFAULT 1,
+  at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rate_events_lookup_idx ON rate_events (bucket, subject, at);
+GRANT SELECT, INSERT, DELETE ON rate_events TO rolewright_system;
+GRANT USAGE, SELECT ON SEQUENCE rate_events_id_seq TO rolewright_system;
 `;

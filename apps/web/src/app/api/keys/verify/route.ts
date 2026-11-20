@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // A key that does not work is an answer, not a failure: 200 with ok: false.
 export const POST = route("keys.verify", async (req, { state }) => {
   const userId = await requireUser(state);
-  takeRateLimit("ai", userId);
+  await takeRateLimit("keyCheck", userId);
   try {
     const { provider, key } = readLlmHeaders(req);
     const { models, recommended } = await verifyKey({ provider, key });
