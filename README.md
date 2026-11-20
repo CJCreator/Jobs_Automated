@@ -1,6 +1,6 @@
 # Rolewright
 
-Rework your resume from the experience you actually have, tailor it to a job description, and get past the first screen. Every claim in the exported resume is checked against the facts you confirmed, so nothing invented reaches a recruiter.
+Rework your resume from the experience you actually have, tailor it to a job description, and get past the first screen. Every claim in the exported resume is checked against the facts you confirmed. The export is refused when a changed line states something your confirmed facts do not. The check catches invented employers, figures, credentials and seniority words; it does not understand meaning, so you still review every change.
 
 Built for job seekers in India: freshers, experienced hires and career switchers.
 
@@ -14,7 +14,7 @@ Built for job seekers in India: freshers, experienced hires and career switchers
 4. **Export a PDF** that reads well to ATS keyword screening and to people.
 5. **Track applications, draft cover letters and prepare for interviews** from the same confirmed facts (in the plan, not built yet).
 
-You bring your own AI key (Anthropic, OpenAI, Gemini or OpenRouter), or start with a small free trial. Keys are used for the request and never stored.
+You bring your own AI key (Gemini, OpenRouter or Anthropic), or start with a small free trial. Keys are used for the request and never stored.
 
 ## Repository layout
 

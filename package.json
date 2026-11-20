@@ -3,7 +3,7 @@
   "private": true,
   "description": "Rolewright: rework and tailor your resume to a job, with a fact check on every claim. Monorepo root.",
   "engines": {
-    "node": "^22.13.0 || >=23.4.0"
+    "node": "^22.18.0 || >=23.6.0"
   },
   "scripts": {
     "app:dev": "npm --prefix apps/web run dev",
