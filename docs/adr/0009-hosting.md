@@ -35,3 +35,11 @@ Google Cloud, region `asia-south1` (Mumbai), for every component that holds or p
 
 - PDF export cold starts include Chromium; set a minimum instance count of 1 in production if export latency matters.
 - The code keeps the purge as an HTTP endpoint plus `npm run purge:inactive`, so moving hosts later stays possible.
+
+## Amended
+
+- **2026-11-20 (orchestrator, from the P1-6 review; owner to confirm at the Phase 1 gate):**
+  - Cloud Run reaches Cloud SQL by private IP over direct VPC egress, not through the Cloud SQL connector.
+  - The instance accepts encrypted connections only (`ssl_mode = ENCRYPTED_ONLY`).
+  - The app verifies the server certificate in a follow-up task; until then the Node connection strings use `sslmode=no-verify`.
+  - Everything else in this decision is unchanged.

@@ -234,3 +234,7 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - **CI at `a71eb19`.** `npm test` passes on both Node legs (452 tests; gate-cost passed on this runner). `test:flow` step 4 (`tests/integration/run.mjs:331`) fails because the consent GET now also returns `storageAccepted`. This is a known stale harness from P1-15's "Harness impact" section.
   - **P1-17 follow-up.** `tests/consent.test.mjs` should also run on Postgres. It calls `createDb()` with no arguments and belongs to P1-15, so it becomes a P1-F task if the TEST wave confirms the gap.
 - Owner, 2026-11-20: the dependency graph is switched on.
+- Follow-ups recorded during wave 1 review:
+  - **Shared hash key.** `ipSubject` and `emailSubject` use the same key without domain separation. This is harmless today because the two kinds of subject never share a bucket. Separate them if they ever do.
+  - **Database certificate.** Cloud SQL certificate verification (`sslmode=verify-ca` with the server CA) is not done yet. ADR 0009 is amended to record this.
+- Owner decision, 2026-11-20: Dependency Review is removed. On a private repository it needs paid Code Security. Restore it when the repository goes public.
