@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
 import { useLlmKey } from "@/lib/client/llm-key";
 import { providerLabel, useProviders } from "@/lib/client/providers";
+import { trialApi, trialUsable, useTrial } from "@/lib/client/trial";
 import type { FactsResponse } from "@/lib/client/types";
 import { useApi } from "@/lib/client/use-api";
 import { tailorableLines } from "@/lib/facts.mjs";
@@ -25,7 +26,12 @@ export function TailorForm() {
   const { providers } = useProviders();
   const facts = useApi<FactsResponse>("/api/facts");
   // Keyed on the provider: choosing another provider asks again.
-  const consent = useApi<ConsentState>(llm ? `/api/consent?provider=${encodeURIComponent(llm.provider)}` : "/api/consent");
+  const { trial, loading: trialLoading, reload: reloadTrial } = useTrial();
+  // No key of the user's own: the free trial, when this server offers it and some of it is left.
+  const onTrial = !llm && trialUsable(trial, "tailorings");
+  const consent = useApi<ConsentState>(
+    llm ? `/api/consent?provider=${encodeURIComponent(llm.provider)}` : onTrial ? "/api/consent?provider=trial" : "/api/consent",
+  );
   const [agreed, setAgreed] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -35,14 +41,15 @@ export function TailorForm() {
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  if (facts.loading || consent.loading || !ready) return <LoadingBlock label={en.common.loading} lines={5} />;
+  if (facts.loading || consent.loading || trialLoading || !ready) return <LoadingBlock label={en.common.loading} lines={5} />;
   if (facts.error || !facts.data) {
     return <ErrorBlock message={facts.error?.message ?? en.common.loadError} retryLabel={en.common.retry} onRetry={facts.reload} />;
   }
 
   const needConsent = !consent.data?.accepted;
   const hasLines = tailorableLines(facts.data.facts).length > 0;
-  const missingKey = !llm;
+  const missingKey = !llm && !onTrial;
+  const trialUsedUp = !llm && Boolean(trial?.available && trial.verified) && !onTrial;
 
   if (missingKey || !hasLines) {
     return (
@@ -50,9 +57,9 @@ export function TailorForm() {
         <ul className="list-disc space-y-2 ps-5">
           {missingKey ? (
             <li>
-              {t.missingKey}{" "}
+              {trialUsedUp ? en.trial.usedUp : t.missingKey}{" "}
               <Link href="/app/key" className="font-semibold text-brand underline underline-offset-4">
-                {t.missingKeyLink}
+                {trialUsedUp ? en.trial.addKey : t.missingKeyLink}
               </Link>
             </li>
           ) : null}
@@ -92,20 +99,22 @@ export function TailorForm() {
       if (needConsent) {
         await api<{ accepted: boolean }>("/api/consent", {
           method: "POST",
-          json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: llm.provider },
+          json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: llm ? llm.provider : "trial" },
         });
         consentSaved = true;
         consent.setData({ noticeVersion: NOTICE_VERSION, accepted: true, storageAccepted: true });
       }
-      const res = await api<{ id: string }>("/api/tailorings", {
-        method: "POST",
-        json: { title: title.trim(), company: company.trim(), jdText: jd.trim() },
-      });
+      const payload = { title: title.trim(), company: company.trim(), jdText: jd.trim() };
+      const res = llm
+        ? await api<{ id: string }>("/api/tailorings", { method: "POST", json: payload })
+        : await trialApi<{ id: string }>("/api/tailorings", { json: payload });
       router.push(`/app/tailor/${res.id}`);
     } catch (err) {
       // A tab left open across a notice change: ask again.
       if (err instanceof ApiError && err.code === "consent_required") consent.setData({ noticeVersion: NOTICE_VERSION, accepted: false, storageAccepted: consent.data?.storageAccepted ?? false });
       setServerError(err instanceof ApiError ? err.message : consentSaved ? en.common.loadError : en.consent.saveFailed);
+      // The count may have changed (a use taken, or none left): read it again.
+      reloadTrial();
       setBusy(false);
     }
   };
@@ -113,6 +122,7 @@ export function TailorForm() {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6" aria-busy={busy}>
       <p className="max-w-[65ch] text-lg text-muted">{t.intro}</p>
+      {onTrial && trial ? <p className="max-w-[65ch] font-medium">{en.trial.leftShort(trial.tailoringsLeft)}</p> : null}
       <fieldset className="space-y-6 border-0 p-0">
         <legend className="sr-only">{t.title}</legend>
         <div className="grid gap-5 sm:grid-cols-2">
@@ -174,7 +184,7 @@ export function TailorForm() {
               }}
               label={
                 <>
-                  {en.consent.lead(llm ? providerLabel(llm.provider, providers) : en.app.resume.providerFallback)}{" "}
+                  {llm ? en.consent.lead(providerLabel(llm.provider, providers)) : en.trial.consentLead}{" "}
                   <Link href="/privacy" target="_blank" className="inline-block min-h-6 font-semibold text-brand underline underline-offset-4">
                     {en.consent.linkText}
                   </Link>

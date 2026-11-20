@@ -6,9 +6,11 @@ import { readJsonObject } from "@/lib/server/body";
 import { requireConsent } from "@/lib/server/consent";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { HttpError, json, route } from "@/lib/server/http";
-import { readLlmHeaders } from "@/lib/server/llm-key";
+import { readLlmHeaders, requireTrialAccess, trialHttpError } from "@/lib/server/llm-key";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
+import { runWithTrial, withReservation } from "@/lib/server/trial.mjs";
+import { en } from "@/i18n/en";
 import { buildSuggestions, countUsable, selectLines } from "@/lib/tailoring.mjs";
 
 export const runtime = "nodejs";
@@ -25,8 +27,10 @@ export const GET = route("tailorings.list", async (_req, { state }) => {
 
 export const POST = route("tailorings.create", async (req, { state }) => {
   const userId = await requireUser(state);
-  const llm = readLlmHeaders(req);
-  await requireConsent(userId);
+  const llm = readLlmHeaders(req, { allowTrial: true });
+  // The consent is for the provider that will see the text: the trial providers, or the user's own.
+  if (llm.trial) await requireTrialAccess(userId, req);
+  else await requireConsent(userId, llm.provider);
   const body = await readJsonObject(req);
   const title = field(body.title, 200);
   const company = field(body.company, 200);
@@ -48,24 +52,41 @@ export const POST = route("tailorings.create", async (req, { state }) => {
 
   // Select before the model call: it never receives more than MAX_LINES_SENT lines.
   const { sent, total } = selectLines(lines);
-  const rewrites = await suggestRewrites({ provider: llm.provider, key: llm.key, model: llm.model, lines: sent, jdText });
-  const rewritesReturned = countUsable(rewrites, sent);
-  const suggestions = buildSuggestions(rewrites, sent, {
-    sourceText: factBaseText(facts),
-    jdText,
-    cannotConfirm: facts.cannotConfirm,
-    engineGate,
-  });
-  const { id } = await createJobWithTailoring(db, userId, {
-    title,
-    company,
-    jdText,
-    suggestions,
-    provider: llm.provider,
-    model: llm.model ?? null,
-    linesTotal: total,
-    linesSent: sent.length,
-    rewritesReturned,
-  });
+  const work = async () => {
+    const used = llm.trial
+      ? await runWithTrial((c: { provider: string; key: string; model: string }) => suggestRewrites({ ...c, lines: sent, jdText }))
+      : {
+          value: await suggestRewrites({ provider: llm.provider, key: llm.key, model: llm.model, lines: sent, jdText }),
+          provider: llm.provider,
+          model: llm.model ?? null,
+        };
+    const rewrites = used.value;
+    const rewritesReturned = countUsable(rewrites, sent);
+    const suggestions = buildSuggestions(rewrites, sent, {
+      sourceText: factBaseText(facts),
+      jdText,
+      cannotConfirm: facts.cannotConfirm,
+      engineGate,
+    });
+    return createJobWithTailoring(db, userId, {
+      title,
+      company,
+      jdText,
+      suggestions,
+      provider: used.provider,
+      model: used.model,
+      linesTotal: total,
+      linesSent: sent.length,
+      rewritesReturned,
+    });
+  };
+  // A trial use is taken just before the model call and given back if anything fails before the row is stored.
+  let created: { id: string };
+  try {
+    created = llm.trial ? await withReservation(db, userId, "tailorings", work, { usedUpMessage: en.trial.usedUp }) : await work();
+  } catch (err) {
+    throw trialHttpError(err);
+  }
+  const { id } = created;
   return json({ id });
 });

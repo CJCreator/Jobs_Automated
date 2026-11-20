@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { formatDate } from "@/lib/client/format";
 import { clearLlmKey, maskKey, setLlmKey, useLlmKey } from "@/lib/client/llm-key";
 import { providerLabel, useProviders } from "@/lib/client/providers";
+import { useTrial } from "@/lib/client/trial";
 import type { ModelOption, ProviderId, VerifyResponse } from "@/lib/client/types";
 import { EyeIcon, EyeOffIcon } from "@/components/ui/icons";
 import { Button, Card, Field, Input, Notice, Select, Spinner } from "@/components/ui/primitives";
@@ -22,6 +23,7 @@ interface Verified {
 export function KeyView() {
   const { llm, ready } = useLlmKey();
   const { providers } = useProviders();
+  const { trial } = useTrial();
   const [provider, setProvider] = useState<ProviderId>("gemini");
   const [keyInput, setKeyInput] = useState("");
   const [show, setShow] = useState(false);
@@ -115,6 +117,16 @@ export function KeyView() {
         <p className="text-lg">{t.intro}</p>
         <p className="text-muted">{t.freeNote}</p>
       </div>
+
+      {ready && !llm && trial?.available ? (
+        <Card className="space-y-2" aria-labelledby="trial-title">
+          <h2 id="trial-title" className="font-heading text-2xl font-semibold">
+            {en.trial.keyTitle}
+          </h2>
+          <p>{en.trial.keyBody}</p>
+          <p className="font-medium">{trial.verified ? en.trial.left(trial.tailoringsLeft, trial.uploadsLeft) : en.trial.notVerified}</p>
+        </Card>
+      ) : null}
 
       {ready && llm ? (
         <Card className="space-y-4" aria-labelledby="saved-key-title">

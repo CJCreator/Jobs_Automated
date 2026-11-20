@@ -405,6 +405,24 @@ export const en = {
     missingToggle: (n: number) => `Keywords not in your resume (${n})`,
     note: "Missing keywords are shown for information. Add one only if it is true for you.",
   },
+  // P1-2
+  trial: {
+    unavailable: "The free trial is not available right now. Add your own AI key to continue.",
+    usedUp: "You have used your 5 free tailorings. Add your own AI key to continue.",
+    usedUpUploads: "You have used your 3 free resume readings. Add your own AI key to continue.",
+    notVerified: "The free trial is for accounts with a confirmed email address. Sign in with Google or use the email link, or add your own AI key.",
+    consentLead:
+      "I understand my resume text and the job description will be sent to Google Gemini or OpenRouter, the AI providers behind the free trial, which may process them outside India.",
+    keyTitle: "Free trial",
+    keyBody:
+      "Without a key you can use the free trial. It runs on Google Gemini or OpenRouter free models, which may pass the fact check less often than your own key.",
+    left: (tailorings: number, uploads: number) =>
+      `${tailorings} of 5 free tailorings and ${uploads} of 3 free resume readings left.`,
+    leftShort: (n: number) => `${n} of 5 free tailorings left.`,
+    leftUploads: (n: number) => `${n} of 3 free resume readings left.`,
+    addKey: "Add your own AI key",
+    notAvailableForYou: "The free trial is not available for this account.",
+  },
 } as const;
 
 export type Strings = typeof en;

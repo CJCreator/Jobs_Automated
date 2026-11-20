@@ -23,7 +23,7 @@ test("LIMITS match the plan", () => {
   assert.deepEqual(m("keyCheck"), [10, 600_000]);
   assert.deepEqual(m("export"), [20, 3_600_000]);
   assert.deepEqual(m("gateMs"), [20_000, 60_000]);
-  assert.deepEqual(m("trialIp"), [10, 86_400_000]);
+  assert.deepEqual(m("trialIp"), [50, 86_400_000]);
   assert.deepEqual(m("signInIp"), [20, 600_000]);
   assert.deepEqual(m("emailSend"), [5, 3_600_000]);
 });
