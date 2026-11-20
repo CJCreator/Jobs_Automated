@@ -2,7 +2,7 @@
 
 ADR 0003: before a provider is offered, or a trial model is used, the same fixtures run through it and the fact-gate pass rate and keyword coverage are recorded here. Free models may pass the fact check less often than paid ones, and the user sees which model they are on.
 
-A provider or trial model stays hidden until its row below exists and the owner has signed it. Hidden means: not in `launchProviders()` (OpenAI and Groq stay off `ROLEWRIGHT_EXTRA_PROVIDERS`), and no `ROLEWRIGHT_TRIAL_*` key and model set in production.
+Gemini, OpenRouter and Anthropic are always offered (`launchProviders()`). Their signed rows below are a pre-launch checklist item: no code enforces it, so the owner checks that each has a signed row before launch. OpenAI, Groq and the trial models stay off until their row is signed: OpenAI and Groq stay out of `ROLEWRIGHT_EXTRA_PROVIDERS`, and no `ROLEWRIGHT_TRIAL_*` key and model is set in production.
 
 ## How to run it
 
@@ -26,7 +26,7 @@ Providers: `gemini`, `openrouter`, `anthropic`; `openai` and `groq` when named i
 node scripts/provider-parity.mjs --trial --out ../../docs/reviews/provider-parity-runs.md
 ```
 
-Do not commit run output that you have not read. It holds counts and fixture ids only, never resume, job or model text.
+Each block written by `--out` (or printed) starts with a one-line heading: date, provider, model, and whether it was a trial key or your own key. Do not commit run output that you have not read. It holds counts and fixture ids only, never resume, job or model text.
 
 ## Reading the table
 
@@ -34,6 +34,7 @@ Do not commit run output that you have not read. It holds counts and fixture ids
 - **pass / warn / block**: the check verdict on each rewrite. The summary row also gives the share of checked rewrites.
 - **block issue kinds**: the kinds of issue behind blocks, counted per issue (a rewrite can have several).
 - **coverage before / after**: job keywords found in the resume, as covered/total, before and after every non-blocked rewrite is applied.
+- If pass + warn + block is less than rewrites, checking stopped early at the 20-suggestion cap or the 1 s gate budget, so the shares cover only the rewrites that were checked.
 - **error**: `none`, or the error code of a failed call (for example `quota`, `rate_limited`, `invalid_key`). A failed fixture has zero rewrites.
 
 ## What "accepted" means
@@ -42,6 +43,6 @@ A row is accepted when the owner reads it and signs it in the table below. There
 
 ## Accepted runs
 
-| Date | Provider | Model | Rewrites | Pass | Warn | Block | Coverage before / after | Signed by |
-|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+| Date | Provider | Model | Trial or own key | Rewrites | Pass | Warn | Block | Fixtures failed | Coverage before / after | Signed by |
+|---|---|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | | | |

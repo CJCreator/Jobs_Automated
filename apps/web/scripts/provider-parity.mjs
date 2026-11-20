@@ -149,7 +149,7 @@ function parseArgs(argv) {
       const v = argv[++i];
       if (!v || v.startsWith("--")) throw new Error(`${a} needs a value.`);
       out[a.slice(2)] = v;
-    } else throw new Error(`Unknown argument ${a.startsWith("--key") ? "--key" : a.slice(0, 20)}. The key is read from PARITY_KEY, never an argument.`);
+    } else throw new Error("Unknown argument. Allowed: --provider, --model, --out, --trial. The key is read from PARITY_KEY, never an argument.");
   }
   return out;
 }
@@ -182,7 +182,11 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const gate = await loadFactGate(); // throws EngineUnavailableError before any model call
   const fixtures = loadFixtures();
   const blocks = [];
-  for (const t of targets) blocks.push((await run({ ...t, fixtures, gate })).markdown);
+  const date = new Date().toISOString().slice(0, 10);
+  for (const t of targets) {
+    const heading = `### ${date} ${t.provider} ${t.model} (${args.trial ? "trial key" : t.provider === "mock" ? "mock, no key" : "own key"})`;
+    blocks.push(`${heading}\n\n${(await run({ ...t, fixtures, gate })).markdown}`);
+  }
   const text = redact(blocks.join("\n\n") + "\n", secrets);
   if (args.out) fs.appendFileSync(path.resolve(args.out), text);
   else process.stdout.write(text);

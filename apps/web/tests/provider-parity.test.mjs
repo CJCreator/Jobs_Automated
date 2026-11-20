@@ -5,11 +5,24 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// Isolate from the developer's shell: nothing here may pick up a real key or an extra provider.
+for (const k of Object.keys(process.env)) {
+  if (k === "ROLEWRIGHT_EXTRA_PROVIDERS" || k === "PARITY_KEY" || k.startsWith("ROLEWRIGHT_TRIAL_")) delete process.env[k];
+}
 process.env.ROLEWRIGHT_ALLOW_MOCK_LLM = "1";
 const { COLUMNS, FIXTURES_DIR, loadFixtures, main, run } = await import("../scripts/provider-parity.mjs");
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/provider-parity.mjs");
 const FAKE_KEY = "fake-parity-key-7f3a9c1e5b2d4086";
+
+/** A child environment built explicitly: no spread of the parent's, so no stray key or provider list. */
+const childEnv = (extra = {}) => ({
+  PATH: process.env.PATH,
+  HOME: process.env.HOME,
+  TMPDIR: process.env.TMPDIR,
+  ROLEWRIGHT_ALLOW_MOCK_LLM: "1",
+  ...extra,
+});
 
 const cellsOf = (line) => line.slice(1, -1).split(" | ").map((s) => s.trim());
 
@@ -69,12 +82,13 @@ test("a key never appears in stdout, stderr or the report", async () => {
   const dir = fs.mkdtempSync(path.join(process.env.TMPDIR ?? "/tmp", "parity-"));
   const out = path.join(dir, "report.md");
   // A hidden provider fails fast in a child process, with the key in its environment.
-  const hidden = spawnSync(process.execPath, [SCRIPT, "--provider", "openai", "--model", "m", "--out", out], { env: { ...process.env, PARITY_KEY: FAKE_KEY }, encoding: "utf8" });
+  const hidden = spawnSync(process.execPath, [SCRIPT, "--provider", "openai", "--model", "m", "--out", out], { env: childEnv({ PARITY_KEY: FAKE_KEY }), encoding: "utf8" });
   assert.notEqual(hidden.status, 0);
   // A launch provider with the network stubbed: every request fails with an error that names the key and the URL.
   const realFetch = globalThis.fetch;
   const seenKeys = [];
   globalThis.fetch = async (url, init) => {
+    assert.ok(!String(url).includes(FAKE_KEY), "the key is never put in a URL");
     seenKeys.push(init?.headers?.["x-goog-api-key"]);
     throw new Error(`connect failed for ${url} with ${FAKE_KEY}`);
   };
@@ -83,7 +97,7 @@ test("a key never appears in stdout, stderr or the report", async () => {
   process.stdout.write = (c) => (captured.push(String(c)), true);
   process.stderr.write = (c) => (captured.push(String(c)), true);
   try {
-    await main(["--provider", "gemini", "--model", "gemini-x", "--out", out], { ...process.env, PARITY_KEY: FAKE_KEY });
+    await main(["--provider", "gemini", "--model", "gemini-x", "--out", out], childEnv({ PARITY_KEY: FAKE_KEY }));
   } finally {
     process.stdout.write = w1;
     process.stderr.write = w2;
@@ -104,10 +118,28 @@ test("the key is refused as an argument, and a real provider needs it in the env
   await assert.rejects(main(["--trial"], {}), /No trial provider/);
 });
 
+test("no part of an argument is echoed, whatever shape the key takes", () => {
+  const shapes = [[FAKE_KEY], [`--api-key=${FAKE_KEY}`], ["-k", FAKE_KEY], ["--provider", "mock", FAKE_KEY], [`--key=${FAKE_KEY}`]];
+  for (const args of shapes) {
+    const r = spawnSync(process.execPath, [SCRIPT, ...args], { env: childEnv(), encoding: "utf8" });
+    assert.notEqual(r.status, 0, args.join(" "));
+    assert.match(r.stderr, /Unknown argument\. Allowed: --provider, --model, --out, --trial\./);
+    for (let i = 0; i + 6 <= FAKE_KEY.length; i++) {
+      const slice = FAKE_KEY.slice(i, i + 6);
+      assert.ok(!r.stderr.includes(slice) && !r.stdout.includes(slice), `${args[0]} leaked "${slice}"`);
+    }
+  }
+});
+
+test("every fixture has enough job keywords for coverage to move in small steps", async () => {
+  const { rows } = await run({ provider: "mock" });
+  for (const r of rows) assert.ok(r.before.total >= 5, `${r.fixture}: ${r.before.total}`);
+});
+
 test("--out appends the table to the file", () => {
   const out = path.join(fs.mkdtempSync(path.join(process.env.TMPDIR ?? "/tmp", "parity-")), "r.md");
   for (let i = 0; i < 2; i++) {
-    const r = spawnSync(process.execPath, [SCRIPT, "--provider", "mock", "--out", out], { env: process.env, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [SCRIPT, "--provider", "mock", "--out", out], { env: childEnv(), encoding: "utf8" });
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.stdout, "");
   }
@@ -116,7 +148,7 @@ test("--out appends the table to the file", () => {
 
 test("the script exits non-zero when the engine gate cannot load", () => {
   const r = spawnSync(process.execPath, [SCRIPT, "--provider", "mock"], {
-    env: { ...process.env, CAREER_OPS_CODE_ROOT: path.join(FIXTURES_DIR, "no-engine-here") },
+    env: childEnv({ CAREER_OPS_CODE_ROOT: path.join(FIXTURES_DIR, "no-engine-here") }),
     encoding: "utf8",
   });
   assert.notEqual(r.status, 0);
