@@ -423,6 +423,37 @@ export const en = {
     addKey: "Add your own AI key",
     notAvailableForYou: "The free trial is not available for this account.",
   },
+  // P1-18
+  erasure: {
+    delete: "Delete",
+    deleteLabel: (title: string) => `Delete tailored resume: ${title}`,
+    confirmLead: (title: string) =>
+      `Delete "${title}" and its job description? Your confirmed facts stay. This cannot be undone.`,
+    confirmYes: "Yes, delete it",
+    confirmNo: "Keep it",
+    deleting: "Deleting...",
+    deletedStatus: (title: string) => `Deleted "${title}".`,
+    failed: "That could not be deleted. Try again.",
+    resumeTitle: "Delete my uploaded resume text",
+    resumeBody:
+      "This removes the resume text and file names we kept from your uploads. It does not delete your account, your facts (confirmed or not) or your tailored resumes, so you can still tailor from your facts.",
+    resumeAccountNote: "To remove everything, delete your account below instead.",
+    resumeButton: "Delete resume text",
+    resumeConfirm: "Yes, delete the resume text",
+    resumeDone: (n: number) =>
+      n === 0
+        ? "There was no resume text to delete."
+        : `Deleted the text of ${n} uploaded resume${n === 1 ? "" : "s"}. Your confirmed facts are unchanged.`,
+    resumeFailed: "The resume text could not be deleted. Try again.",
+    factsTitle: "Also delete the facts that came from my resume",
+    factsBody:
+      "This also removes every fact that was read from your resume, whether you confirmed it or not. Facts you typed or edited yourself, your contact details and your 'can't confirm' list stay. Tailored resumes you already made are kept, but they will leave out the removed lines, and may refuse to export until you add and confirm facts again. They still hold the old wording of those lines; delete them on the home page to remove that too. This cannot be undone.",
+    factsButton: "Delete resume text and those facts",
+    factsConfirm: "Yes, delete the resume text and those facts",
+    factsDone: (n: number, f: number) =>
+      `Deleted the text of ${n} ${n === 1 ? "resume" : "resumes"} and ${f} ${f === 1 ? "fact" : "facts"} that came from them. Facts you added yourself are unchanged.`,
+    factsLink: "Open your facts",
+  },
 } as const;
 
 export type Strings = typeof en;

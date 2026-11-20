@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { confirmationCounts } from "@/lib/facts.mjs";
 import { formatDate } from "@/lib/client/format";
 import { useLlmKey } from "@/lib/client/llm-key";
@@ -9,10 +9,11 @@ import type { FactsResponse, TailoringListItem } from "@/lib/client/types";
 import { useApi } from "@/lib/client/use-api";
 import { cn } from "@/components/ui/cn";
 import { CheckIcon } from "@/components/ui/icons";
-import { Badge, buttonClass, Card, ErrorBlock, LoadingBlock } from "@/components/ui/primitives";
+import { Badge, Button, buttonClass, Card, ErrorBlock, LoadingBlock, Notice } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
 
 const t = en.app.home;
+const e = en.erasure;
 
 function Step({
   n,
@@ -50,6 +51,86 @@ function Step({
   );
 }
 
+/** DELETE answers 204 with no body, which the shared api() helper cannot read, so this calls fetch. */
+async function deleteTailoring(id: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/tailorings/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "same-origin", cache: "no-store" });
+  } catch {
+    throw new Error(e.failed);
+  }
+  // 404: already gone (deleted in another tab), which is what was wanted.
+  if (!res.ok && res.status !== 404) throw new Error(e.failed);
+}
+
+function DeleteTailoring({ item, onDeleted }: { item: TailoringListItem; onDeleted: (title: string) => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const title = item.title || t.untitled;
+  const leadId = useId();
+  // Button takes no ref, so each is wrapped and its button found inside.
+  const trigger = useRef<HTMLSpanElement>(null);
+  const keep = useRef<HTMLSpanElement>(null);
+  const cancelled = useRef(false);
+
+  useEffect(() => {
+    if (confirming) keep.current?.querySelector("button")?.focus();
+    else if (cancelled.current) {
+      cancelled.current = false;
+      trigger.current?.querySelector("button")?.focus();
+    }
+  }, [confirming]);
+
+  const cancel = () => {
+    cancelled.current = true;
+    setConfirming(false);
+  };
+
+  const confirm = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteTailoring(item.id);
+      onDeleted(title);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : e.failed);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2">
+      {confirming ? (
+        <div role="group" aria-labelledby={leadId} className="space-y-2 rounded-xl border border-danger p-3">
+          <p id={leadId} className="max-w-[60ch]">
+            {e.confirmLead(title)}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="danger" size="sm" onClick={confirm} loading={busy}>
+              {busy ? e.deleting : e.confirmYes}
+            </Button>
+            <span ref={keep}>
+              <Button variant="secondary" size="sm" onClick={cancel} disabled={busy}>
+                {e.confirmNo}
+              </Button>
+            </span>
+          </div>
+        </div>
+      ) : (
+        <span ref={trigger} className="inline-block">
+          <Button variant="ghost" size="sm" aria-label={e.deleteLabel(title)} onClick={() => setConfirming(true)}>
+            {e.delete}
+          </Button>
+        </span>
+      )}
+      <div role="status" aria-live="polite">
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+      </div>
+    </div>
+  );
+}
+
 export function HomeView() {
   const { llm, ready } = useLlmKey();
   const facts = useApi<FactsResponse>("/api/facts");
@@ -59,6 +140,14 @@ export function HomeView() {
   const hasResume = counts ? counts.total > 0 : false;
   const factsDone = counts ? counts.total > 0 && counts.confirmed > 0 : false;
   const keyDone = ready && Boolean(llm);
+  const listHeading = useRef<HTMLHeadingElement>(null);
+  const [deletedTitle, setDeletedTitle] = useState<{ title: string; n: number } | null>(null);
+  const afterDelete = (title: string) => {
+    setDeletedTitle((d) => ({ title, n: (d?.n ?? 0) + 1 }));
+    list.reload();
+    // The row that had focus is gone; the list heading is the next stable place.
+    listHeading.current?.focus();
+  };
 
   return (
     <div className="space-y-10">
@@ -119,9 +208,12 @@ export function HomeView() {
       </section>
 
       <section aria-labelledby="tailored-title" className="space-y-4">
-        <h2 id="tailored-title" className="font-heading text-2xl font-semibold">
+        <h2 id="tailored-title" ref={listHeading} tabIndex={-1} className="font-heading text-2xl font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand">
           {t.listTitle}
         </h2>
+        <div role="status" aria-live="polite">
+          {deletedTitle !== null ? <p key={deletedTitle.n} className="text-muted">{e.deletedStatus(deletedTitle.title)}</p> : null}
+        </div>
         {list.loading ? (
           <LoadingBlock label={en.common.loading} lines={4} />
         ) : list.error ? (
@@ -142,6 +234,7 @@ export function HomeView() {
                     {t.createdOn(formatDate(item.createdAt))}. {t.listCounts(item.accepted, item.pending)}.
                   </span>
                 </Link>
+                <DeleteTailoring item={item} onDeleted={afterDelete} />
               </li>
             ))}
           </ul>

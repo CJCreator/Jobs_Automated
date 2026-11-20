@@ -5,6 +5,7 @@
 // database, not this file, decides which rows a user can see.
 
 import { emptyFacts } from "../facts.mjs";
+import { withoutResumeFacts } from "../fact-source.mjs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v) => typeof v === "string" && UUID_RE.test(v);
@@ -146,6 +147,44 @@ export function createJob(db, userId, { title, company, jdText }) {
       [id, userId, title ?? null, company ?? null, jdText ?? null],
     );
     return { id };
+  });
+}
+
+/**
+ * Deletes one tailoring (its suggestions are a column of it), then its job
+ * description when no other tailoring still uses it. Runs under row-level
+ * security, so another user's id deletes nothing.
+ * @returns {Promise<boolean>} whether a tailoring was deleted
+ */
+export function deleteTailoring(db, userId, id) {
+  if (!isUuid(id)) return Promise.resolve(false);
+  return db.withUser(userId, async (tx) => {
+    const { rows } = await tx.query("DELETE FROM tailorings WHERE id = $1 RETURNING job_id", [id]);
+    if (!rows.length) return false;
+    await tx.query(
+      "DELETE FROM jobs WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM tailorings WHERE job_id = $1)",
+      [rows[0].job_id],
+    );
+    return true;
+  });
+}
+
+/**
+ * Deletes the stored text of the user's uploaded resumes. By default the facts
+ * are not touched or locked. With `facts: true`, the facts that were read from
+ * the resume (withoutResumeFacts) are removed in the same transaction.
+ * @returns {Promise<{ deleted: number, factsRemoved: number }>}
+ */
+export function deleteResumeTexts(db, userId, { facts = false } = {}) {
+  return db.withUser(userId, async (tx) => {
+    const { rows } = await tx.query("DELETE FROM resumes WHERE user_id = $1 RETURNING id", [userId]);
+    let factsRemoved = 0;
+    if (facts) {
+      const result = withoutResumeFacts(await lockFacts(tx, userId));
+      factsRemoved = result.removed;
+      await writeFacts(tx, userId, result.facts);
+    }
+    return { deleted: rows.length, factsRemoved };
   });
 }
 

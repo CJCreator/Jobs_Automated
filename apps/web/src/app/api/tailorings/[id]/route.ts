@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index.mjs";
-import { getFacts, getTailoring } from "@/lib/db/repo.mjs";
+import { deleteTailoring, getFacts, getTailoring } from "@/lib/db/repo.mjs";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { json, route } from "@/lib/server/http";
 import { chargeGate, takeRateLimit } from "@/lib/server/rate-limit";
@@ -25,4 +25,15 @@ export const GET = route<{ id: string }>("tailorings.get", async (_req, { params
     timed(() => freshChecks(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate })),
   );
   return json({ tailoring: tailoringView(tailoring, suggestions) });
+});
+
+// Deletes the tailoring and, when nothing else uses it, its job description.
+// A missing id and another user's id get the same 404.
+export const DELETE = route<{ id: string }>("tailorings.delete", async (_req, { params, state }) => {
+  const userId = await requireUser(state);
+  await takeRateLimit("tailoring", userId);
+  const { id } = await params;
+  const deleted = await deleteTailoring(await getDb(), userId, id);
+  if (!deleted) throw notFound();
+  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 });
