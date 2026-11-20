@@ -28,7 +28,7 @@ You bring your own AI key (Anthropic, OpenAI, Gemini or OpenRouter), or start wi
 
 ## Run it locally
 
-Needs Node 22.13 or later.
+Needs Node 22.18 or later for the app (`apps/web`); the engine alone runs on 22.13 or later.
 
 ```bash
 npm --prefix packages/engine install
