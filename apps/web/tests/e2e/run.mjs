@@ -711,7 +711,7 @@ try {
     const card = cardLoc(page, crore);
     await card.locator('[id^="attest-"]').first().click();
     const confirmText = await card.innerText();
-    assert.ok(/You are stating that '₹?5 crore' is true about you/.test(confirmText), `inline statement shown:\n${confirmText}`);
+    assert.ok(/You are stating that '₹?5 crore portfolios' is true about you/.test(confirmText), `inline statement shown:\n${confirmText}`);
     await card.getByRole("button", { name: "Yes, it is true. Add it" }).click();
     await poll(async () => {
       // One count over a filtered locator: the issues list can disappear between a count and an innerText.
@@ -729,7 +729,7 @@ try {
     const extras = page.locator('section[aria-labelledby="sec-extras-title"] textarea');
     await poll(async () => (await extras.count()) > 0, "an additional fact is listed");
     const values = await extras.evaluateAll((els) => els.map((e) => e.value));
-    assert.ok(values.some((v) => v.includes("5 crore")), `Additional facts lists the new fact: ${JSON.stringify(values)}`);
+    assert.ok(values.some((v) => v.includes("5 crore portfolios")), `Additional facts lists the new fact as confirmed: ${JSON.stringify(values)}`);
     await checkpoint(page, "resume-with-extras");
     const cannot = await page.locator('section[aria-labelledby="sec-cannot-title"]').innerText();
     assert.ok(cannot.includes("12"), "the can't-confirm claim from step f is listed");

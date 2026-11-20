@@ -188,25 +188,25 @@ test("attest adds a confirmed, user-stated fact and the blocked suggestion then 
   assert.equal(out.factsChanged, true);
   assert.equal(out.facts.extras.length, 1);
   const extra = out.facts.extras[0];
-  assert.equal(extra.text, "12");
+  // P1-20: the figure is stored with what it is about, so one attest clears the line.
+  assert.equal(extra.text, "12 analysts");
   assert.equal(extra.confirmed, true);
   assert.equal(extra.source, "user");
   assert.equal(extra.statedAt, "2026-11-18");
   assert.equal(facts.extras.length, 0, "the input facts are not mutated");
-  // P1-20: a bare "12" is not about analysts; the figure now has to be confirmed in context.
-  assert.equal(out.suggestions[0].check.verdict, "block");
-  assert.deepEqual(out.suggestions[0].check.issues.map((i) => i.value), ["12 analysts"]);
-  const stated = applyAction(out.facts, out.suggestions, list[0].id, { action: "attest", value: "12 analysts" }, ctx);
-  assert.equal(stated.facts.extras.length, 2);
-  assert.notEqual(stated.suggestions[0].check.verdict, "block");
+  assert.notEqual(out.suggestions[0].check.verdict, "block");
   // Every suggestion is re-checked against the new facts: 12 is confirmed for analysts, not contracts.
-  assert.deepEqual(stated.suggestions[1].check.issues.map((i) => i.value), ["12 vendor"]);
+  assert.equal(out.suggestions[1].check.verdict, "block");
+  assert.deepEqual(out.suggestions[1].check.issues.map((i) => i.value), ["12 vendor"]);
+  // The confirmed fact is about analysts: 12 of something else still blocks.
+  const offices = checkSuggestion(suggestion(REF.team, "Grew the team to 12 offices"), { ...ctxFor(out.facts), engineGate: gate });
+  assert.equal(offices.check.verdict, "block");
 
   // Once stated, it is no longer an issue, so it cannot be attested a second time.
-  expectError(() => applyAction(stated.facts, stated.suggestions, list[0].id, { action: "attest", value: "12" }, ctx), 400, "not_an_issue");
+  expectError(() => applyAction(out.facts, out.suggestions, list[0].id, { action: "attest", value: "12" }, ctx), 400, "not_an_issue");
 
-  // An unconfirmed extra with the same text is confirmed in place, not duplicated.
-  const pendingExtra = ashaFacts({ extras: [{ id: "x-twelve", text: "12", confirmed: false }] });
+  // An unconfirmed extra with the text an attest would add is confirmed in place, not duplicated.
+  const pendingExtra = ashaFacts({ extras: [{ id: "x-twelve", text: "12 analysts", confirmed: false }] });
   const again = applyAction(pendingExtra, list, list[0].id, { action: "attest", value: "12" }, ctx);
   assert.equal(again.facts.extras.length, 1);
   assert.equal(again.facts.extras[0].id, "x-twelve");
@@ -400,3 +400,172 @@ test("an issue with an empty value can be neither attested nor marked", () => {
     }
   }
 });
+
+// P1-20 round 2: every new must-block line is cleared by attesting what it flags, through
+// applyAction, so each new form survives the round trip through an added fact.
+const ROUND2_LINES = [
+  "longstanding member of the finance team", "several yrs in finance", "Analyst with years experience in finance",
+  "Analyst with years' experience in finance", "long-time finance analyst", "multi-year finance analyst",
+  "multi-lingual analyst", "bi-lingual analyst", "tri-lingual analyst", "Fluent in bangla at work", "Fluent in polish at work",
+  "Fluent in farsi at work", "Fluent in several languages",
+  "m.c.a graduate", "b.b.a graduate", "p.g.d.m graduate", "m.b.b.s graduate", "ll.b graduate", "l.l.b graduate",
+  "b tech graduate", "b. tech graduate", "b com graduate", "b. com graduate", "m sc graduate",
+  "commerce graduate (hons)", "qualified ca", "c.a by training", "company secretary for the board", "m.phil in economics",
+  "b.ed holder", "master of business administration", "master in finance",
+  "top performer in the team", "top-rated analyst", "top-ranked analyst", "top scorer in the batch", "topped the batch",
+  "won first prize at the hackathon", "runner-up at the case competition", "named in the merit list",
+  "star performer of the team", "employee of the month", "passed in first division", "silver medal in commerce",
+  "1st in class", "first in her batch", "came first in the university", "came in first", "finished in second place",
+  "secured 1st place in the quiz",
+  // the rest of the new rows, so every new form makes the round trip
+  "Long-standing member of the finance team", "Fluent in multiple languages", "Fluent in many languages",
+  ...["konkani", "nepali", "sindhi", "kashmiri", "maithili", "bhojpuri", "marwari", "tulu", "manipuri", "hindustani", "sinhala",
+    "persian", "turkish", "thai", "vietnamese", "malay", "indonesian", "swahili", "hebrew", "greek", "swedish", "cantonese"]
+    .map((l) => `Fluent in ${l} at work`),
+  "b.c.a graduate", "m tech graduate", "b sc graduate", "m com graduate", "cleared ca final",
+  "top-performing analyst", "top achiever in finance", "employee of the quarter", "employee of the year",
+  "bronze medal in commerce", "2nd in the batch", "finished second in the region",
+  "Served as a C-suite leader", "Promoted to the C-suite", "Presented results and was promoted to the C-suite",
+  // review 2: dotted degrees, years ... experience, award-winning
+  "analyst with an M.S. in finance", "a B.A. in economics", "an LL.M. in tax", "a postgrad qualification",
+  "years of rich experience in finance", "yrs. of experience in audit", "An award-winning analyst",
+];
+test("P1-20 round 2: one attest per flagged item clears every new must-block line", () => {
+  const { gate } = stubGate();
+  const ctx = { engineGate: gate, now: NOW };
+  const needed = {};
+  for (const text of ROUND2_LINES) {
+    let facts = ashaFacts({ education: [] });
+    let list = [suggestion(REF.team, text)];
+    let check = checkSuggestion(list[0], { ...ctxFor(facts), engineGate: gate }).check;
+    assert.equal(check.verdict, "block", text);
+    let attests = 0;
+    while (check.verdict === "block") {
+      const issue = check.issues.find((i) => i.value);
+      assert.ok(issue, `${text}: blocked with nothing to attest ${JSON.stringify(check.issues)}`);
+      assert.ok(attests < 3, `${text}: still blocked after ${attests} attests ${JSON.stringify(check.issues)}`);
+      const out = applyAction(facts, list, list[0].id, { action: "attest", value: issue.value }, ctx);
+      facts = out.facts;
+      list = out.suggestions;
+      check = list[0].check;
+      attests++;
+    }
+    needed[text] = attests;
+  }
+  // Each line flags exactly one thing, so each needs exactly one attest.
+  assert.deepEqual(Object.entries(needed).filter(([, n]) => n !== 1), []);
+});
+
+test("attesting a bare figure is refused when its phrase is on the can't-confirm list", () => {
+  const facts = ashaFacts({ cannotConfirm: ["12 analysts"] });
+  const { gate } = stubGate();
+  const list = [suggestion(REF.team, "Led a team of 12 analysts across reporting")];
+  expectError(() => applyAction(facts, list, list[0].id, { action: "attest", value: "12" }, { engineGate: gate, now: NOW }), 409, "cannot_confirm");
+});
+
+// P1-20 review 2, edit 1: an attest stores a string that backs every later line, so it must
+// not carry a claim the user was not asked about. Facts: title "Analyst", no extras.
+const LAUNDER = [
+  // [line attested, value attested, another line that must stay blocked]
+  ["Led 12 senior analysts", "12", "Senior Finance Analyst driving month-end close"],
+  ["Led 12 expеrts", "12", "Month-end close expеrts"],
+  ["Hired 12 Deloitte auditors", "12", "Worked with Deloitte on month-end close"],
+  ["Sеnior analyst for month-end close", "Sеnior", "Month-end close for sеnior staff"],
+  ["Handled 2 crore directors", "2 crore directors", "Director of reporting"],
+  ["Won first Deloitte director prize", null, "Director at Deloitte"],
+];
+for (const [line, value, other] of LAUNDER) {
+  test(`attest cannot launder a claim: ${line}`, () => {
+    const facts = ashaFacts();
+    facts.experience = facts.experience.map((e) => ({ ...e, title: "Analyst" }));
+    const { gate } = stubGate();
+    const ctx = { engineGate: gate, now: NOW };
+    const list = [suggestion(REF.team, line), suggestion(REF.budget, other)];
+    const issues = checkSuggestion(list[0], { ...ctxFor(facts), engineGate: gate }).check.issues;
+    const v = value ?? issues.find((i) => i.kind === "rank")?.value;
+    assert.ok(issues.some((i) => i.value === v), `${line}: ${JSON.stringify(issues)}`);
+    let after = facts;
+    try {
+      after = applyAction(facts, list, list[0].id, { action: "attest", value: v }, ctx).facts;
+    } catch (err) {
+      assert.ok(err instanceof TailoringError && err.status === 409 && err.code === "confirm_others_first", String(err));
+    }
+    // Whatever was stored, the other line is still blocked.
+    const o = checkSuggestion(list[1], { ...ctxFor(after), engineGate: gate });
+    assert.equal(o.check.verdict, "block", `${other} after attesting ${v}: stored ${JSON.stringify(after.extras.map((x) => x.text))}`);
+  });
+}
+
+test("attest refusals: a claim word or name inside the stored string is refused with 409", () => {
+  const facts = ashaFacts();
+  facts.experience = facts.experience.map((e) => ({ ...e, title: "Analyst" }));
+  const { gate } = stubGate();
+  const ctx = { engineGate: gate, now: NOW };
+  for (const [line, v] of [["Handled 2 crore directors", "2 crore directors"], ["Sеnior analyst for month-end close", "Sеnior"]]) {
+    const list = [suggestion(REF.team, line)];
+    expectError(() => applyAction(facts, list, list[0].id, { action: "attest", value: v }, ctx), 409, "confirm_others_first");
+  }
+  // The phrase skips nouns that are claims: "12 analysts", not "12 senior"; "12 auditors", not "12 Deloitte".
+  for (const [line, stored] of [["Led 12 senior analysts", "12 analysts"], ["Hired 12 Deloitte auditors", "12 auditors"], ["Led 12 expеrts", "12"]]) {
+    const list = [suggestion(REF.team, line)];
+    const out = applyAction(facts, list, list[0].id, { action: "attest", value: "12" }, ctx);
+    assert.equal(out.facts.extras[0].text, stored, line);
+  }
+  // The honest case still clears in one attest.
+  const list = [suggestion(REF.team, "Led a team of 12 analysts across reporting")];
+  const out = applyAction(ashaFacts(), list, list[0].id, { action: "attest", value: "12" }, ctx);
+  assert.equal(out.facts.extras[0].text, "12 analysts");
+  assert.notEqual(out.suggestions[0].check.verdict, "block");
+});
+
+// P1-20 final review: a rank span that holds a figure ("Secured 12 clients, first") cannot be
+// attested whole, or "12" would be confirmed for anything. "top 5" still can.
+const RANK_SPANS = [
+  ["Secured 12 clients, first in the region", "Managed 12 clients"],
+  ["Placed 12 analysts. First to automate close", "Managed 12 analysts"],
+  ["Ranked 12 analysts first", "Managed 12 analysts"],
+];
+for (const [line, other] of RANK_SPANS) {
+  test(`attest cannot launder a figure through a rank span: ${line}`, () => {
+    const facts = ashaFacts();
+    const { gate } = stubGate();
+    const list = [suggestion(REF.team, line), suggestion(REF.budget, other)];
+    const issues = checkSuggestion(list[0], { ...ctxFor(facts), engineGate: gate }).check.issues;
+    const span = issues.find((i) => i.kind === "rank")?.value;
+    assert.ok(span && /12/.test(span), JSON.stringify(issues));
+    expectError(() => applyAction(facts, list, list[0].id, { action: "attest", value: span }, { engineGate: gate, now: NOW }), 409, "confirm_others_first");
+    assert.equal(checkSuggestion(list[1], { ...ctxFor(facts), engineGate: gate }).check.verdict, "block", other);
+  });
+}
+
+test("a rank shaped 'top N' is still attested with its figure in one step", () => {
+  const { gate } = stubGate();
+  const list = [suggestion(REF.team, "top 5 performer in the team")];
+  const out = applyAction(ashaFacts(), list, list[0].id, { action: "attest", value: "top 5" }, { engineGate: gate, now: NOW });
+  assert.equal(out.facts.extras[0].text, "top 5");
+  assert.notEqual(out.suggestions[0].check.verdict, "block", JSON.stringify(out.suggestions[0].check.issues));
+});
+
+// KNOWN_GAP (asserts today's behaviour, not the goal): a lower-case name next to a figure reads as an
+// ordinary noun, so attesting the figure stores "12 deloitte", and the capitalised name then passes
+// elsewhere. Closing it needs a name dictionary or case-insensitive name reading (Phase 2).
+const KNOWN_GAP_LOWERCASE_NAMES = [
+  ["Hired 12 deloitte auditors", "12", "12 deloitte", "Worked with Deloitte on month-end close"],
+  ["Hired 12 kpmg auditors", "12", "12 kpmg", "Worked with KPMG on month-end close"],
+  ["Hired 12 google engineers", "12", "12 google", "Worked with Google on month-end close"],
+  ["Built 12 tableau dashboards", "12", "12 tableau", "Built Tableau reports for month-end close"],
+  ["Wrote 12 python scripts", "12", "12 python", "Wrote Python scripts for month-end close"],
+  ["Top 3 deloitte partner", "3", "3 deloitte", "Worked with Deloitte on month-end close"],
+  ["Reduced 30% deloitte", "30% deloitte", "30% deloitte", "Worked with Deloitte on month-end close"],
+];
+for (const [line, value, stored, other] of KNOWN_GAP_LOWERCASE_NAMES) {
+  test(`KNOWN_GAP: lower-case name in an attest: ${line}`, () => {
+    const facts = ashaFacts();
+    const { gate } = stubGate();
+    const list = [suggestion(REF.team, line), suggestion(REF.budget, other)];
+    assert.equal(checkSuggestion(list[1], { ...ctxFor(facts), engineGate: gate }).check.verdict, "block", `${other} blocks before`);
+    const out = applyAction(facts, list, list[0].id, { action: "attest", value }, { engineGate: gate, now: NOW });
+    assert.equal(out.facts.extras[0].text, stored);
+    assert.notEqual(out.suggestions[1].check.verdict, "block", `KNOWN_GAP: ${other} passes after attesting "${stored}"`);
+  });
+}

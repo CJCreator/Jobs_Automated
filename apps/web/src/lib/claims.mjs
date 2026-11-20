@@ -20,18 +20,34 @@
 // It errs towards flagging. A false flag costs the user one click to attest a
 // true fact; a false pass puts an invented claim in front of an employer.
 //
-// Covered: invented figures; capitalised or mixed names; and the claim words in
-// CLAIM_FAMILIES, whole-word and case-insensitive ("global", "Global",
-// "GLOBAL"), where a word is supported by any form of its family in the facts.
+// Covered: invented figures, and a figure the facts hold only about something
+// else (number-context.mjs); capitalised or mixed names; and the claim words in
+// CLAIM_FAMILIES and APP_ONLY_FAMILIES, whole-word and case-insensitive ("global",
+// "Global", "GLOBAL"), where a word is supported by any form of its family in the
+// facts. That includes degrees and exams in their dotted and spaced spellings
+// ("B.Tech", "b tech", "m.c.a", "hons", "CA", "master of"), rank words ("top
+// performer", "runner-up", "employee of the month", "silver medal"), and language
+// names ("Tamil", "Bangla", "multi-lingual", "several languages"). Phrases read by
+// detectors: ranks ("Ranked 1st", "top 5", "Best performer", "1st in class",
+// "came first", "first prize") and tenure ("decade", "several yrs", "longstanding",
+// "long-time", "multi-year", "years experience" with no figure before it).
+// "C-suite" blocks as the candidate's role and passes as an audience ("presented
+// to the C-suite", "a C-suite sponsor"), as in the engine.
+//
 // Not covered (by design, because closing them would flag honest rewording):
 // lower-case tool names ("python"), claim words outside the lists ("lead",
-// "specialist", "experienced"), and vague multipliers ("doubled", "half the
-// time"). The engine gate catches some of these; the user's review is the
+// "specialist", "experienced", "extensive experience", "graduate", "fluent"), the
+// bare word "master", ordinals with no rank context ("the first batch", "Finished
+// the first close"), "a long time" (spaced), vague multipliers ("doubled", "half the
+// time"), Latin-script lines in another language (Hinglish, French), and accented
+// look-alikes ("sénior"). Known honest false blocks: "polish" as a verb, "master of
+// ceremonies", "multi-year contracts" unless the facts say so (the user attests or
+// rewords). The engine gate catches some of these; the user's review is the
 // backstop for the rest.
 //
 // Pure functions, no I/O, so `node --test` can import this file directly.
 
-import { unsupportedNumberContexts } from "./number-context.mjs";
+import { unsupportedNumberContexts, figureContexts } from "./number-context.mjs";
 
 const CURRENCY_PREFIX = {
   "₹": "INR", "rs": "INR", "rs.": "INR", "inr": "INR",
@@ -134,7 +150,8 @@ const INDIAN_GROUPING = /^\d{1,2}(?:,\d{2})+,\d{3}$/;
 // Plural words after a lakh or crore figure that still mean money.
 const NOT_COUNTED = new Set(`budgets revenues sales savings costs expenses profits loans funds investments deals
 contracts assets receivables payables collections inflows outflows grants earnings returns dues payments orders
-rupees dollars lakhs crores`.split(/\s+/));
+rupees dollars lakhs crores
+this plus towards thus versus besides always perhaps sometimes afterwards whereas its his`.split(/\s+/));
 
 /** The numeric matches in already-prepared text. */
 function scanNumbers(prepared) {
@@ -249,7 +266,7 @@ actively directly closely jointly together
 career summary profile objective overview experience education skills projects
 certifications achievements highlights background expertise knowledge proficient familiar
 ownership oversight leadership management delivery analysis analytics reporting budgeting
-forecasting planning strategy finance accounting compliance reconciliation variance
+forecasting planning strategy finance accounting commerce compliance reconciliation variance
 automation improvement improvements enhancement initiative initiatives collaboration
 partnership partnerships responsibility responsibilities
 cross self data co end customer client clients detail cost costs high multi full long short
@@ -510,27 +527,102 @@ export const CLAIM_FAMILIES = {
 // language by the name list, and those three kinds are declared in APP_ONLY_KINDS.
 export const APP_ONLY_KINDS = ["rank", "tenure", "language"];
 export const APP_ONLY_FAMILIES = {
+  // Spellings of one qualification share a row, so a fact in one spelling supports the others.
   credential: [
     ["degree", "degrees"],
     ["bachelor's", "bachelors", "bachelor"],
-    ["master's", "masters"],
-    ["b.tech", "btech"], ["m.tech", "mtech"], ["b.e"], ["b.sc", "bsc"], ["m.sc", "msc"], ["b.com", "bcom"], ["m.com", "mcom"],
-    ["bba"], ["bca"], ["mca"], ["pgdm"], ["pgdba"], ["mbbs"], ["llb"],
+    ["master's", "masters", "master of", "master in"],
+    ["b.tech", "btech", "b tech", "b. tech"], ["m.tech", "mtech", "m tech", "m. tech"], ["b.e"],
+    ["b.sc", "bsc", "b sc", "b. sc"], ["m.sc", "msc", "m sc", "m. sc"],
+    ["b.com", "bcom", "b com", "b. com"], ["m.com", "mcom", "m com", "m. com"],
+    ["bba", "b.b.a"], ["bca", "b.c.a"], ["mca", "m.c.a"], ["pgdm", "p.g.d.m"], ["pgdba"], ["mbbs", "m.b.b.s"],
+    ["llb", "ll.b", "l.l.b"], ["m.phil", "mphil"], ["b.ed"],
+    // Dotted short degrees. The bare letters ("ma", "ms", "ba") are ordinary words, so only dotted forms.
+    ["b.a"], ["m.a"], ["b.s"], ["m.s"], ["m.e"], ["ll.m", "llm"], ["m.ed"], ["b.pharm", "bpharm"], ["bbm", "b.b.m"],
+    // A separate row from the shared "postgraduate" family, which is the engine's twin.
+    ["postgrad", "post grad"],
+    // "award-winning" is supported by any word in AWARD_WORDS in the facts (owner decision, see below).
+    ["award-winning"],
+    ["ca", "c.a"], ["company secretary"],
     ["cpa"], ["cfa"], ["pmp"], ["frm"], ["acca"], ["cma"], ["icwa"],
-    ["honours", "honors"], ["distinction"], ["first class"], ["gold medal"], ["rank holder"],
+    ["honours", "honors", "hons"], ["distinction"], ["first class"], ["gold medal"], ["rank holder"],
     ["valedictorian"], ["cum laude"], ["dean's list"],
   ],
+  // Rank words and phrases. Ordinals and "top N" are read by rankHits; "top-performing" is
+  // already a shared expertise form, so it is not repeated here.
+  rank: [
+    ["top performer", "top performers"], ["top-rated"], ["top-ranked"], ["top scorer", "top scorers"],
+    ["top achiever", "top achievers"], ["topped"], ["first prize"], ["runner-up", "runners-up"], ["merit list"],
+    ["star performer", "star performers"],
+    ["employee of the month"], ["employee of the quarter"], ["employee of the year"],
+    ["first division"], ["silver medal"], ["bronze medal"],
+  ],
   language: [
-    ...["hindi", "english", "tamil", "telugu", "kannada", "malayalam", "marathi", "bengali", "gujarati", "punjabi", "urdu",
+    ...["hindi", "english", "tamil", "telugu", "kannada", "malayalam", "marathi", "gujarati", "punjabi", "urdu",
       "odia", "assamese", "sanskrit", "french", "german", "spanish", "mandarin", "chinese", "japanese", "korean", "arabic",
-      "russian", "portuguese", "italian", "dutch"].map((n) => [n]),
-    ["bilingual"], ["trilingual"], ["multilingual"], ["polyglot"], ["mother tongue"], ["native speaker"],
+      "russian", "portuguese", "italian", "dutch",
+      "konkani", "nepali", "sindhi", "kashmiri", "maithili", "bhojpuri", "marwari", "tulu", "manipuri", "hindustani",
+      "sinhala", "turkish", "thai", "vietnamese", "malay", "indonesian", "swahili", "hebrew", "greek", "polish", "swedish",
+      "cantonese"].map((n) => [n]),
+    ["bengali", "bangla"], ["persian", "farsi"],
+    ["bilingual", "bi-lingual"], ["trilingual", "tri-lingual"], ["multilingual", "multi-lingual"], ["polyglot"],
+    ["mother tongue"], ["native speaker"],
+    ["several languages", "multiple languages", "many languages"],
   ],
 };
 
 // Plain business phrases that contain a claim word and claim nothing. Exact phrases
-// only; the bare word still blocks. Twin of the engine's exemption list.
-const CLAIM_PHRASE_EXEMPTIONS = /(?<![\p{L}\p{N}])(?:executive\s+summary|enterprise\s+reporting|award[\s\p{Pd}]+winning|best[\s\p{Pd}]+practices?)(?![\p{L}\p{N}])/giu;
+// only; the bare word still blocks. "executive summary" and "enterprise reporting" are from
+// the engine's list (CLAIM_PHRASE_EXEMPTIONS in verify-cv-facts.mjs); the engine's third,
+// "award-winning", is a claim here unless the facts mention an award (AWARD_WORDS below).
+// "best practice(s)" is app-only: "best" is a rank word only in this layer, so the engine
+// has nothing to exempt. This is therefore not a pure twin of the engine's list.
+const CLAIM_PHRASE_EXEMPTIONS = /(?<![\p{L}\p{N}])(?:executive\s+summary|enterprise\s+reporting|best[\s\p{Pd}]+practices?)(?![\p{L}\p{N}])/giu;
+
+// "award-winning" (owner decision, 2026-11-20): not exempt. It passes only when the facts
+// hold a form of the award family (award, awards, awarded), as in the engine (P1-19c): a
+// "prize" or "honours" does not back it. Otherwise it blocks with the value
+// "award-winning", and one attest clears it.
+const AWARD_WORDS = ["award", "awards", "awarded"];
+
+// "C-suite" is a seniority claim word unless one of two closed, same-line shapes names it
+// as the audience. Each match is read with an 80-character window each side:
+//   1. never exempt after a role predicate ("as a", "I am a", "was the", "Appointed");
+//   2. exempt when one space or dash, an optional "reporting", and an audience noun follow,
+//      with no role noun after that ("a C-suite sponsor", "C-suite reporting packs"; not
+//      "C-suite engagement lead");
+//   3. exempt after an exact verb form, up to three words from a closed object list, and
+//      "to the" ("Presented quarterly results to the C-suite"; not "Presented my
+//      transition to the C-suite", "Recommended for promotion to the C-suite").
+// Neither shape crosses a line break, and the after-shape does not cross a dash clause
+// ("Member of the C-suite — reviews all budgets" blocks). "C-suite reporting" alone blocks.
+// Mirrors the engine's rule (P1-19c final commit d40cf15, not merged here yet); keep the
+// two equal. Role predicates include "appointed", "named", "acting", "interim", "elected",
+// "hired", "promoted", "elevated". The line is read with its line breaks kept.
+const C_SUITE_RE = /(?<![\p{L}\p{N}])c[\s\p{Pd}]+suite(?![\p{L}\p{N}])/giu;
+const C_SUITE_ROLE_PREDICATE_RE = /(?<![\p{L}\p{N}])(?:as|am|i['’]m|is|was|were|are|be|been|being|became|become|becoming|appointed|named|acting|interim|elected|hired|promoted|elevated)[^\S\n]+(?:(?:an?|the|my|our)[^\S\n]+)?$/iu;
+const C_SUITE_AUDIENCE_AFTER_RE = /^(?: |\p{Pd})(?:reporting(?: |\p{Pd}))?(?:sponsors?|stakeholders?|audiences?|narratives?|presentations?|briefings?|decks?|packs?|dashboards?|communications?|visibility|engagement|alignment|buy-in)(?![\p{L}\p{N}])(?![^\S\n]*\p{Pd}?[^\S\n]*(?:leads?|leaders?|heads?|managers?|directors?|officers?|executives?|owners?|members?|chairs?|boards?|roles?|positions?|seats?|levels?|teams?|councils?|committees?)(?![\p{L}\p{N}]))/iu;
+const C_SUITE_OBJECT_WORDS = "the|our|my|quarterly|monthly|weekly|annual|yearly|results|findings|updates|plans?|strategy|risks|numbers|figures|recommendations|proposals|budgets?|forecasts?|insights|metrics|analysis|reports|progress|performance|outcomes|financials|issues|status";
+const C_SUITE_AUDIENCE_BEFORE_RE = new RegExp(String.raw`(?<![\p{L}\p{N}])(?:present(?:ed|ing|s)?|report(?:ed|ing|s)?|brief(?:ed|ing|s)?|escalat(?:ed|es|ing)|communicat(?:ed|es|ing)|pitch(?:ed|es|ing)?)[^\S\n]+(?:(?:${C_SUITE_OBJECT_WORDS})[^\S\n]+){0,3}to[^\S\n]+the[^\S\n]+$`, "iu");
+const C_SUITE_WINDOW = 80;
+// The rule's sources, for tests/claim-lists-sync.test.mjs to compare with the engine's.
+export const C_SUITE_RULE = Object.freeze({
+  match: C_SUITE_RE.source, rolePredicate: C_SUITE_ROLE_PREDICATE_RE.source, after: C_SUITE_AUDIENCE_AFTER_RE.source,
+  before: C_SUITE_AUDIENCE_BEFORE_RE.source, window: C_SUITE_WINDOW,
+});
+
+const blank = (m) => " ".repeat(m.length);
+
+/** Cleaned text with exempt phrases and audience "C-suite" blanked out, same length so indices hold. */
+function withoutExemptions(clean) {
+  return clean.replace(CLAIM_PHRASE_EXEMPTIONS, blank).replace(C_SUITE_RE, (match, offset, whole) => {
+    const end = offset + match.length;
+    const before = whole.slice(Math.max(0, offset - C_SUITE_WINDOW), offset);
+    if (C_SUITE_ROLE_PREDICATE_RE.test(before)) return match;
+    if (C_SUITE_AUDIENCE_AFTER_RE.test(whole.slice(end, end + C_SUITE_WINDOW)) || C_SUITE_AUDIENCE_BEFORE_RE.test(before)) return blank(match);
+    return match;
+  });
+}
 
 const CLAIM_FORMS = [];
 for (const families of [CLAIM_FAMILIES, APP_ONLY_FAMILIES]) {
@@ -549,6 +641,11 @@ const CLAIM_RE = new RegExp(
   "giu",
 );
 const FORM_RES = new Map(CLAIM_FORMS.map(({ form }) => [form, new RegExp(`(?<![\\p{L}\\p{N}])${formPattern(form)}(?![\\p{L}\\p{N}])`, "iu")]));
+// Rank forms read as words (APP_ONLY_FAMILIES.rank) are blanked before rankHits, so one phrase gives one issue.
+const RANK_FORM_RE = new RegExp(
+  `(?<![\\p{L}\\p{N}])(?:${CLAIM_FORMS.filter((f) => f.kind === "rank").map((f) => formPattern(f.form)).join("|")})(?![\\p{L}\\p{N}])`,
+  "giu",
+);
 
 /** A predicate over claim forms: does this text contain the form (space and hyphen alike)? Answers are kept per form. */
 function formPredicate(text, clean = cleanText(text)) {
@@ -585,6 +682,17 @@ const seniorityPredicate = (src) => fromSource(src, "senior", (text) => formPred
 
 const ORDINALS = new Set(`1st 2nd 3rd 4th 5th 6th 7th 8th 9th 10th first second third fourth fifth sixth seventh eighth ninth tenth`.split(" "));
 const RANK_CONTEXT = new Set("ranked placed stood secured position rank highest best top".split(" "));
+// More ordinal context, read in one direction only, so that "the first batch of hires" or
+// "Finished the first close" stays honest:
+//   prize             within 3 words after the ordinal: "first prize", "1st cash prize";
+//   place             directly after the ordinal: "2nd place" (not "the first controls in place");
+//   class, batch      after "in" or "of" that follows the ordinal: "1st in class", "first in her batch";
+//   came, finished    just before the ordinal, or before "in"/"at" and the ordinal: "came first", "finished in second".
+const RANK_AFTER = new Set(["prize"]);
+const RANK_GROUP = new Set(["class", "batch"]);
+const RANK_GROUP_FILLER = new Set(["the", "my", "his", "her", "our", "their", "whole", "entire"]);
+const RANK_BEFORE = new Set(["came", "finished"]);
+
 const AFTER_BEST_SKIP = new Set("in of at for to and with by on from as the a an".split(" "));
 const NUMBER_BEFORE_YEARS = new Set([...Object.keys(NUMBER_WORDS), "one", "few", "several", "many", "multiple", "numerous", "countless", "couple"]);
 
@@ -603,7 +711,7 @@ function mergeSpans(spans) {
 
 /** Rank claims in cleaned text: "Ranked 1st", "top 5", "Best performer", "Second-highest". */
 function rankHits(clean) {
-  const text = clean.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length)).replace(/best[\s\p{Pd}]+in[\s\p{Pd}]+class/giu, (m) => " ".repeat(m.length));
+  const text = withoutExemptions(clean).replace(/best[\s\p{Pd}]+in[\s\p{Pd}]+class/giu, blank).replace(RANK_FORM_RE, blank);
   const words = [...text.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({ w: m[0].toLowerCase(), s: m.index, e: m.index + m[0].length }));
   const spans = [];
   for (const m of text.matchAll(/(?<![\p{L}\p{N}])top\s+\d+(?:\.\d+)?\s?%?/giu)) spans.push({ s: m.index, e: m.index + m[0].trimEnd().length });
@@ -616,9 +724,20 @@ function rankHits(clean) {
       spans.push({ s: word.s, e: joined ? next.e : word.e });
     }
     if (ORDINALS.has(word.w)) {
+      const at = (j) => spans.push({ s: Math.min(word.s, words[j].s), e: Math.max(word.e, words[j].e) });
       for (let j = Math.max(0, i - 3); j <= Math.min(words.length - 1, i + 3); j++) {
-        if (j !== i && RANK_CONTEXT.has(words[j].w)) spans.push({ s: Math.min(word.s, words[j].s), e: Math.max(word.e, words[j].e) });
+        if (j !== i && RANK_CONTEXT.has(words[j].w)) at(j);
       }
+      for (let j = i + 1; j <= Math.min(words.length - 1, i + 3); j++) if (RANK_AFTER.has(words[j].w)) at(j);
+      if (words[i + 1]?.w === "place") at(i + 1);
+      if (["in", "of"].includes(words[i + 1]?.w)) {
+        let j = i + 2;
+        while (j < words.length && j <= i + 4 && RANK_GROUP_FILLER.has(words[j].w)) j++;
+        if (RANK_GROUP.has(words[j]?.w)) at(j);
+      }
+      const prev = words[i - 1]?.w;
+      if (RANK_BEFORE.has(prev)) at(i - 1);
+      else if (["in", "at"].includes(prev) && RANK_BEFORE.has(words[i - 2]?.w)) at(i - 2);
     }
   });
   return mergeSpans(spans).map(({ s, e }) => text.slice(s, e).trim()).filter(Boolean);
@@ -626,11 +745,14 @@ function rankHits(clean) {
 
 /** Tenure claims in cleaned text: "decade", "several years", "long-standing", "years of experience" with no figure. */
 function tenureHits(clean) {
-  const text = clean.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length));
+  const text = withoutExemptions(clean);
   const out = [];
-  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:decades?|long[\s\p{Pd}]standing)(?![\p{L}\p{N}])/giu)) out.push(m[0]);
-  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:several|many|multiple|numerous|countless|a\s+few|(?:a\s+)?couple\s+of)\s+years?(?![\p{L}\p{N}])/giu)) out.push(m[0]);
-  for (const m of text.matchAll(/(?<![\p{L}\p{N}])years?\s+of\s+experience/giu)) {
+  // "long-time" and "longtime", never "a long time" (spaced) which is no tenure claim.
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:decades?|long[\s\p{Pd}]?standing|long\p{Pd}?time|multi[\s\p{Pd}]?years?)(?![\p{L}\p{N}])/giu)) out.push(m[0]);
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:several|many|multiple|numerous|countless|a\s+few|(?:a\s+)?couple\s+of)\s+(?:years?|yrs?\.?)(?![\p{L}\p{N}])/giu)) out.push(m[0]);
+  // "years of experience", "years experience", "years' experience", "yrs. of experience", and up to three
+  // words between ("years of rich experience", "years of solid finance experience"), with no figure before it.
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}])(?:years?|yrs?\.?)['’]?\s+(?:of\s+)?(?:[\p{L}\p{Pd}'’]+\s+){0,3}?experience(?![\p{L}\p{N}])/giu)) {
     const before = /([\p{L}\p{N}+]+)[\s+-]*$/u.exec(text.slice(Math.max(0, m.index - 24), m.index));
     const prev = before?.[1].toLowerCase() ?? "";
     if (/\d/.test(prev) || NUMBER_BEFORE_YEARS.has(prev)) continue;
@@ -647,7 +769,7 @@ const sourcePhraseKeys = (src) => fromSource(src, "phrases", (text) => new Set(p
  * @returns {{ kind: string, value: string, index: number, end: number, supported: boolean }[]} words only; phrases have index -1
  */
 function claimMatches(clean, sourceText) {
-  const text = clean.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length));
+  const text = withoutExemptions(clean);
   const inSource = sourcePredicate(sourceText);
   const inTitle = seniorityPredicate(sourceText);
   const found = [];
@@ -655,9 +777,10 @@ function claimMatches(clean, sourceText) {
     const entry = CLAIM_BY_FORM.get(formKey(match[0].replace(/\s+/g, " ")));
     if (!entry) continue;
     const check = entry.kind === "seniority" ? inTitle : inSource;
+    const family = entry.form === "award-winning" ? AWARD_WORDS : entry.family;
     found.push({
       kind: entry.kind, value: match[0].replace(/\s+/g, " "), index: match.index, end: match.index + match[0].length,
-      supported: entry.family.some(check), form: entry.form,
+      supported: family.some(check), form: entry.form,
     });
   }
   // "bachelor's degree" is one thing for the user to confirm, not two.
@@ -698,7 +821,7 @@ const SCRIPTS = ["Latin", "Cyrillic", "Greek", "Armenian", "Hebrew", "Arabic", "
 const LATIN_TOKEN = /^[\p{Script=Latin}\p{M}\p{N}]+$/u;
 const scriptOf = (ch) => SCRIPTS.find(([, re]) => re.test(ch))?.[0] ?? "Other";
 
-/** Tokens of cleaned text that have a letter outside the Latin script, with the scripts their letters use. */
+/** Tokens of cleaned text that have a letter outside the Latin script, as written, with the scripts their letters use. */
 function nonLatinTokens(clean) {
   const out = [];
   if (!/[^\u0000-ɏḀ-ỿ]/.test(clean)) return out;
@@ -706,22 +829,81 @@ function nonLatinTokens(clean) {
     if (LATIN_TOKEN.test(m[0])) continue;
     const scripts = new Set();
     for (const ch of m[0]) if (/\p{L}/u.test(ch)) scripts.add(scriptOf(ch));
-    if (scripts.size) out.push({ token: m[0].toLowerCase(), scripts });
+    if (scripts.size) out.push({ token: m[0].toLowerCase(), written: m[0], scripts });
   }
   return out;
 }
 const sourceNonLatin = (src) => fromSource(src, "nonlatin", (text) => new Set(nonLatinTokens(cleanSource(text)).map((t) => t.token)));
 
-/** True when the text has a token the fact check cannot read (mixed scripts, or non-Latin letters the facts do not contain). */
-function hasUnreadableText(clean, sourceText) {
+/**
+ * The first token the fact check cannot read (mixed scripts, or letters outside the Latin
+ * script), as written, or null. A token the facts contain verbatim is always readable: it
+ * is the user's own wording ("200 µs", "10 kΩ", which NFKC turns into Greek letters).
+ */
+function unreadableToken(clean, sourceText) {
   let known = null;
-  for (const { token, scripts } of nonLatinTokens(clean)) {
-    if (scripts.size > 1) return true;
-    if (scripts.has("Latin")) continue;
+  for (const { token, written, scripts } of nonLatinTokens(clean)) {
+    if (scripts.size === 1 && scripts.has("Latin")) continue;
     known ??= sourceNonLatin(sourceText);
-    if (!known.has(token)) return true;
+    if (!known.has(token)) return written;
   }
-  return false;
+  return null;
+}
+
+// ---- what an attest may add -------------------------------------------------------
+
+// Words that make a rank or tenure phrase on their own, beyond the listed forms.
+const PHRASE_CLAIM_WORDS = new Set("best highest top winner winners ranked rank ranking decade decades".split(" "));
+
+/**
+ * True when `word` can stand in an attested phrase without claiming anything itself:
+ * Latin letters only, not a claim form, not name-shaped (unless an ordinary opener word).
+ * Used to pick the noun in "12 analysts".
+ */
+export function isPlainPhraseWord(word) {
+  const w = String(word ?? "");
+  if (!/^[\p{Script=Latin}'’]+$/u.test(w)) return false;
+  const l = lower(w).replace(/’/g, "'");
+  if (CLAIM_BY_FORM.has(l) || PHRASE_CLAIM_WORDS.has(l)) return false;
+  return !(nameShaped(w) && !OPENERS.has(l));
+}
+
+const RANK_FIGURE_SHAPE = /^(?:top\s+\d+(?:\.\d+)?\s?%?|#\s?\d+)$/iu;
+
+const containsWord = (haystack, needle) => {
+  const n = escapeRegExp(lower(String(needle)).trim());
+  return Boolean(n) && new RegExp(`(?<![\\p{L}\\p{N}])${n}(?![\\p{L}\\p{N}])`, "u").test(lower(String(haystack)));
+};
+
+/**
+ * Claims that confirming `statement` as a fact would also confirm, beyond the issue
+ * being attested. An attest stores a string; every word in it then backs other lines, so
+ * the string must carry nothing the user has not been asked about. Returns the leftover
+ * issues; any non-Latin or mixed-script token is always one ("unreadable").
+ *
+ * Allowed inside the statement besides the issue itself: the name-shaped parts of a listed
+ * claim form ("C" in "C-suite"), and the figure of a rank shaped "top N", "top N%" or "#N".
+ * Known gap: a lower-case name ("12 deloitte") reads as an ordinary noun and is stored.
+ *
+ * @param {string} statement what the attest would store
+ * @param {string} sourceText the current confirmed facts
+ * @param {{ kind: string, value: string, attestAs?: string }} issue the issue being attested
+ * @returns {{ kind: string, value: string }[]}
+ */
+export function attestLeftovers(statement, sourceText, issue) {
+  if (nonLatinTokens(cleanText(statement)).length) return [{ kind: "unreadable", value: "" }];
+  const isForm = CLAIM_BY_FORM.has(formKey(issue.value));
+  const same = (a, b) => Boolean(b) && lower(String(a)).trim() === lower(String(b)).trim();
+  return checkText({ text: statement, sourceText }).issues
+    .filter((i) => {
+      if (same(i.value, issue.value) || same(i.value, issue.attestAs)) return false;
+      if (i.kind === "name" && isForm && containsWord(issue.value, i.value)) return false;
+      // A figure is part of the rank only in "top N", "top N%" and "#N"; a wider span ("Secured 12
+      // clients, first") would confirm "12" for anything.
+      if (i.kind === "number" && issue.kind === "rank" && RANK_FIGURE_SHAPE.test(issue.value.trim()) && containsWord(issue.value, i.value)) return false;
+      return true;
+    })
+    .map(({ kind, value }) => ({ kind, value }));
 }
 
 // ---- the check ---------------------------------------------------------------------
@@ -733,7 +915,8 @@ function hasUnreadableText(clean, sourceText) {
 // could not read), blocks.
 export const NON_BLOCKING_COVERAGE = ["no-count-claims-recognized"];
 
-const UNREADABLE_MESSAGE = "This line has text the fact check cannot read (letters outside the English alphabet). Rewrite it in English letters, or remove it.";
+// Names the token, so the user can find a look-alike letter they cannot see.
+const unreadableMessage = (token) => `This line contains "${token}", which mixes alphabets or uses letters outside the English alphabet, so the fact check cannot read it. Rewrite it in English letters, or remove it.`;
 const COVERAGE_MESSAGE = "The fact check could not read this line fully, so it is blocked. Rewrite it in plain English.";
 
 /**
@@ -748,17 +931,18 @@ const COVERAGE_MESSAGE = "The fact check could not read this line fully, so it i
  * @param {(text: string, opts: { sourceText: string }) => any} [input.engineGate]
  *   the engine's verifyFactsFromText; when absent only the strict checks run
  *   and `engineRan` is false so a caller can refuse to treat that as a full pass
- * @returns {{ verdict: 'pass'|'warn'|'block', issues: { kind: string, value: string, message: string }[], advisory: string[], engineRan: boolean }}
+ * @returns {{ verdict: 'pass'|'warn'|'block', issues: { kind: string, value: string, message: string, attestAs?: string }[], advisory: string[], engineRan: boolean }}
+ *   `attestAs`, on a figure absent from the facts, is the phrase an attest of `value` adds as a fact.
  */
 export function checkText({ text, sourceText, before = "", jdText = "", cannotConfirm = [], engineGate } = {}) {
   const target = cleanText(text);
   const issues = [];
   const seen = new Set();
-  const add = (kind, value, message) => {
+  const add = (kind, value, message, attestAs) => {
     const id = `${kind}|${lower(String(value))}`;
     if (seen.has(id)) return;
     seen.add(id);
-    issues.push({ kind, value: String(value), message });
+    issues.push(attestAs ? { kind, value: String(value), message, attestAs } : { kind, value: String(value), message });
   };
 
   for (const phrase of cannotConfirm) {
@@ -768,9 +952,18 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
   }
 
   const allowedNumbers = fromSource(sourceText, "numbers", (src) => new Set(numberClaimsOf(src, cleanSource(src)).map((c) => c.key)));
+  let contexts = null;
   for (const claim of numberClaims(target)) {
     if (!allowedNumbers.has(claim.key)) {
-      add("number", claim.raw, `The figure "${claim.raw}" is not in your confirmed facts.`);
+      // The user confirms the figure with what it is about ("12 analysts"), not a bare "12",
+      // so the fact they add also passes the number-context check for this line.
+      contexts ??= figureContexts(target);
+      const phrase = contexts.find((c) => c.key === claim.key && c.raw === claim.raw && c.value)?.value;
+      if (phrase) {
+        add("number", claim.raw, `The figure "${claim.raw}" is not in your confirmed facts. Confirm "${phrase}" only if it is true.`, phrase);
+      } else {
+        add("number", claim.raw, `The figure "${claim.raw}" is not in your confirmed facts.`);
+      }
     }
   }
   for (const { value, raw } of unsupportedNumberContexts(target, sourceText)) {
@@ -786,11 +979,13 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
     if (!keys.has(`${kind}|${phraseKey(value)}`)) add(kind, value, `"${value}" is not in your confirmed facts.`);
   }
 
-  if (hasUnreadableText(target, sourceText)) add("unreadable", "", UNREADABLE_MESSAGE);
+  // Value "" so nothing here can be attested: the token is shown in the message only.
+  const unreadable = unreadableToken(target, sourceText);
+  if (unreadable !== null) add("unreadable", "", unreadableMessage(unreadable));
 
   // Name check on the line without the claim forms the facts back ("Sr.", "Vice President"
   // are claim words, not names) and without exempt phrases.
-  let nameText = target.replace(CLAIM_PHRASE_EXEMPTIONS, (m) => " ".repeat(m.length));
+  let nameText = withoutExemptions(target);
   for (const m of [...matches].reverse()) {
     if (m.supported) nameText = nameText.slice(0, m.index) + " ".repeat(m.end - m.index) + nameText.slice(m.end);
   }

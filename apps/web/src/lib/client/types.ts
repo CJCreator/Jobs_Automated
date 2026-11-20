@@ -122,6 +122,8 @@ export interface CheckIssue {
   kind: string;
   value: string;
   message: string;
+  /** On a figure absent from the facts: the phrase an attest stores ("12 analysts"), shown in the confirm dialog. */
+  attestAs?: string;
   /** Set on export-blocked issues: the suggestion, the resume line, and the exact exported text. */
   sid?: string | null;
   ref?: string | null;
