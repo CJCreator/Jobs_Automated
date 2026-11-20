@@ -26,7 +26,7 @@ Paths are repo-relative. `src/...` and `tests/...` mean `apps/web/src/...` and `
 | `ROLEWRIGHT_SIGNUP_ALLOWLIST` | comma list of addresses and `@domain` entries | P1-14 | P1-6 |
 | `takeRateLimit(bucket, subject)` | async; throws `HttpError` 429 | P1-3 | all routes |
 | `spendRateLimit(bucket, subject, cost)` | async; records a cost | P1-3 | P1-3 |
-| Buckets | `ai`, `upload`, `tailoring`, `keyCheck`, `export`, `gateMs`, `trialIp`, `signInIp`, `emailSend` | P1-3 | P1-2, P1-3b |
+| Buckets | `ai`, `upload`, `tailoring`, `keyCheck`, `export`, `gateMs`, `trialIp`, `signInIp`, `emailSend`, `coverage` (60/min, added by P1-5b review) | P1-3 | P1-2, P1-3b, P1-5b |
 | `clientIp(headers, env)` in `src/lib/server/client-ip.mjs` | string or `"unknown"` | P1-3 | P1-2, P1-3b |
 | `ROLEWRIGHT_TRUSTED_PROXY_HOPS` | integer, default 0 | P1-3 | P1-6 |
 | Table `rate_events` | system table | P1-3 | P1-17 structural test |
