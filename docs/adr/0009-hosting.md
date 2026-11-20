@@ -38,7 +38,7 @@ Google Cloud, region `asia-south1` (Mumbai), for every component that holds or p
 
 ## Amended
 
-- **2026-11-20 (orchestrator, from the P1-6 review; owner to confirm at the Phase 1 gate):**
+- **2026-11-20 (from the P1-6 review; accepted by the owner the same day):**
   - Cloud Run reaches Cloud SQL by private IP over direct VPC egress, not through the Cloud SQL connector.
   - The instance accepts encrypted connections only (`ssl_mode = ENCRYPTED_ONLY`).
   - The app verifies the server certificate in a follow-up task; until then the Node connection strings use `sslmode=no-verify`.

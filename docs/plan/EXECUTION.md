@@ -255,3 +255,9 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - the read-only per-source memo;
   - must-block cases "2 crore analysts" and "2 crore customers";
   - an app-side worst-case cost test.
+- Owner decisions, 2026-11-20 (round 3):
+  - **Resume-text deletion.** Offer both options. The default keeps confirmed facts. A second, explicit option also deletes the facts that came from that resume. This is added to P1-18.
+  - **Google Cloud projects.** Keep two projects, staging and production.
+  - **ADR 0009 amendment.** Private IP, encrypted connections only, certificate verification later. Accepted.
+  - **App CI.** It becomes a required check only after a green Phase 1 exit.
+  - **Questions.** The owner asked to be asked any open question at any time. Ask as decisions arise.
