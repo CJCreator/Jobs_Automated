@@ -407,3 +407,27 @@ test('a language gap wins the coverage reason over a count gap', () => {
   const without = gate('lideró toda la función de finanzas en infosys', source);
   assert.equal(without.coverage?.reason, 'scope-not-checked');
 });
+
+test('final review: a singular money word used as a modifier does not back a headcount', () => {
+  for (const line of ['Served 2 crore budget travellers', 'Sold 2 crore budget smartphones',
+    'Handled 2 crore budget holders', 'Served 2 crore budget airline passengers']) {
+    blocks(line, SOURCE);
+  }
+  for (const line of ['Handled a 2 crore budget successfully', 'Handled a 2 crore budget for vendors',
+    'Handled a 2 crore budget, cutting close time by 30%', 'Owned a 2 crore budget at Infosys',
+    'Handled 2 crore budgets using SQL']) {
+    passes(line, SOURCE);
+  }
+});
+
+test('final review: "hundred" and "dozen" after a rupee amount fail closed', () => {
+  blocks('Handled ₹2 hundred crore', 'Handled ₹2');
+  blocks('Handled ₹2 dozen crore', 'Handled ₹2');
+  passes('Handled ₹2 hundred', 'Handled ₹2 hundred');
+});
+
+test('KNOWN FALSE BLOCKS (final review): a money-word modifier before a non-count noun', () => {
+  for (const line of ['Handled a 2 crore budget team', 'Handled 2 crore budget cycles']) {
+    assert.equal(gate(line, SOURCE).verdict, 'block', `${line} is a pinned known false block`);
+  }
+});

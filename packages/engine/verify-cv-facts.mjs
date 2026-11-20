@@ -2366,7 +2366,7 @@ const MONEY_MULTIPLIERS = new Map([
 // What may not follow an amount the parser read: more digits, a separator
 // and a digit, or a word that looks like a magnitude. Each means the amount
 // was not read whole, and it fails closed (unreadableMoneyKey).
-const MONEY_LEFTOVER_RE = /^(?:[,.]?\d|[^\S\n]{0,3}(?:(?:lakhs?|lacs?|crores?|cr|thousand|million|mn|billion|bn|trillion|tn|\p{L}*illions?)(?!\p{L})|[kmbl](?![\p{L}\p{N}&/\p{Pd}])))/iu;
+const MONEY_LEFTOVER_RE = /^(?:[,.]?\d|[^\S\n]{0,3}(?:(?:lakhs?|lacs?|crores?|cr|hundred|dozen|thousand|million|mn|billion|bn|trillion|tn|\p{L}*illions?)(?!\p{L})|[kmbl](?![\p{L}\p{N}&/\p{Pd}])))/iu;
 // A range after an amount with no magnitude: "₹2-3 crore", "₹2 to 30 crore".
 // The first figure alone is not the amount, so the key is the whole run.
 const MONEY_RANGE_TAIL_RE = new RegExp(String.raw`^[^\S\n]{0,3}(?:\p{Pd}|to(?![\p{L}\p{N}]))[^\S\n]{0,3}(?:₹|rs\.?|inr)?[^\S\n]{0,3}\d[\d,.]*(?:[^\S\n]{0,3}(?:${MONEY_WORD_MAGNITUDE}|[kmbl])(?![\p{L}\p{N}])){0,2}`, 'iu');
@@ -2556,6 +2556,7 @@ function rekeyAmount(text, amount, numberAt, noun, nounEnd) {
 }
 
 const COORDINATORS = new Set(['and', 'or']);
+const MONEY_MODIFIER_STOP_RE = /^(?:while|when|where|using|during|since|through|throughout|within|under|that|which|who|this|last|alongside|including|until|after|before|so|then|also|\p{L}+ly)$/u;
 
 /** Extract metric-like claims that require source evidence. */
 export function metricClaims(text, { keepPlanHorizons = false } = {}) {
@@ -2599,6 +2600,14 @@ export function metricClaims(text, { keepPlanHorizons = false } = {}) {
       ? rekeyAmount(masked, amount, match.index, noun, match.index + match[0].length)
       : null;
     claims.add(normalizeClaim(rekeyed ?? `${amount} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
+    // "2 crore budget travellers": a singular money word before another word is a modifier; that word is counted too.
+    if (MONEY_NOUNS.has(noun) && !/s$/.test(noun)) {
+      const nounEnd = match.index + match[0].length;
+      const word = MONEY_LABEL_RIGHT_RE.exec(masked.slice(nounEnd, nounEnd + LABEL_WINDOW))?.[1].toLowerCase();
+      if (word && !MONEY_MODIFIER_STOP_RE.test(word) && !MAGNITUDE_NOT_A_NOUN.has(word) && !AMOUNT_ADVERBS.has(word)) {
+        claims.add(normalizeClaim(`${amount} ${NOUN_SYNONYMS.get(word) ?? word}`));
+      }
+    }
   }
   // A lakh or crore figure with no word after it is named by the money word on
   // its left ("budgets of 2 crore" is "2crore budgets"), or is the bare figure.
