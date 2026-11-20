@@ -379,6 +379,10 @@ export const en = {
     error: "Tick the box to continue.",
     saveFailed: "Your agreement could not be saved. Try again.",
   },
+  // P1-1
+  header: {
+    aiInUse: "AI in use:",
+  },
 } as const;
 
 export type Strings = typeof en;

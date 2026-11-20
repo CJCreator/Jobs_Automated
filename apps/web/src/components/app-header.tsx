@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { bindLlmKeyOwner, clearLlmKey } from "@/lib/client/llm-key";
+import { bindLlmKeyOwner, clearLlmKey, useLlmKey } from "@/lib/client/llm-key";
+import { providerLabel, useProviders } from "@/lib/client/providers";
 import { en } from "@/i18n/en";
 import { cn } from "@/components/ui/cn";
 import { CloseIcon, MenuIcon } from "@/components/ui/icons";
@@ -25,6 +26,8 @@ function isCurrent(pathname: string, href: string) {
 export function AppHeader({ email, children }: { email: string; children: ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { llm } = useLlmKey();
+  const { providers } = useProviders();
 
   // The AI key belongs to whoever is signed in; a different person gets none.
   useEffect(() => bindLlmKeyOwner(email), [email]);
@@ -89,6 +92,12 @@ export function AppHeader({ email, children }: { email: string; children: ReactN
               <span className="sr-only">{en.app.signedInAs} </span>
               {email}
             </p>
+            {llm ? (
+              <p className="min-w-0 text-sm text-muted">
+                <span className="sr-only">{en.header.aiInUse} </span>
+                {providerLabel(llm.provider, providers)} · {llm.model}
+              </p>
+            ) : null}
             {/* The sign-out form's submit bubbles up to here: forget the key first. */}
             <div onSubmit={() => clearLlmKey()}>{children}</div>
           </div>

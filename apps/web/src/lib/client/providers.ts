@@ -8,10 +8,8 @@ import type { ProviderOption } from "./types";
 
 export const FALLBACK_PROVIDERS: ProviderOption[] = [
   { id: "gemini", label: "Google Gemini", keyUrl: "https://aistudio.google.com/apikey", keyHint: "Starts with AIza" },
-  { id: "openai", label: "OpenAI", keyUrl: "https://platform.openai.com/api-keys", keyHint: "Starts with sk-" },
-  { id: "anthropic", label: "Anthropic Claude", keyUrl: "https://console.anthropic.com/settings/keys", keyHint: "Starts with sk-ant-" },
   { id: "openrouter", label: "OpenRouter", keyUrl: "https://openrouter.ai/keys", keyHint: "Starts with sk-or-" },
-  { id: "groq", label: "Groq", keyUrl: "https://console.groq.com/keys", keyHint: "Starts with gsk_" },
+  { id: "anthropic", label: "Anthropic Claude", keyUrl: "https://console.anthropic.com/settings/keys", keyHint: "Starts with sk-ant-" },
 ];
 
 let cached: ProviderOption[] | null = null;
