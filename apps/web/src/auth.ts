@@ -16,6 +16,7 @@ import * as repo from "@/lib/db/repo.mjs";
 import { assertSafeEnv, devLoginEnabled, strictEnv } from "@/lib/server/env-guard.mjs";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { HttpError } from "@/lib/server/http";
+import { RateLimitUnavailableError } from "@/lib/server/rate-limit-core.mjs";
 import { allowEmailLink, gateSignInAction } from "@/lib/server/signin-limit.mjs";
 import { maySignIn, signupMode } from "@/lib/server/signup-gate.mjs";
 
@@ -37,6 +38,10 @@ const emailEnabled = Boolean(process.env.AUTH_RESEND_KEY && process.env.EMAIL_FR
 
 // Development only: in production assertSafeEnv above has already refused to
 // run without AUTH_SECRET.
+// The app's own "check your email" page. Every email-link answer (sent, unknown address in closed
+// mode, rate-limited, limiter down) ends here, so the page cannot tell them apart.
+const CHECK_EMAIL_PATH = "/sign-in/check-email";
+
 const DEV_ONLY_SECRET = "rolewright-development-only-secret-never-use-in-production";
 
 // A stolen or copied cookie works until it expires (signing out does not
@@ -160,7 +165,7 @@ const config: NextAuthConfig = {
   // otherwise switch the default to database sessions.
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_S },
   secret: process.env.AUTH_SECRET || (strictEnv(process.env) ? undefined : DEV_ONLY_SECRET),
-  pages: { signIn: "/sign-in", error: "/sign-in" },
+  pages: { signIn: "/sign-in", error: "/sign-in", verifyRequest: CHECK_EMAIL_PATH },
   callbacks: {
     // Auth.js calls this twice for an email link: when the link is requested
     // (before any token is stored or email sent) and when it is opened. Both
@@ -184,7 +189,7 @@ const config: NextAuthConfig = {
       // account. Returning a string makes Auth.js redirect before it creates
       // a token or sends an email.
       const verifyRequest = account
-        ? `/api/auth/verify-request?${new URLSearchParams({ provider: account.provider, type: "email" })}`
+        ? `${CHECK_EMAIL_PATH}?${new URLSearchParams({ provider: account.provider, type: "email" })}`
         : null;
       if (!allowed && verifyRequest && emailStep?.verificationRequest && signupMode(process.env) === "closed") {
         return verifyRequest;
@@ -244,6 +249,10 @@ export async function signIn(...args: Parameters<typeof nextAuth.signIn>): Retur
   } catch (err) {
     if (err instanceof HttpError) {
       console.warn(`[rolewright] sign-in action ${err.status} ${err.code}`);
+      throw new AuthError("Sign-in limited.");
+    }
+    if (err instanceof RateLimitUnavailableError) {
+      console.warn("[rolewright] sign-in action 503 rate_limit_unavailable");
       throw new AuthError("Sign-in limited.");
     }
     throw err;

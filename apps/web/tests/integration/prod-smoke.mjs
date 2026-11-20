@@ -72,6 +72,7 @@ function serverEnv() {
     NODE_ENV: "production",
     BUILD_DIST: ".next-prod",
     AUTH_SECRET: SECRET,
+    ROLEWRIGHT_RATE_LIMIT_KEY: "prod-smoke-rate-limit-key-not-for-real-use-0123456789",
     AUTH_URL: base,
     ROLEWRIGHT_DATA_DIR: dbDir,
     NEXT_TELEMETRY_DISABLED: "1",

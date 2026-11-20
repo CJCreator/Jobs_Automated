@@ -454,6 +454,14 @@ export const en = {
       `Deleted the text of ${n} ${n === 1 ? "resume" : "resumes"} and ${f} ${f === 1 ? "fact" : "facts"} that came from them. Facts you added yourself are unchanged.`,
     factsLink: "Open your facts",
   },
+  // P1-28
+  checkEmail: {
+    title: "Check your email",
+    body: "If that address can sign in, a link is on its way. Open it on this device to finish signing in.",
+    delay: "The link can take a few minutes to arrive. Look in your spam folder too.",
+    limited: "Sign-in requests are limited, so asking for several links in a row may not send more. Wait a few minutes before you try again.",
+    back: "Back to sign in",
+  },
 } as const;
 
 export type Strings = typeof en;
