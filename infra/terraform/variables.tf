@@ -19,7 +19,13 @@ variable "region" {
 }
 
 variable "enable_workloads" {
-  description = "Create the Cloud Run service and job, the scheduler and the alerts. Leave false on the first apply: they need an image in Artifact Registry and secret values, which exist only after the first apply (see docs/runbook/gcp.md)."
+  description = "Create the Cloud Run migrate job (the service and scheduler also need create_service). Leave false on the first apply: they need an image in Artifact Registry and secret values, which exist only after the first apply (see docs/runbook/gcp.md)."
+  type        = bool
+  default     = false
+}
+
+variable "create_service" {
+  description = "Create the Cloud Run service and the purge scheduler (needs enable_workloads = true). Leave false until the migrate job has run successfully: the app refuses an unmigrated database, so a service created earlier fails its start-up probe and the apply fails with it (see docs/runbook/gcp.md)."
   type        = bool
   default     = false
 }

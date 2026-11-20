@@ -1,5 +1,5 @@
 # Cloud Run service (the app) and job (migrations). Created only once an image
-# and the secret values exist: set enable_workloads = true for the second apply.
+# and the secret values exist: set enable_workloads = true for the second apply (the migrate job), then run the job, then set create_service = true for the third apply (the service).
 
 locals {
   plain_env = {
@@ -19,7 +19,7 @@ locals {
 }
 
 resource "google_cloud_run_v2_service" "app" {
-  count    = var.enable_workloads ? 1 : 0
+  count    = var.enable_workloads && var.create_service ? 1 : 0
   name     = local.service_name
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"

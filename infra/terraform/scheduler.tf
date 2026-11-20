@@ -3,7 +3,7 @@
 # the audience and the account itself and refuses everyone else.
 
 resource "google_cloud_scheduler_job" "purge" {
-  count            = var.enable_workloads ? 1 : 0
+  count            = var.enable_workloads && var.create_service ? 1 : 0
   name             = "rolewright-purge"
   region           = var.region
   description      = "Delete accounts with no sign-in for 12 months"
