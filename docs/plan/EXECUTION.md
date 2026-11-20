@@ -285,3 +285,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - **P1-29:** sweep expired `rate_events` rows, and delete a user's own-id rows with the account.
   - After P1-29, P1-27 can call the rate-limit records short-lived again.
 - **Launch-gate note:** do not set `ROLEWRIGHT_SIGNUPS=open` before P1-7 and P1-27. `env-guard` allows it once a grievance contact is set, whether or not the purge scheduler runs.
+- **P1-19 merged** with the P1-19d split, approved by the advisor. One exception is recorded and accepted: lakh and crore money can back a count noun one filler word further away than main allowed. On the other side, the merge closes main's larger hole of reading "2 crore customers" as "2 customers". The P1-19c case table is in `p1-19c-cases.md`.
