@@ -50,8 +50,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   // never shown; one plain sentence covers every cause.
   const errorParam = (await searchParams).error;
   const failed = Boolean(errorParam);
-  // A refused sign-up gets one message whether or not the address has an
-  // account, so the page does not reveal who has one.
+  // The refusal text is the same for every refused address.
   const denied = errorParam === "AccessDenied";
 
   return (
