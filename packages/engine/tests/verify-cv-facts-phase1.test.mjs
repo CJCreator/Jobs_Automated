@@ -101,9 +101,76 @@ test('the lists are exported for the sync test', () => {
   assert.ok(COVERAGE_REASONS.includes('scope-not-checked'));
 });
 
-test('the claim-word check stays fast on a 30,000-character source', () => {
-  const big = SOURCE.repeat(Math.ceil(30000 / SOURCE.length)).slice(0, 30000);
-  const started = performance.now();
-  for (let i = 0; i < 20; i++) gate('Led month-end close reporting', big);
-  assert.ok((performance.now() - started) / 20 < 500);
+test('plural Indian magnitudes are magnitudes, not modifiers', () => {
+  const blocks = (line, source) => gate(line, source).invented.length > 0;
+  assert.ok(blocks('Served 5 lakhs customers', 'Served 5 customers'));
+  assert.ok(blocks('Served 5 lacs customers', 'Served 5 customers'));
+  assert.ok(blocks('Handled 3 crores transactions', 'Handled 3 transactions'));
+  assert.equal(blocks('Served 5 lakhs customers', 'Served 5 lakh customers'), false);
+  assert.equal(blocks('Handled 3 crores transactions', 'Handled 3 crore transactions'), false);
+});
+
+test('a crore or lakh amount without a currency mark is backed by the same amount in the facts', () => {
+  const verdict = (line) => gate(line, SOURCE);
+  for (const line of ['Handled 2 crore budgets', 'Handled ₹ 2 crore budgets', 'Handled 2 Cr budgets', 'Handled 2cr budgets',
+    'Handled a 2 crore budget', 'Managed 2 crore worth of budgets', 'Managed budgets totalling 2 crore annually']) {
+    const result = verdict(line);
+    assert.deepEqual(result.invented, [], line);
+  }
+  // A different noun, or a different amount, is not backed. The non-noun
+  // branch ("worth", "annually") still needs the same amount.
+  for (const line of ['Managed 2 crore customers', 'Handled 20 crore budgets', 'Managed 20 crore worth of budgets',
+    'Managed budgets totalling 20 crore annually', 'Handled 2 lakh budgets']) {
+    assert.ok(verdict(line).invented.length > 0, line);
+  }
+});
+
+test('a plain source number backs a rewritten count only on its own line and never as money', () => {
+  const blocks = (line, source) => gate(line, source).invented.length > 0;
+  for (const source of ['Budget Rs 50000 invoices were processed', 'Budget Rs. 50000 invoices were processed',
+    'INR 50000 invoices were processed', '₹ 50000 invoices were processed', '₹50000 invoices were processed',
+    '$ 50000 invoices were processed', 'USD 50000 invoices were processed']) {
+    assert.ok(blocks('Processed 50k invoices', source), source);
+  }
+  assert.ok(blocks('Served 2.02k customers', 'Joined in 2020\nCustomers were served daily'));
+  assert.ok(blocks('Processed 9.9b invoices', 'Phone 9900000000 invoices'));
+  assert.ok(blocks('Onboarded 5k vendors', 'PIN 5000 vendors onboarded'));
+  assert.equal(blocks('Processed 10k invoices', 'Processed 10,000 invoices'), false);
+  assert.equal(blocks('Processed 10k invoices', 'Processed 10000 invoices'), false);
+  // Years are not excluded by value: 2,000 invoices is a count.
+  assert.equal(blocks('Processed 2k invoices', 'Processed 2,000 invoices'), false);
+});
+
+test('cxos is in the cxo family', () => {
+  const words = (line, source) => gate(line, source).unsupportedFacts.map((fact) => fact.value);
+  assert.ok(words('Presented to CXOs monthly', 'Analyst.').includes('cxos'));
+  assert.deepEqual(words('Presented to CXOs monthly', 'Presented to the CXO monthly'), []);
+});
+
+// The gate re-derives nothing from a source it has already read: a call on
+// the same source is several times faster than the first call on a new one.
+// Without the per-source memo, warm and cold cost the same.
+test('a warm call on a 30,000-character source reuses the source work', (t) => {
+  const big = SOURCE.repeat(Math.ceil(30000 / SOURCE.length)).slice(0, 29990);
+  const target = 'Reduced month-end close time by 30% using SQL and Power BI, budgets of ₹2 crore';
+  const fresh = (tag) => `${big}\n${tag}`;
+  // JIT warm-up on other sources, so the cold figure is source work, not compile time.
+  for (let i = 0; i < 5; i++) gate(target, fresh(`warm-up ${i}`));
+  let cold = Infinity;
+  let warm = Infinity;
+  for (let i = 0; i < 5; i++) {
+    const source = fresh(`cold ${i}`);
+    let started = performance.now();
+    gate(target, source);
+    cold = Math.min(cold, performance.now() - started);
+    for (let j = 0; j < 5; j++) {
+      // A new string with the same content, the way the app rebuilds the fact base per call.
+      const same = `${source} `.slice(0, -1);
+      started = performance.now();
+      gate(target, same);
+      warm = Math.min(warm, performance.now() - started);
+    }
+  }
+  t.diagnostic(`cold ${cold.toFixed(2)} ms, warm ${warm.toFixed(2)} ms`);
+  assert.ok(warm * 3 <= cold || warm < 5, `cold ${cold.toFixed(2)} ms, warm ${warm.toFixed(2)} ms`);
 });
