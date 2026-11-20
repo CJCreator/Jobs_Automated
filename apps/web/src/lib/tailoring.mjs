@@ -26,6 +26,38 @@ export const MAX_SUGGESTIONS = 20;
 // the worst case is this budget plus one gate call (about 70 ms at the cap, worst shape).
 export const GATE_BUDGET_MS = 1000;
 
+// The most lines one tailoring sends to the model: the summary first, then bullets in fact order
+// (most recent job first). The rest are not considered, and the review screen says so.
+export const MAX_LINES_SENT = 60;
+
+/**
+ * The lines to send to the model, and how many there were.
+ * @param {{ ref: string, kind: string }[]} lines from tailorableLines()
+ * @returns {{ sent: any[], total: number }}
+ */
+export function selectLines(lines) {
+  const all = Array.isArray(lines) ? lines : [];
+  const ordered = [...all.filter((l) => l.kind === "summary"), ...all.filter((l) => l.kind !== "summary")];
+  return { sent: ordered.slice(0, MAX_LINES_SENT), total: all.length };
+}
+
+/**
+ * How many usable rewrites the model returned, before the cap of MAX_SUGGESTIONS: a known line, once,
+ * with some text. Mirrors the filter in buildSuggestions without checking anything.
+ * @param {{ ref: string, after: string }[]} rawRewrites
+ * @param {{ ref: string }[]} lines
+ */
+export function countUsable(rawRewrites, lines) {
+  const known = new Set((lines ?? []).map((l) => l.ref));
+  const seen = new Set();
+  for (const raw of Array.isArray(rawRewrites) ? rawRewrites : []) {
+    if (!known.has(raw?.ref) || seen.has(raw.ref) || typeof raw.after !== "string") continue;
+    if (!raw.after.trim().slice(0, MAX_TEXT)) continue;
+    seen.add(raw.ref);
+  }
+  return seen.size;
+}
+
 /** A refused action, carrying the HTTP status a route should answer with. */
 export class TailoringError extends Error {
   /**

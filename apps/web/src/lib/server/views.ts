@@ -8,6 +8,9 @@ type StoredTailoring = {
   company: string | null;
   jdText: string | null;
   createdAt: string | null;
+  linesTotal?: number | null;
+  linesSent?: number | null;
+  rewritesReturned?: number | null;
 };
 
 export function tailoringView(t: StoredTailoring, suggestions: unknown[]) {
@@ -18,6 +21,9 @@ export function tailoringView(t: StoredTailoring, suggestions: unknown[]) {
     jdText: t.jdText ?? "",
     suggestions,
     createdAt: t.createdAt,
+    linesTotal: t.linesTotal ?? null,
+    linesSent: t.linesSent ?? null,
+    rewritesReturned: t.rewritesReturned ?? null,
   };
 }
 

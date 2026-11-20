@@ -149,12 +149,20 @@ export function createJob(db, userId, { title, company, jdText }) {
   });
 }
 
+/** A count that is absent (null) or a non-negative integer; anything else is a bug in the caller. */
+function optionalCount(n) {
+  if (n === undefined || n === null) return null;
+  if (!Number.isSafeInteger(n) || n < 0) throw new Error("A count must be a non-negative integer.");
+  return n;
+}
+
 /**
  * A job and its tailoring in one transaction, so a failure part-way never
  * leaves behind a job description the user has no screen to see or delete.
  * @returns {Promise<{ id: string, jobId: string }>}
  */
-export function createJobWithTailoring(db, userId, { title, company, jdText, suggestions, provider, model }) {
+export function createJobWithTailoring(db, userId, { title, company, jdText, suggestions, provider, model, linesTotal, linesSent, rewritesReturned }) {
+  const counts = [linesTotal, linesSent, rewritesReturned].map(optionalCount);
   const jobId = newId();
   const id = newId();
   return db.withUser(userId, async (tx) => {
@@ -163,9 +171,9 @@ export function createJobWithTailoring(db, userId, { title, company, jdText, sug
       [jobId, userId, title ?? null, company ?? null, jdText ?? null],
     );
     await tx.query(
-      `INSERT INTO tailorings (id, user_id, job_id, suggestions, provider, model)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
-      [id, userId, jobId, JSON.stringify(suggestions ?? []), provider ?? null, model ?? null],
+      `INSERT INTO tailorings (id, user_id, job_id, suggestions, provider, model, lines_total, lines_sent, rewrites_returned)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9)`,
+      [id, userId, jobId, JSON.stringify(suggestions ?? []), provider ?? null, model ?? null, ...counts],
     );
     return { id, jobId };
   });
@@ -188,6 +196,7 @@ export function createTailoring(db, userId, { jobId, suggestions, provider, mode
 }
 
 const TAILORING_SELECT = `SELECT t.id, t.job_id, t.suggestions, t.provider, t.model, t.created_at, t.updated_at,
+         t.lines_total, t.lines_sent, t.rewrites_returned,
          j.title, j.company, j.jd_text
   FROM tailorings t JOIN jobs j ON j.id = t.job_id
   WHERE t.id = $1`;
@@ -203,6 +212,9 @@ const toTailoring = (r) =>
         suggestions: r.suggestions,
         provider: r.provider,
         model: r.model,
+        linesTotal: r.lines_total ?? null,
+        linesSent: r.lines_sent ?? null,
+        rewritesReturned: r.rewrites_returned ?? null,
         createdAt: iso(r.created_at),
         updatedAt: iso(r.updated_at),
       }

@@ -9,7 +9,7 @@ import { HttpError, json, route } from "@/lib/server/http";
 import { readLlmHeaders } from "@/lib/server/llm-key";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
-import { buildSuggestions } from "@/lib/tailoring.mjs";
+import { buildSuggestions, countUsable, selectLines } from "@/lib/tailoring.mjs";
 
 export const runtime = "nodejs";
 
@@ -35,7 +35,7 @@ export const POST = route("tailorings.create", async (req, { state }) => {
   if (jdText.length < MIN_JD || jdText.length > MAX_JD) {
     throw new HttpError(400, "invalid_jd", "Paste the full job description: between 200 and 20,000 characters.");
   }
-  takeRateLimit("ai", userId);
+  await takeRateLimit("ai", userId);
 
   // Fail closed: without the engine's fact gate nothing is checked, so nothing is made.
   const engineGate = await loadFactGate();
@@ -46,8 +46,11 @@ export const POST = route("tailorings.create", async (req, { state }) => {
     throw new HttpError(409, "nothing_confirmed", "Confirm at least one line of your summary or experience first.");
   }
 
-  const rewrites = await suggestRewrites({ provider: llm.provider, key: llm.key, model: llm.model, lines, jdText });
-  const suggestions = buildSuggestions(rewrites, lines, {
+  // Select before the model call: it never receives more than MAX_LINES_SENT lines.
+  const { sent, total } = selectLines(lines);
+  const rewrites = await suggestRewrites({ provider: llm.provider, key: llm.key, model: llm.model, lines: sent, jdText });
+  const rewritesReturned = countUsable(rewrites, sent);
+  const suggestions = buildSuggestions(rewrites, sent, {
     sourceText: factBaseText(facts),
     jdText,
     cannotConfirm: facts.cannotConfirm,
@@ -60,6 +63,9 @@ export const POST = route("tailorings.create", async (req, { state }) => {
     suggestions,
     provider: llm.provider,
     model: llm.model ?? null,
+    linesTotal: total,
+    linesSent: sent.length,
+    rewritesReturned,
   });
   return json({ id });
 });

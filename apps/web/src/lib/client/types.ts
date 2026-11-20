@@ -157,6 +157,10 @@ export interface Tailoring {
   jdText: string;
   suggestions: Suggestion[];
   createdAt: string;
+  /** Null or absent on tailorings made before the cap existed. */
+  linesTotal?: number | null;
+  linesSent?: number | null;
+  rewritesReturned?: number | null;
 }
 
 export type SuggestionAction =

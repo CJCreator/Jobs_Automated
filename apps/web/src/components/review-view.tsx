@@ -190,6 +190,15 @@ export function ReviewView({ id }: { id: string }) {
     );
   }
 
+  const { linesTotal, linesSent, rewritesReturned } = tailoring;
+  const capNotices: string[] = [];
+  if (typeof linesTotal === "number" && typeof linesSent === "number" && linesSent < linesTotal) {
+    capNotices.push(en.tailoringCap.linesCut(linesTotal, linesSent));
+  }
+  if (typeof rewritesReturned === "number" && rewritesReturned > tailoring.suggestions.length) {
+    capNotices.push(en.tailoringCap.rewritesCut(rewritesReturned, tailoring.suggestions.length));
+  }
+
   const stats: [string, number][] = [
     [t.counts.accepted, counts.accepted],
     [t.counts.rejected, counts.rejected],
@@ -271,6 +280,14 @@ export function ReviewView({ id }: { id: string }) {
               )}
             </>
           ) : null}
+        </Notice>
+      ) : null}
+
+      {capNotices.length > 0 ? (
+        <Notice tone="info" role="status">
+          {capNotices.map((n) => (
+            <p key={n}>{n}</p>
+          ))}
         </Notice>
       ) : null}
 

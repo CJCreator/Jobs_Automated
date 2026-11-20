@@ -144,4 +144,9 @@ CREATE POLICY consents_isolation ON consents
 -- Privileges: user-data tables only. Nothing on users, accounts or verification_tokens.
 GRANT SELECT, INSERT, UPDATE, DELETE ON resumes, fact_bases, jobs, tailorings TO rolewright_app;
 GRANT SELECT, INSERT ON consents TO rolewright_app;
+
+-- P1-16
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS lines_total integer;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS lines_sent integer;
+ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS rewrites_returned integer;
 `;

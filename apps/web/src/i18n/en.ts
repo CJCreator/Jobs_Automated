@@ -379,6 +379,11 @@ export const en = {
     error: "Tick the box to continue.",
     saveFailed: "Your agreement could not be saved. Try again.",
   },
+  // P1-16
+  tailoringCap: {
+    linesCut: (total: number, sent: number) => `Your resume has ${total} confirmed lines. The first ${sent} were considered.`,
+    rewritesCut: (returned: number, shown: number) => `The AI suggested ${returned} changes. The first ${shown} are shown.`,
+  },
 } as const;
 
 export type Strings = typeof en;
