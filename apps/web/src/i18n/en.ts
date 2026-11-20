@@ -478,6 +478,15 @@ export const en = {
     failed: "We could not prepare your file. Try again in a moment.",
     fallbackName: "rolewright-data.json",
   },
+  // P2-6
+  dataExportPdfs: {
+    body: "A zip with one PDF for each tailored resume that passes the fact check today, newest first, up to 20. Any that do not pass are listed in a README inside the zip with a reason, never their content.",
+    button: "Download your tailored resumes (PDF)",
+    working: "Making your PDFs",
+    done: "Your resumes have been downloaded.",
+    failed: "We could not make your PDFs. Try again in a moment.",
+    fallbackName: "rolewright-resumes.zip",
+  },
   // P2-3
   segment: {
     title: "Which sounds most like you?",
