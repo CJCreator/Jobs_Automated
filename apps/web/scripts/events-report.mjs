@@ -4,6 +4,9 @@
 //
 // Per-day counts by event name with distinct users, sign-ups per day (from users.created_at),
 // and the segment split. Uses DATABASE_URL, or the embedded database when that is unset.
+// Against the production database, run it as the app's login with ROLEWRIGHT_DEPLOYED=1, so it
+// reads through the rolewright_system role and does not try to apply the schema (that login
+// cannot; `npm run db:migrate` as the owner does).
 
 import { getDb } from "../src/lib/db/index.mjs";
 
