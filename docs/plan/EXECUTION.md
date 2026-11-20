@@ -279,3 +279,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
     - everything that works today keeps working.
   - P1-19c also carries the earlier rupee-amount scope.
 - **P1-25** reached 0 engine failures, down from 28; 19,704 tests pass. It is in review round 2 for the id-list message port and the baseline wording.
+- **P1-F (small): last Web CI failure.** `packages/engine/web/tests/lib/status-tone-contrast.test.mjs` fails on `duplex-sparring.tsx:275-287`: `text-emerald-700` on a tint measures 4.34:1, below the required 4.5. Change it to `text-emerald-800` or the shared tone token. This is the only remaining Web CI failure after P1-25.
