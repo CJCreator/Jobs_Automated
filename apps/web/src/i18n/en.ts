@@ -388,6 +388,11 @@ export const en = {
   header: {
     aiInUse: "AI in use:",
   },
+  // P1-15
+  consentStorage: {
+    lead: "I agree that Rolewright stores what I enter here, as described in the privacy notice.",
+    error: "Tick the box to save your changes.",
+  },
 } as const;
 
 export type Strings = typeof en;

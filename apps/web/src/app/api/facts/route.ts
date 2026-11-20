@@ -4,6 +4,7 @@ import { MAX_FACT_BASE_CHARS, confirmationCounts, factBaseText } from "@/lib/fac
 import { readJsonObject } from "@/lib/server/body";
 import { applyFactsEdit, parseRemovals } from "@/lib/server/facts-edit.mjs";
 import { HttpError, json, route } from "@/lib/server/http";
+import { requireStorageConsent } from "@/lib/server/consent";
 import { requireUser } from "@/lib/server/session";
 
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ export const GET = route("facts.get", async (_req, { state }) => {
 // action running at the same moment is never overwritten.
 export const PUT = route("facts.put", async (req, { state }) => {
   const userId = await requireUser(state);
+  await requireStorageConsent(userId);
   const body = await readJsonObject(req);
   if (!body.facts || typeof body.facts !== "object" || Array.isArray(body.facts)) {
     throw new HttpError(400, "invalid_facts", "There were no facts to save.");

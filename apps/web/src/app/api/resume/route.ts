@@ -32,8 +32,8 @@ export const POST = route("resume.upload", async (req, { state }) => {
   const userId = await requireUser(state);
   const llm = readLlmHeaders(req);
   // Before the body is read and before a rate-limit token is spent: no collection without consent.
-  await requireConsent(userId);
-  takeRateLimit("upload", userId);
+  await requireConsent(userId, llm.provider);
+  await takeRateLimit("upload", userId);
 
   const type = req.headers.get("content-type") ?? "";
   if (!type.toLowerCase().startsWith("multipart/form-data")) {

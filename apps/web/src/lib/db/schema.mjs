@@ -149,4 +149,10 @@ GRANT SELECT, INSERT ON consents TO rolewright_app;
 ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS lines_total integer;
 ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS lines_sent integer;
 ALTER TABLE tailorings ADD COLUMN IF NOT EXISTS rewrites_returned integer;
+
+-- P1-15
+ALTER TABLE consents ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT '';
+ALTER TABLE consents DROP CONSTRAINT IF EXISTS consents_user_id_notice_version_purpose_key;
+CREATE UNIQUE INDEX IF NOT EXISTS consents_user_version_purpose_provider_key
+  ON consents (user_id, notice_version, purpose, provider);
 `;
