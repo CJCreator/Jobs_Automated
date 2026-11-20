@@ -1,0 +1,13 @@
+# NOTE: the image is built from the repository root, where BuildKit reads
+# apps/web/Dockerfile.dockerignore instead of this file. This one applies only
+# if the context is apps/web.
+**/node_modules
+**/.next
+**/.next-*
+.data
+.env
+.env.*
+*.log
+.git
+tests
+docs

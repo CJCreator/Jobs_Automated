@@ -1,0 +1,69 @@
+# Read by BuildKit for the repo-root build context (docker build -f apps/web/Dockerfile .).
+# Allowlist: only the app and the engine enter the context.
+*
+!apps/web
+!packages/engine
+
+# Never in an image
+**/node_modules
+**/.next
+**/.next-*
+**/.data
+**/.env
+**/.env.*
+**/.envrc
+**/.career-ops.env
+**/.pii-token-map.json
+**/*.log
+**/*.tsbuildinfo
+**/*.db*
+**/*.bak*
+**/.DS_Store
+
+# App: tests and docs
+apps/web/tests
+apps/web/docs
+apps/web/Dockerfile*
+apps/web/.dockerignore
+
+# Engine: legacy UI, tests, fixtures
+packages/engine/web
+packages/engine/tests
+packages/engine/test-fixtures
+
+# Engine: the personal user layer (cv, tracker, profile, reports); the app keeps
+# user data in the database and points the engine at an empty temp folder.
+packages/engine/cv.md
+packages/engine/article-digest.md
+packages/engine/voice-dna.md
+packages/engine/applications.md
+packages/engine/follow-ups.md
+packages/engine/portals.yml
+packages/engine/local
+packages/engine/.career-ops-data
+packages/engine/.career-ops-web
+packages/engine/data
+packages/engine/reports
+packages/engine/output
+packages/engine/jds
+packages/engine/documents
+packages/engine/interview-prep
+packages/engine/writing-samples
+packages/engine/plan
+packages/engine/plugins.local
+packages/engine/config/profile.yml
+packages/engine/config/cv-facts.json
+packages/engine/config/benchmarks.yml
+packages/engine/config/privacy.yml
+packages/engine/config/plugins.yml
+packages/engine/modes/_profile.md
+packages/engine/modes/_custom.md
+packages/engine/modes/_brief.md
+packages/engine/batch/logs
+packages/engine/batch/tmp
+packages/engine/batch/tracker-additions
+packages/engine/batch/*.tsv
+packages/engine/batch/batch-state-recovery.d
+packages/engine/.claude
+packages/engine/.opencode
+packages/engine/.mcp.json
