@@ -37,7 +37,7 @@ Both flags are refused on a **deployed host** and when `NODE_ENV` is `production
 
 ## Environment variables
 
-Read from the process environment only. "Required when deployed" means a deployed host (`ROLEWRIGHT_DEPLOYED=1` or `K_SERVICE` set) refuses to start, or refuses the feature, without it. `AUTH_SECRET` and `DATABASE_URL` are checked at start; `ROLEWRIGHT_RATE_LIMIT_KEY` is checked when a request is limited (see its row). Everything else here is optional unless its row says otherwise. The grievance variables are required only when sign-ups are `open`, but the notice shows "not yet set" until both are valid.
+Read from the process environment only. "Required when deployed" means a deployed host (`ROLEWRIGHT_DEPLOYED=1` or `K_SERVICE` set) refuses to start, or refuses the feature, without it. `AUTH_SECRET` and `DATABASE_URL` are checked at start; `ROLEWRIGHT_RATE_LIMIT_KEY` is checked on sign-in and free-trial requests (see its row). Everything else here is optional unless its row says otherwise. The grievance variables are required only when sign-ups are `open`, but the notice shows "not yet set" until both are valid.
 
 | Name | Meaning |
 |---|---|
@@ -59,13 +59,14 @@ Read from the process environment only. "Required when deployed" means a deploye
 | `ROLEWRIGHT_GRIEVANCE_EMAIL` | Email address of the grievance contact, shown with the name on the privacy notice. Must be a valid email address; otherwise the notice says the contact is not yet set. |
 | `ROLEWRIGHT_SIGNUPS` | Who may sign in: `closed` (only people who already have an account), `allowlist` (only addresses on `ROLEWRIGHT_SIGNUP_ALLOWLIST`) or `open` (anyone). Unset or unrecognised: `allowlist` on a deployed host or with `NODE_ENV=production`, `open` elsewhere. A deployed server refuses to start if the value is not one of the three, or if it is `open` while the grievance contact is not set. Optional. See [Sign-ups](#sign-ups). |
 | `ROLEWRIGHT_SIGNUP_ALLOWLIST` | Comma-separated full addresses and `@domain` entries (for example `asha@example.com,@example.org`), compared in lower case. Malformed entries are ignored. Used only in `allowlist` mode. Needed for anyone new to get in while the mode is `allowlist`. |
-| `ROLEWRIGHT_RATE_LIMIT_KEY` | A secret of at least 32 characters. Rate limits are stored under a keyed hash (HMAC-SHA-256) of the IP address or email address, never the plain value. On a deployed host or with `NODE_ENV=production`, a missing or short key makes the rate-limited routes answer 503 (it is checked when a request is limited, not at start-up); elsewhere a fixed development value is used. **Required when deployed.** Changing it resets the counts. |
+| `ROLEWRIGHT_RATE_LIMIT_KEY` | A secret of at least 32 characters. Rate limits are stored under a keyed hash (HMAC-SHA-256) of the IP address or email address, never the plain value. On a deployed host or with `NODE_ENV=production`, a missing or short key breaks every sign-in (the request fails with a server error) and makes the free trial answer 503; limits kept under a user id still work. It is checked on those requests, not at start-up; elsewhere a fixed development value is used. **Required when deployed.** Changing it resets the counts. |
 | `ROLEWRIGHT_TRUSTED_PROXY_HOPS` | How many proxies beyond the first sit in front of the app, a whole number from 0 to 99. The client address for rate limits is read from `x-forwarded-for`, counting from the right: with `0` (the default) the last entry, with `1` the one before it. Never the leftmost, which a client can forge. A wrong value either lets a client choose its own address or puts everyone in one shared `unknown` bucket. Optional; set it to match your hosting. |
 | `ROLEWRIGHT_EXTRA_PROVIDERS` | Comma-separated list of extra AI providers to offer in the key screen: `openai`, `groq`. Gemini, OpenRouter and Anthropic are always offered; other names are ignored. Optional. |
 | `ROLEWRIGHT_TRIAL_GEMINI_KEY`, `ROLEWRIGHT_TRIAL_GEMINI_MODEL` | The free trial's Gemini key and model id (ADR 0003). The provider is used only when both are set and the model id is valid (letters, digits and `. : / _ -`, no `..`). The key stays on the server. Optional, but with neither trial provider configured the free trial answers "not available right now". |
 | `ROLEWRIGHT_TRIAL_OPENROUTER_KEY`, `ROLEWRIGHT_TRIAL_OPENROUTER_MODEL` | The same for OpenRouter. The trial tries Gemini first and OpenRouter when Gemini's quota or service fails. Optional. |
 | `ROLEWRIGHT_MIGRATE_DATABASE_URL` | Connection string for the owner login, used only by `npm run db:migrate`. On a deployed host `db:migrate` needs it and never falls back to `DATABASE_URL`. The running app does not read it. See [Migrations and database roles](#migrations-and-database-roles). |
 | `ROLEWRIGHT_EXPECT_GRIEVANCE=1` | For `npm run test:prod` only: the smoke test then expects the privacy page to show a grievance contact; without it, it expects the contact to be unset. |
+| `SMOKE_BASE_URL` | For `npm run test:prod` only: an https URL of a running deployment. When set, nothing is built or started and only the remote steps run. |
 | `ROLEWRIGHT_REQUIRE_PG=1` | For tests only: makes `tests/db.test.mjs` fail instead of falling back to the embedded database when no Postgres URL is set. |
 | `ROLEWRIGHT_TEST_OWNER_URL` | For tests only, with `ROLEWRIGHT_TEST_DATABASE_URL`: the owner login the database tests use to apply the schema, so the app login in the test owns nothing. |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | Optional. A Chromium binary to use for PDF export instead of Playwright's own download. |
@@ -90,7 +91,7 @@ Read from the process environment only. "Required when deployed" means a deploye
 
 ## What production needs
 
-- A Postgres database in an India region (for example AWS `ap-south-1` Mumbai), set up as in [Migrations and database roles](#migrations-and-database-roles) below. On a deployed host the schema is not applied when the app starts: run `npm run db:migrate` first.
+- A Postgres database in an India region (Cloud SQL in `asia-south1`, Mumbai; ADR 0009), set up as in [Migrations and database roles](#migrations-and-database-roles) below. On a deployed host the schema is not applied when the app starts: run `npm run db:migrate` first.
 - Chromium for PDF export: install the engine checkout's Playwright browser (`npx playwright install --with-deps chromium` on Linux), or point `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at a Chromium binary.
 - The engine checkout deployed alongside the app, with its dependencies installed, and `CAREER_OPS_CODE_ROOT` pointing at it if it is not the app's parent folder.
 - `AUTH_SECRET`, `AUTH_URL` and `ROLEWRIGHT_RATE_LIMIT_KEY`.
@@ -110,7 +111,7 @@ Read from the process environment only. "Required when deployed" means a deploye
 
 When the variable is unset, a deployed host (or `NODE_ENV=production`) uses `allowlist` and development uses `open`. To admit one more person, add their address to `ROLEWRIGHT_SIGNUP_ALLOWLIST` and restart or redeploy the app.
 
-For the email link, an address that is not admitted, and an address that has asked for too many links (5 an hour), both see the same "check your email" page and get no email, so the page does not show who has an account. Sign-in attempts from one network are also limited (20 in 10 minutes). The "check your email" page is Auth.js's built-in page; the app has no page of its own for it.
+For the email link in closed mode, an address with no account sees the same "check your email" page as one with an account, and gets no email, so the page does not show who has an account. In allowlist mode an address that is not on the list is refused on the sign-in page. In every mode an admitted address that has asked for too many links (5 an hour) sees the "check your email" page and gets no email. Sign-in attempts from one network are also limited (20 in 10 minutes). The "check your email" page is Auth.js's built-in page; the app has no page of its own for it.
 
 ## Migrations and database roles
 
@@ -127,7 +128,7 @@ Set-up, once, as an administrator:
 
 - Create the four roles as above, then `GRANT rolewright_app, rolewright_system TO rolewright_login;`.
 - Create the database owned by `rolewright_owner`, and give `rolewright_login` `CONNECT` on it and `USAGE` on the `public` schema.
-- Never grant `rolewright_owner` to the app login or to `rolewright_app`. The start-up check refuses to serve if the app login owns a user-data table or is a member of its owner, if it is a superuser or has `BYPASSRLS`, if `rolewright_app` is a superuser, has `BYPASSRLS`, owns a user-data table or is a member of `rolewright_system`, or if the login is missing either grant.
+- Never grant `rolewright_owner` to the app login or to `rolewright_app`. On a deployed host the start-up check refuses to serve if the app login owns a user-data table or is a member of its owner, if it is a superuser or has `BYPASSRLS`, if `rolewright_app` is a superuser, has `BYPASSRLS`, owns a user-data table or is a member of `rolewright_system`, or if the login is missing either grant.
 
 Order of a release: **migrate, then deploy.**
 
