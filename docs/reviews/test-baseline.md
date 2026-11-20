@@ -14,7 +14,7 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 | After the skill rename | `97fd9d1` | 18,316 | 117 | The rename also rewrote some regex literals; reverted in the next commit. |
 | After Phase 0 (all tasks merged) | `3922e19` | 19,678 | 28 | All failures on the pre-existing list below; lint passes (1,951 files). |
 | After test repairs | `9d6c104` | 19,509 | 28 | Every inline section runs to the end; earlier runs stopped at a crash reading the removed `modes/zh`, which hid later sections. All 28 failures are on the pre-existing list below. |
-| After engine baseline cleanup (P1-25) | this commit | 19,704 | 0 | `npm run lint` passes. No known failures remain; see the list below for what was done to each. |
+| After engine baseline cleanup (P1-25) | `PLACEHOLDER` | 19,704 | 0 | `npm run lint` passes. No known failures remain; see the list below for what was done to each. |
 
 ## The app
 
@@ -32,7 +32,7 @@ After the browser sweep and the merge of P0-8 and P0-12 (P0-11, merged tree): `n
 
 ## Known pre-existing engine failures
 
-None. P1-25 cleared the 28 inherited failures. Each was fixed at its cause, or its test was adjusted where the restructure or ADR 0013 removed what it covered:
+P1-25 cleared the 28 inherited failures. One flaky test remains on the list. Each of the others was fixed at its cause, or its test was adjusted where the restructure or ADR 0013 removed what it covered:
 
 - Skill entrypoints (`.antigravitycli`, `.claude`, `.grok`, `.kimi`, `.opencode`, `.qwen`): were regular files holding link text; now git symlinks to `.agents/skills/rolewright/SKILL.md`.
 - `set-status` suites and `writer-scripts-data-root`: the copied import closure lacked `lib/services/tracker-service.mjs`; added. The service had also lost the "one command per row" id-list message (code `usage`), the `linkedBy` detail of `report-number-ambiguous`, and `set-status.mjs` no longer printed the follow-up line; restored. `set-status-lock-scope` now reads the service, where the lock transaction lives.
@@ -45,7 +45,8 @@ None. P1-25 cleared the 28 inherited failures. Each was fixed at its cause, or i
 - `readme-shared-layer`: deleted. The engine README is a short Rolewright page with no project tree, so there is nothing to check. `readme-usage-commands` now checks that every command in the README Command Reference is routed (the `job` alias it listed was not). The README gained the Codex paragraph the Codex check requires.
 - `scripts/followup-sweep.sh` is committed executable.
 - Legacy web UI (kept, ADR 0007 as amended): five `text-brand` uses now use `text-brand-text`; the doctor route is in process, so its spawn and failed-child tests became one in-process test and `web-core-argv-contract` no longer lists it; the market-mode tests use `modes/hi`, the only market set left.
-- `#2346` was not flaky: the `linkedBy` detail was missing (fixed above). Follow-up lock-timeout lines in the log are the expected output of tests of that timeout, not failures. `tests/pdf-shared-browser.test.mjs` failed once in four full runs when the browser launch was slow under load, and passes alone; treat it as flaky if it appears.
+- `tests/pdf-shared-browser.test.mjs`: flaky when the browser launch is slow under load (failed once in four full runs); passes alone.
+- `#2346` was not flaky: the `linkedBy` detail was missing (fixed above). Follow-up lock-timeout lines in the log are the expected output of tests of that timeout, not failures.
 
 ## Rules for changes
 

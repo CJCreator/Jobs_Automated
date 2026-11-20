@@ -268,10 +268,10 @@ try {
 // inside it. Add an entry to ALLOWED_MISSING_ENTRIES only with a comment
 // justifying why it may legitimately be absent.
 const ALLOWED_MISSING_ENTRIES = new Set([
-  // Upstream community, governance and release files removed from this fork
+  // Upstream entries are kept listed; fork additions are appended. These 17 are
+  // upstream community, governance and release files removed from this fork
   // (ADR 0013), plus repo-root files that live above packages/engine after the
-  // monorepo move. The manifest is upstream's list and the updater is disabled,
-  // so these stay listed rather than diverge from it.
+  // monorepo move. The updater is disabled, so they stay listed.
   '.gitattributes', '.editorconfig', 'hired-share.mjs', 'hired-wall-build.mjs', 'HIRED.md',
   'MANIFESTO.md', 'manifesto.mjs', 'MAINTAINERS.md', 'CHANGELOG.md', 'CODE_OF_CONDUCT.md',
   'CONTRIBUTORS.md', '.all-contributorsrc', 'GOVERNANCE.md', 'SUPPORT.md', 'TRADEMARK.md',

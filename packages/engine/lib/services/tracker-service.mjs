@@ -209,12 +209,17 @@ export async function executeSetStatus(options = {}) {
   if (selector !== null) {
     const idList = trackerIdList(selector);
     if (idList) {
-      const nums = idList.filter((part) => part !== '');
-      const suffix = undo ? '--undo' : requestedStatus;
-      const lines = nums.map((num) => `  node set-status.mjs --row ${num} ${suffix}`);
-      const empty = idList.includes('') ? ' The list has an empty slot (a stray comma); finish it or drop the comma.' : '';
+      const nums = idList.filter((part) => /^\d+$/.test(part));
+      const shown = nums.slice(0, 8);
+      const action = undo ? '--undo' : requestedStatus;
+      // These numbers are tracker rows. A bare `14 Applied` is rejected when that
+      // row's report id differs, so the command that means "tracker row" is --row.
+      const lines = shown.map((id) => `node set-status.mjs --row ${id} ${action}`);
+      const extra = nums.length - shown.length;
+      const more = extra > 0 ? `\n... and ${extra} more` : '';
+      const empty = idList.some((part) => part === '') ? ' The list has an empty slot.' : '';
       throw new TrackerServiceError(
-        `"${selector}" is a list of tracker numbers, not a company. Run one command per row:\n${lines.join('\n')}${empty}`,
+        `set-status updates one row.${empty} Run one command per tracker number:\n${lines.join('\n')}${more}`,
         { code: 'usage', exitCode: EXIT_USAGE },
       );
     }
