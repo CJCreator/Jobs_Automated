@@ -14,7 +14,7 @@ Built for job seekers in India: freshers, experienced hires and career switchers
 4. **Export a PDF** that reads well to ATS keyword screening and to people.
 5. **Track applications, draft cover letters and prepare for interviews** from the same confirmed facts (in the plan, not built yet).
 
-You bring your own AI key (Gemini, OpenRouter or Anthropic), or start with a small free trial. Keys are used for the request and never stored.
+You bring your own AI key (Gemini, OpenRouter or Anthropic), or start with a small free trial on Rolewright's own keys: 5 tailorings and 3 resume readings for each account with a confirmed email address. Your key is used for the request and never stored.
 
 ## Repository layout
 

@@ -324,7 +324,9 @@ export const en = {
         "The suggestions made for each job, your decisions on them, and which AI provider and model made them.",
         "Your email address. If you sign in with Google, also your name, your picture and your Google account ID.",
         "The date and time you last used Rolewright, and when your account was created.",
-        "A record of when you agreed to this notice, and which version.",
+        "A record of what you agreed to: when you first agreed, which version of this notice, what you agreed to (sending text to an AI provider, or storing what you enter), and for the AI provider, which one (or \"trial\" for the free trial).",
+        "How many of your free-trial tailorings and resume readings you have used. This is a count, not content.",
+        "Records that count your recent requests, so the limits on sign-ins, emails, uploads and AI requests can work. They are kept under your account ID. For sign-in and free-trial limits they are kept under a scrambled form of your IP address, or of your email address when you ask for a sign-in link. The scrambled form is made with a secret key, and Rolewright does not store your IP address in plain form for this. Each record counts for 24 hours at most. After that it is removed the next time the same limit is checked; until then it stays stored.",
       ],
       notStoredTitle: "What we do not store",
       notStored: [
@@ -332,11 +334,11 @@ export const en = {
         "Payment details. Rolewright does not take payments. You pay your AI provider directly.",
       ],
       sentTitle: "What goes to your AI provider",
-      sent: "To read your resume and suggest changes, the text of your resume, your confirmed lines with their job title and employer and the job description you paste are sent to the AI provider you chose. That provider may process them outside India, under its own terms.",
+      sent: "To read your resume and suggest changes, the text of your resume, your confirmed lines with their job title and employer and the job description you paste are sent to the AI provider you chose. That provider may process them outside India, under its own terms. If you use the free trial instead, the same text goes to Google Gemini, and to OpenRouter as well if Gemini cannot answer, on Rolewright's own key. The free trial is for accounts with a confirmed email address, and covers 5 tailorings and 3 resume readings.",
       retentionTitle: "How long we keep it",
-      retention: "If you do not use Rolewright for 12 months, your account and all the data in it are deleted.",
+      retention: "If you do not use Rolewright for 12 months, your account and all the data in it are deleted. You can delete things sooner, one at a time. On the home page you can delete one tailored resume together with the job description it was made for. On the privacy screen you can delete the text and file names of your uploaded resumes. That does not delete your facts, unless you also choose to delete the facts that were read from your resume; your contact details and the facts you typed or edited yourself stay either way. A tailored resume keeps the old wording of its lines until you delete it.",
       deleteTitle: "Delete my account and data",
-      deleteBody: "This removes your account, resume, facts, job descriptions and suggestions. It cannot be undone. Your consent record, which shows when you agreed to this notice, is deleted with the account. Your AI key is never saved, so there is nothing to remove.",
+      deleteBody: "This removes your account, resume, facts, job descriptions and suggestions. It cannot be undone. Your consent record, which shows when you agreed to this notice, is deleted with the account. Your AI key is never saved, so there is nothing to remove. The rate-limit records are not deleted with your account. They stop counting within 24 hours, but the records kept under your account ID, which no longer points to anyone, stay stored.",
       deleteLabel: "Type DELETE to confirm",
       deleteWord: "DELETE",
       deleteButton: "Delete my account and data",
@@ -349,6 +351,7 @@ export const en = {
         "Google: if you sign in with Google, Google confirms who you are and shares your name, email and picture with Rolewright.",
         "Google Cloud (Mumbai region): hosts Rolewright and stores everything listed under \"What we store\".",
         "Your AI provider: gets the text described under \"What goes to your AI provider\".",
+        "Google Gemini and OpenRouter, only if you use the free trial: Gemini gets the same text, and OpenRouter gets it when Gemini cannot answer, on Rolewright's own key.",
       ],
     },
   },
@@ -374,7 +377,7 @@ export const en = {
   // P0-2
   consent: {
     lead: (provider: string) =>
-      `I understand my resume text and the job description will be sent to ${provider}, the AI provider I chose, which may process them outside India.`,
+      `I understand my resume text and the job description will be sent to ${provider}, the AI provider I chose, which may process them outside India, and that Rolewright will also store them in my account.`,
     linkText: "Read the privacy notice",
     error: "Tick the box to continue.",
     saveFailed: "Your agreement could not be saved. Try again.",
@@ -412,7 +415,7 @@ export const en = {
     usedUpUploads: "You have used your 3 free resume readings. Add your own AI key to continue.",
     notVerified: "The free trial is for accounts with a confirmed email address. Sign in with Google or use the email link, or add your own AI key.",
     consentLead:
-      "I understand my resume text and the job description will be sent to Google Gemini or OpenRouter, the AI providers behind the free trial, which may process them outside India.",
+      "I understand my resume text and the job description will be sent to Google Gemini and OpenRouter, the AI providers behind the free trial, which may process them outside India, and that Rolewright will also store them in my account.",
     keyTitle: "Free trial",
     keyBody:
       "Without a key you can use the free trial. It runs on Google Gemini or OpenRouter free models, which may pass the fact check less often than your own key.",
@@ -421,7 +424,6 @@ export const en = {
     leftShort: (n: number) => `${n} of 5 free tailorings left.`,
     leftUploads: (n: number) => `${n} of 3 free resume readings left.`,
     addKey: "Add your own AI key",
-    notAvailableForYou: "The free trial is not available for this account.",
   },
   // P1-18
   erasure: {
@@ -447,11 +449,15 @@ export const en = {
     resumeFailed: "The resume text could not be deleted. Try again.",
     factsTitle: "Also delete the facts that came from my resume",
     factsBody:
-      "This also removes every fact that was read from your resume, whether you confirmed it or not. Facts you typed or edited yourself, your contact details and your 'can't confirm' list stay. Tailored resumes you already made are kept, but they will leave out the removed lines, and may refuse to export until you add and confirm facts again. They still hold the old wording of those lines; delete them on the home page to remove that too. This cannot be undone.",
+      "This also removes every fact that was read from your resume, whether you confirmed it or not. Facts you typed or edited yourself, your contact details and your 'can't confirm' list stay. A job stays, with its employer and dates, if you added a line of your own under it. Tailored resumes you already made are kept, but they will leave out the removed lines, and may refuse to export until you add and confirm facts again. They still hold the old wording of those lines; delete them on the home page to remove that too. This cannot be undone.",
     factsButton: "Delete resume text and those facts",
     factsConfirm: "Yes, delete the resume text and those facts",
     factsDone: (n: number, f: number) =>
-      `Deleted the text of ${n} ${n === 1 ? "resume" : "resumes"} and ${f} ${f === 1 ? "fact" : "facts"} that came from them. Facts you added yourself are unchanged.`,
+      n === 0 && f === 0
+        ? "There was no resume text and no facts from a resume to delete."
+        : n === 0
+          ? `Deleted ${f} ${f === 1 ? "fact" : "facts"} that came from your resume. There was no resume text to delete. Facts you added yourself are unchanged.`
+          : `Deleted the text of ${n} ${n === 1 ? "resume" : "resumes"} and ${f} ${f === 1 ? "fact" : "facts"} that came from them. Facts you added yourself are unchanged.`,
     factsLink: "Open your facts",
   },
 } as const;

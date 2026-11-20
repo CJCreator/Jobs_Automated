@@ -40,19 +40,30 @@ const p = en.app.privacy;
 
 test("notice: 'Who else handles your data' names each recipient and what it gets", () => {
   assert.equal(p.recipientsTitle, "Who else handles your data");
-  assert.equal(p.recipients.length, 4);
+  assert.equal(p.recipients.length, 5);
   const text = p.recipients.join("\n");
   for (const [name, what] of [
     ["Resend", /email address/],
     ["Google", /name, email and picture/],
     ["Google Cloud", /Mumbai/],
     ["AI provider", /What goes to your AI provider/],
+    ["OpenRouter", /only if you use the free trial/],
   ]) {
     assert.match(text, new RegExp(name), name);
     assert.match(text, what, name);
   }
   assert.match(p.recipients[0], /only if you sign in by email/);
   assert.match(p.recipients[1], /if you sign in with Google/);
+});
+
+test("notice: it covers the trial, the stored consent detail and keyed hashes", () => {
+  assert.match(p.sent, /free trial/);
+  assert.match(p.sent, /5 tailorings and 3 resume readings/);
+  assert.match(p.stored.join("\n"), /scrambled form of your IP address/);
+  assert.match(p.stored.join("\n"), /which one/);
+  assert.match(en.consent.lead("X"), /sent to X/);
+  assert.match(en.consent.lead("X"), /store them in my account/);
+  assert.match(en.trial.consentLead, /store them in my account/);
 });
 
 test("notice: the page renders the recipients item", () => {
