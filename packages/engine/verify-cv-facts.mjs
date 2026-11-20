@@ -2456,8 +2456,11 @@ const PLAIN_SOURCE_COUNT_RE = /(?<![\p{L}\p{N}.$€£₹-])(?<!(?:[$€£₹]|\b
  * 2020" over "Customers were served daily" read as "2020 customers", and its
  * variant "2.02k customers" was support for a figure the source never states.
  * A large plain number counts the word after it even when that word is no
- * listed noun. Last, a lakh or crore amount the source states as money
- * (currencyAmountClaims). All of this adds support and never raises a claim.
+ * listed noun. All of this adds support and never raises a claim. No rule
+ * here turns a lakh or crore amount the source states as money ("₹2 crore
+ * budgets") into a bare count claim ("2 crore budgets"); P1-19c rebuilds that.
+ * The count patterns can still read a money figure as a count on both sides
+ * ("₹2 crore from customers" reads as "2crore customers"), as main does.
  */
 function sourceMetricBase(text) {
   const allowed = sourceMetricClaims(text);
@@ -2476,92 +2479,7 @@ function sourceMetricBase(text) {
     }
   }
   for (const claim of perLine) for (const variant of countVariants(claim)) allowed.add(variant);
-  for (const claim of currencyAmountClaims(text)) allowed.add(claim);
   return allowed;
-}
-
-// "Handled 2 crore budgets" reads as a count of budgets, because no currency
-// mark precedes the figure, while the source says "Handled budgets of ₹2
-// crore". A lakh or crore figure is almost always rupees, so a claim
-// `<n><lakh|crore> <word>` is backed when the source states the same figure as
-// money with that word next to it (AMOUNT_REACH words either side, in either
-// number), in the same clause and with no other number in between. A word
-// another number counts ("4 analysts") is never backed. A claim whose word
-// only describes the amount ("2 crore worth", "2 crore annually") is backed by
-// the same figure as money anywhere in the source. A different figure, or a
-// word away from the amount ("2 crore customers" from "₹2 crore budgets for
-// 300 customers"), is not. Each amount backs a bounded number of keys, so the
-// cost is linear in the source: backing every word of the statement made a
-// one-line source of 1,500 amounts cost 8 s and 1.3 GB.
-const CURRENCY_AMOUNT_RE = /(?:(?:[$€£₹]|\b(?:rs|inr|usd|eur|gbp)\b\.?)\s*(\d[\d.]*)\s*(lakhs?|lacs?|crores?|cr)\b|\b(\d[\d.]*)\s*(lakhs?|lacs?|crores?|cr)\s+(?:rupees?|inr|rs)\b)/gu;
-// Only words that cannot stand before a noun: "2 crore monthly invoices"
-// binds "monthly", so an adjective here would back a count of anything.
-const AMOUNT_WORDS = ['worth', 'annually'];
-const AMOUNT_REACH = 4;
-// Numbers, words, and the punctuation that ends a clause.
-const AMOUNT_TOKEN_RE = /(\d[\d.]*)|(\p{L}[\p{L}\p{M}-]*)|[,:()[\]|]/gu;
-// A year dates a statement and counts nothing: "In 2019 handled budgets".
-const YEAR_TOKEN_RE = /^(?:19|20)\d{2}$/;
-
-/** Singular and plural spellings of a word, and its NOUN_SYNONYMS form. */
-function nounForms(word) {
-  const forms = new Set([word, `${word}s`, `${word}es`, word.replace(/s$/u, ''), word.replace(/es$/u, ''),
-    word.replace(/ies$/u, 'y'), word.replace(/y$/u, 'ies')]);
-  for (const form of [...forms]) if (NOUN_SYNONYMS.has(form)) forms.add(NOUN_SYNONYMS.get(form));
-  return forms;
-}
-
-/** Claim keys backed by a lakh or crore amount the source states as money. */
-function currencyAmountClaims(text) {
-  const claims = new Set();
-  for (const line of stripMarkup(text, { keepLineBreaks: true }).split('\n')) {
-    if (!/\d/.test(line)) continue;
-    // Statements, not lines: a paragraph is one line. "Rs." is no sentence end.
-    for (const statement of normalizeClaim(line).split(/(?<!\brs)[.!?;](?:\s+|$)/u)) {
-      const amounts = [...statement.matchAll(CURRENCY_AMOUNT_RE)];
-      if (!amounts.length) continue;
-      const tokens = [...statement.matchAll(AMOUNT_TOKEN_RE)].map((match) => ({
-        kind: match[1] ? 'number' : match[2] ? 'word' : 'stop',
-        text: match[0],
-        start: match.index,
-      }));
-      // First token at or after `offset`, by binary search.
-      const tokenAt = (offset) => {
-        let lo = 0;
-        let hi = tokens.length;
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1;
-          if (tokens[mid].start < offset) lo = mid + 1; else hi = mid;
-        }
-        return lo;
-      };
-      const spans = amounts.map((match) => [tokenAt(match.index), tokenAt(match.index + match[0].length)]);
-      const inAmount = new Set();
-      for (const [from, to] of spans) for (let i = from; i < to; i++) inAmount.add(i);
-      // Words another number counts: the two words after it, within its clause.
-      const counted = new Set();
-      tokens.forEach((token, index) => {
-        if (token.kind !== 'number' || inAmount.has(index) || YEAR_TOKEN_RE.test(token.text)) return;
-        for (let i = index + 1, seen = 0; i < tokens.length && seen < 2 && tokens[i].kind === 'word'; i++, seen++) counted.add(i);
-      });
-      amounts.forEach((match, n) => {
-        const amount = `${match[1] ?? match[3]}${SPELLED_MAGNITUDES.get(match[2] ?? match[4])}`;
-        for (const word of AMOUNT_WORDS) claims.add(`${amount} ${word}`);
-        const [from, to] = spans[n];
-        const near = (start, step) => {
-          for (let i = start, seen = 0; i >= 0 && i < tokens.length && seen < AMOUNT_REACH; i += step) {
-            if (tokens[i].kind !== 'word' || inAmount.has(i)) break;
-            seen++;
-            if (counted.has(i)) continue;
-            for (const form of nounForms(tokens[i].text)) claims.add(`${amount} ${form}`);
-          }
-        };
-        near(from - 1, -1);
-        near(to, 1);
-      });
-    }
-  }
-  return claims;
 }
 
 // One quantity, however it is written: "10k", "10,000" and "1 lakh" are each
@@ -3116,7 +3034,6 @@ function runSelfTest() {
   equal('executive summary is exempt', p1Words('Wrote the executive summary'), []);
   equal('award-winning is exempt', p1Words('Award-winning close team'), []);
   equal('plural lakhs is a magnitude', auditClaims('Served 5 lakhs customers', 'Served 5 customers').invented, ['5lakh customers']);
-  equal('crore money backs a crore count of the same noun', auditClaims('Handled 2 Cr budgets', 'Handled budgets of ₹2 crore').invented, []);
   equal('crore money does not back another noun', auditClaims('Managed 2 crore customers', 'Handled budgets of ₹2 crore').invented, ['2crore customers']);
   equal('a rupee figure is no count', auditClaims('Processed 50k invoices', 'Budget Rs 50000 invoices').invented, ['50k invoices']);
   equal('no count across a line break', auditClaims('Served 2.02k customers', 'Joined in 2020\nCustomers were served daily').invented, ['2.02k customers']);

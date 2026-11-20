@@ -114,37 +114,50 @@ test('plural Indian magnitudes are magnitudes, not modifiers', () => {
   assert.equal(blocks('Served 5lakh customers', 'Served 5 lakh customers'), false);
 });
 
-test('a crore or lakh amount without a currency mark is backed by the same amount in the facts', () => {
-  const verdict = (line) => gate(line, SOURCE);
-  for (const line of ['Handled 2 crore budgets', 'Handled ₹ 2 crore budgets', 'Handled 2 Cr budgets', 'Handled 2cr budgets',
-    'Handled a 2 crore budget', 'Managed 2 crore worth of budgets', 'Managed budgets totalling 2 crore annually']) {
-    const result = verdict(line);
-    assert.deepEqual(result.invented, [], line);
-  }
-  // A different noun, or a different amount, is not backed. The non-noun
-  // branch ("worth", "annually") still needs the same amount.
-  for (const line of ['Managed 2 crore customers', 'Handled 20 crore budgets', 'Managed 20 crore worth of budgets',
-    'Managed budgets totalling 20 crore annually', 'Handled 2 lakh budgets',
-    // An adjective after the figure is not an amount word: these count invoices.
-    'Processed 2 crore monthly invoices', 'Raised 2 crore total invoices', 'Processed 2 crore annual invoices',
-    'Handled 2 crore overall invoices']) {
-    assert.ok(verdict(line).invented.length > 0, line);
+// Known false blocks, pending P1-19c. The engine no longer backs a bare
+// `<n> crore|lakh <word>` claim from the same figure stated as money ("Handled
+// budgets of ₹2 crore"): the rule that did (P1-19, currencyAmountClaims) was
+// removed by owner decision (P1-19d), so the gate errs toward blocking. Each
+// of these honest lines blocks today. P1-19c rebuilds the rule and must flip
+// every entry to pass, then delete this list.
+const KNOWN_FALSE_BLOCKS_PENDING_P1_19C = [
+  ['Handled 2 crore budgets', SOURCE],
+  ['Handled ₹ 2 crore budgets', SOURCE],
+  ['Handled 2 Cr budgets', SOURCE],
+  ['Handled 2cr budgets', SOURCE],
+  ['Handled a 2 crore budget', SOURCE],
+  ['Managed 2 crore worth of budgets', SOURCE],
+  ['Managed budgets totalling 2 crore annually', SOURCE],
+  ['Handled 2 crore budgets', 'Handled ₹2 crore budgets for 300 customers'],
+  ['Handled 2 crore budgets', 'Managed a team of 4 analysts, handled budgets of ₹2 crore'],
+];
+
+test('known false blocks pending P1-19c: these honest crore lines block today', () => {
+  for (const [line, source] of KNOWN_FALSE_BLOCKS_PENDING_P1_19C) {
+    assert.ok(gate(line, source).invented.length > 0, `${line} | ${source === SOURCE ? 'SOURCE' : source}`);
   }
 });
 
-test('a crore amount backs only the words next to it, never a word another number counts', () => {
-  const blocks = (line, source) => gate(line, source).invented.length > 0;
+test('a crore amount without a currency mark needs the same count in the facts', () => {
+  const blocks = (line, source = SOURCE) => gate(line, source).invented.length > 0;
+  for (const line of ['Managed 2 crore customers', 'Handled 20 crore budgets', 'Managed 20 crore worth of budgets',
+    'Managed budgets totalling 20 crore annually', 'Handled 2 lakh budgets',
+    'Processed 2 crore monthly invoices', 'Raised 2 crore total invoices', 'Processed 2 crore annual invoices',
+    'Handled 2 crore overall invoices', 'Sold 2 crore worth of software licences', 'Earned 2 crore annually']) {
+    assert.ok(blocks(line), line);
+  }
   assert.ok(blocks('Managed 2 crore customers', 'Handled ₹2 crore budgets for 300 customers'));
   assert.ok(blocks('Managed 2 crore analysts', 'Managed a team of 4 analysts, handled budgets of ₹2 crore'));
   assert.ok(blocks('Managed 2 crore analysts', 'Led 4 analysts handling ₹2 crore'));
   assert.ok(blocks('Managed 2 crore vendors', 'Handled ₹2 crore budgets across the north and south zones with vendors'));
-  assert.equal(blocks('Handled 2 crore budgets', 'Handled ₹2 crore budgets for 300 customers'), false);
-  assert.equal(blocks('Handled 2 crore budgets', 'Managed a team of 4 analysts, handled budgets of ₹2 crore'), false);
+  assert.ok(blocks('Served 2 crore customers', 'Served 2,000 customers on ₹2 crore budgets'));
+  assert.ok(blocks('Served 2 crore analysts', 'Managed 4 analysts with budgets of ₹2 crore'));
+  // The same count in the facts still backs it.
+  assert.equal(blocks('Handled 2 crore budgets', 'Handled 2 crore budgets'), false);
 });
 
-// Every amount backs a bounded number of keys, so a source of many amounts on
-// one unpunctuated line costs time linear in its length. Unbounded, this
-// source took 8 s and 1.3 GB.
+// A source of many crore amounts on one unpunctuated line must stay cheap:
+// an earlier rule that backed counts from money took 8 s and 1.3 GB on it.
 test('a source of 1,500 crore amounts on one line is checked in under 500 ms', () => {
   const letters = 'abcdefghijklmnopqrstuvwxyz';
   const word = (i) => `${letters[i % 26]}${letters[Math.floor(i / 26) % 26]}${letters[Math.floor(i / 676) % 26]}q`;
