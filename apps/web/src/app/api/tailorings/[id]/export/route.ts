@@ -5,7 +5,7 @@ import { resumeFilename, resumeHtml } from "@/lib/resume-html.mjs";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { HttpError, route } from "@/lib/server/http";
 import { renderPdf } from "@/lib/server/pdf.mjs";
-import { spendRateLimit, takeRateLimit } from "@/lib/server/rate-limit";
+import { chargeGate, takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
 import { flattenBlockers, notFound } from "@/lib/server/views";
 import { exportBlockers } from "@/lib/tailoring.mjs";
@@ -14,9 +14,10 @@ export const runtime = "nodejs";
 
 export const POST = route<{ id: string }>("tailorings.export", async (_req, { params, state }) => {
   const userId = await requireUser(state);
-  await takeRateLimit("export", userId);
+  // The export bucket is taken last, so a refusal by another bucket does not burn one of its 20 an hour.
   await takeRateLimit("tailoring", userId);
   await takeRateLimit("gateMs", userId);
+  await takeRateLimit("export", userId);
   const { id } = await params;
   const db = await getDb();
   const tailoring = await getTailoring(db, userId, id);
@@ -26,9 +27,9 @@ export const POST = route<{ id: string }>("tailorings.export", async (_req, { pa
 
   // Every changed line is checked again here, from scratch, against the facts
   // as they are now. Stored checks and decisions alone never let text through.
-  const gateStart = performance.now();
-  const blockers = exportBlockers(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate });
-  await spendRateLimit("gateMs", userId, Math.round(performance.now() - gateStart));
+  const blockers = await chargeGate(userId, (timed) =>
+    timed(() => exportBlockers(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate })),
+  );
   if (blockers.length === 1 && blockers[0].issues.length === 1 && blockers[0].issues[0].kind === "facts_too_large") {
     throw new HttpError(409, "facts_too_large", blockers[0].issues[0].message);
   }

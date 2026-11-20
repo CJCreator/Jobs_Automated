@@ -2,7 +2,7 @@ import { getDb } from "@/lib/db/index.mjs";
 import { getFacts, getTailoring } from "@/lib/db/repo.mjs";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { json, route } from "@/lib/server/http";
-import { spendRateLimit, takeRateLimit } from "@/lib/server/rate-limit";
+import { chargeGate, takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
 import { notFound, tailoringView } from "@/lib/server/views";
 import { freshChecks } from "@/lib/tailoring.mjs";
@@ -21,8 +21,8 @@ export const GET = route<{ id: string }>("tailorings.get", async (_req, { params
   if (!tailoring) throw notFound();
   const engineGate = await loadFactGate();
   const facts = await getFacts(db, userId);
-  const gateStart = performance.now();
-  const suggestions = freshChecks(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate });
-  await spendRateLimit("gateMs", userId, Math.round(performance.now() - gateStart));
+  const suggestions = await chargeGate(userId, (timed) =>
+    timed(() => freshChecks(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate })),
+  );
   return json({ tailoring: tailoringView(tailoring, suggestions) });
 });

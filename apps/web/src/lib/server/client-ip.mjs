@@ -4,8 +4,10 @@
 // ROLEWRIGHT_TRUSTED_PROXY_HOPS = n extra proxies after the first, take the entry
 // (1 + n) from the right. Never the leftmost.
 
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { isIP } from "node:net";
+import { strictEnv } from "./env-guard.mjs";
+import { RateLimitUnavailableError } from "./rate-limit-core.mjs";
 
 function header(headers, name) {
   if (!headers) return null;
@@ -29,7 +31,31 @@ export function clientIp(headers, env = process.env) {
   return entry.toLowerCase();
 }
 
-/** SHA-256 hex of an address: what is stored as a rate-limit subject. */
-export function ipSubject(ip) {
-  return createHash("sha256").update(String(ip)).digest("hex");
+// Used only outside strict environments, so a local run needs no setup.
+const DEV_KEY = "rolewright-dev-only-rate-limit-key-not-a-secret";
+const MIN_KEY_LENGTH = 32;
+
+function subjectKey(env) {
+  const key = String(env?.ROLEWRIGHT_RATE_LIMIT_KEY ?? "");
+  if (key.length >= MIN_KEY_LENGTH) return key;
+  if (strictEnv(env)) {
+    // A short or missing key would make the hashes guessable, so refuse (fail closed, 503).
+    console.error("ROLEWRIGHT_RATE_LIMIT_KEY is missing or shorter than 32 characters");
+    throw new RateLimitUnavailableError();
+  }
+  return DEV_KEY;
+}
+
+function keyedHash(value, env) {
+  return createHmac("sha256", subjectKey(env)).update(String(value)).digest("hex");
+}
+
+/** HMAC-SHA-256 hex of an address, keyed by ROLEWRIGHT_RATE_LIMIT_KEY: what is stored as a rate-limit subject. */
+export function ipSubject(ip, env = process.env) {
+  return keyedHash(ip, env);
+}
+
+/** The same keyed hash for an email address (trimmed and lower-cased first). */
+export function emailSubject(email, env = process.env) {
+  return keyedHash(String(email).trim().toLowerCase(), env);
 }

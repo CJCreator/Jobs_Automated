@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clientIp, ipSubject } from "../src/lib/server/client-ip.mjs";
+import { createHash } from "node:crypto";
+import { clientIp, emailSubject, ipSubject } from "../src/lib/server/client-ip.mjs";
 
 const h = (xff) => new Headers(xff == null ? {} : { "x-forwarded-for": xff });
 
@@ -36,9 +37,45 @@ test("plain header objects work", () => {
   assert.equal(clientIp({ "x-forwarded-for": "9.9.9.9" }, {}), "9.9.9.9");
 });
 
-test("ipSubject is a SHA-256 hex and never the address", () => {
-  const s = ipSubject("203.0.113.9");
+const KEY_A = "a".repeat(32);
+const KEY_B = "b".repeat(32);
+
+test("ipSubject is a keyed hash: 64 hex, not plain SHA-256, never the address", () => {
+  const s = ipSubject("203.0.113.9", { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A });
   assert.match(s, /^[0-9a-f]{64}$/);
-  assert.ok(!s.includes("203"));
-  assert.equal(s, ipSubject("203.0.113.9"));
+  assert.notEqual(s, createHash("sha256").update("203.0.113.9").digest("hex"));
+  assert.equal(s, ipSubject("203.0.113.9", { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A }));
+});
+
+test("the key changes the output", () => {
+  assert.notEqual(
+    ipSubject("203.0.113.9", { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A }),
+    ipSubject("203.0.113.9", { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_B }),
+  );
+  assert.notEqual(
+    emailSubject("a@example.com", { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A }),
+    emailSubject("a@example.com", { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_B }),
+  );
+});
+
+test("emailSubject ignores case and spaces, and differs from the IP hash of the same text", () => {
+  const env = { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A };
+  assert.equal(emailSubject(" A@Example.com ", env), emailSubject("a@example.com", env));
+  assert.notEqual(emailSubject("a@example.com", env), createHash("sha256").update("a@example.com").digest("hex"));
+});
+
+test("strict environment: a missing or short key fails closed with 503", () => {
+  for (const key of [undefined, "", "short", "x".repeat(31)]) {
+    const env = { NODE_ENV: "production", ROLEWRIGHT_RATE_LIMIT_KEY: key };
+    for (const call of [() => ipSubject("1.2.3.4", env), () => emailSubject("a@example.com", env)]) {
+      assert.throws(call, (err) => err.status === 503 && err.code === "rate_limit_unavailable");
+    }
+  }
+  assert.match(ipSubject("1.2.3.4", { NODE_ENV: "production", ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A }), /^[0-9a-f]{64}$/);
+});
+
+test("non-strict environment falls back to a dev key", () => {
+  const a = ipSubject("1.2.3.4", { NODE_ENV: "development" });
+  assert.match(a, /^[0-9a-f]{64}$/);
+  assert.equal(a, ipSubject("1.2.3.4", {}));
 });

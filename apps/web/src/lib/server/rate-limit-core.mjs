@@ -46,6 +46,37 @@ export async function failClosed(fn) {
   try {
     return await fn();
   } catch {
+    console.error("rate limit store unavailable");
     throw new RateLimitUnavailableError();
+  }
+}
+
+/**
+ * Runs gate work and charges its time to gateMs, whether the work returns or throws.
+ * `run` gets `timed(fn)`, which times one synchronous piece of gate work. On success a
+ * failed charge is an error (the caller refuses, fail closed). On an error path it is
+ * swallowed so the original error (a 409, say) is not masked.
+ * @param {(ms: number) => Promise<void>} spendMs
+ * @param {(timed: <T>(fn: () => T) => T) => any} run
+ */
+export async function chargeGate(spendMs, run) {
+  let ms = 0;
+  const timed = (fn) => {
+    const start = performance.now();
+    try {
+      return fn();
+    } finally {
+      ms += performance.now() - start;
+    }
+  };
+  let ok = false;
+  try {
+    const result = await run(timed);
+    ok = true;
+    return result;
+  } finally {
+    const charge = spendMs(Math.round(ms));
+    if (ok) await charge;
+    else await charge.catch(() => {});
   }
 }

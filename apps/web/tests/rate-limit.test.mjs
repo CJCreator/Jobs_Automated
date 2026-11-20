@@ -2,7 +2,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createDb } from "../src/lib/db/index.mjs";
 import { spend, take } from "../src/lib/db/rate-events.mjs";
-import { LIMITS, RateLimitUnavailableError, decide, failClosed } from "../src/lib/server/rate-limit-core.mjs";
+import { LIMITS, RateLimitUnavailableError, chargeGate, decide, failClosed } from "../src/lib/server/rate-limit-core.mjs";
 
 let db;
 before(async () => {
@@ -109,4 +109,44 @@ test("a database error becomes 503 rate_limit_unavailable", async () => {
 test("no raw address is stored: subjects in the table are what callers pass", async () => {
   const { rows } = await db.system.query("SELECT DISTINCT subject FROM rate_events");
   assert.ok(rows.every((r) => !/^\d+\.\d+\.\d+\.\d+$/.test(r.subject)));
+});
+
+const gateSpend = (subject) => (ms) => spend(db, "gateMs", subject, ms);
+const gateTotal = async (subject) =>
+  Number((await db.system.query("SELECT COALESCE(SUM(cost),0) AS n FROM rate_events WHERE bucket='gateMs' AND subject=$1", [subject])).rows[0].n);
+const busy = (ms) => { const end = performance.now() + ms; while (performance.now() < end); };
+
+test("chargeGate records gateMs when the gate work succeeds", async () => {
+  const out = await chargeGate(gateSpend("ok"), (timed) => timed(() => { busy(5); return 7; }));
+  assert.equal(out, 7);
+  assert.ok((await gateTotal("ok")) >= 4);
+});
+
+test("chargeGate records gateMs when the gate work throws, and the original error survives", async () => {
+  const boom = Object.assign(new Error("blocked"), { status: 409 });
+  await assert.rejects(chargeGate(gateSpend("err"), (timed) => timed(() => { busy(5); throw boom; })), (e) => e === boom);
+  assert.ok((await gateTotal("err")) >= 4, "the time of a throwing gate is still charged");
+});
+
+test("chargeGate: a failed charge on the error path does not mask the original error", async () => {
+  const boom = new Error("original");
+  const failing = async () => { throw new Error("db down"); };
+  await assert.rejects(chargeGate(failing, (timed) => timed(() => { throw boom; })), (e) => e === boom);
+});
+
+test("chargeGate: a failed charge on the success path is an error (fail closed)", async () => {
+  const failing = async () => { throw new RateLimitUnavailableError(); };
+  await assert.rejects(chargeGate(failing, (timed) => timed(() => 1)), (e) => e instanceof RateLimitUnavailableError);
+});
+
+test("failClosed logs one line without the cause", async () => {
+  const lines = [];
+  const orig = console.error;
+  console.error = (...a) => lines.push(a.join(" "));
+  try {
+    await assert.rejects(failClosed(async () => { throw new Error("password=hunter2 host=10.0.0.1"); }));
+  } finally {
+    console.error = orig;
+  }
+  assert.deepEqual(lines, ["rate limit store unavailable"]);
 });

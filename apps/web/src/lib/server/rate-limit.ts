@@ -4,7 +4,7 @@
 import { getDb } from "@/lib/db/index.mjs";
 import { spend, take } from "@/lib/db/rate-events.mjs";
 import { HttpError } from "./http";
-import { LIMITS, RateLimitUnavailableError, failClosed } from "./rate-limit-core.mjs";
+import { LIMITS, RateLimitUnavailableError, chargeGate as chargeGateCore, failClosed } from "./rate-limit-core.mjs";
 
 export { LIMITS };
 export type Bucket = keyof typeof LIMITS;
@@ -37,4 +37,9 @@ export async function takeRateLimit(bucket: Bucket, subject: string): Promise<vo
 /** Record a cost (for example milliseconds of gate work) after the work is done. */
 export async function spendRateLimit(bucket: Bucket, subject: string, cost: number): Promise<void> {
   await guarded(async () => spend(await getDb(), bucket, subject, cost));
+}
+
+/** Run gate work and charge its time to gateMs, on success and on error. See chargeGate in rate-limit-core. */
+export function chargeGate<T>(userId: string, run: (timed: <U>(fn: () => U) => U) => T | Promise<T>): Promise<T> {
+  return chargeGateCore((ms: number) => spendRateLimit("gateMs", userId, ms), run);
 }
