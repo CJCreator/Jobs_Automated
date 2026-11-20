@@ -20,7 +20,7 @@ test("Inbox Undo remains retryable after failure", { skip: liveServerSkip("INBOX
   const pipeline = path.join(root, "data/pipeline.md");
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome", headless: true });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
   let release = () => {};
   t.after(async () => { release(); await page.unrouteAll({ behavior: "wait" }); await browser.close(); });
   const errors = [];
