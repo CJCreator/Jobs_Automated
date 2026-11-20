@@ -22,6 +22,7 @@ One file per decision. A decision is changed by a new ADR that supersedes it, ne
 | [0014](0014-open-source-or-private.md) | Repository stays private until launch | Accepted |
 | [0015](0015-cover-letters-interview-prep.md) | Cover letters and interview prep packs from confirmed facts | Accepted |
 | [0016](0016-success-metrics.md) | Success measured as ATS keyword match and callbacks, separately | Accepted |
-| [0017](0017-agent-delivery-model.md) | Delivery: an advisor model plans and reviews, worker agents build, the owner gates each phase | Accepted |
+| [0017](0017-agent-delivery-model.md) | Delivery: an advisor model plans and reviews, worker agents build, the owner gates each phase | Accepted (amended by 0018) |
+| [0018](0018-build-then-test.md) | Delivery from Phase 1: build all tasks in parallel, run the full test suites once at the end | Accepted |
 
 Template: [`template.md`](template.md).

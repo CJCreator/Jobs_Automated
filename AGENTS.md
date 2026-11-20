@@ -23,7 +23,7 @@ Rolewright helps job seekers in India rework their resume from the experience th
 - **No upstream updates.** `packages/engine/.no-upstream-updates` disables the career-ops updater. Do not remove it (ADR 0013).
 - **Identifiers stay.** Environment variables such as `CAREER_OPS_ROOT`, `CAREER_OPS_CODE_ROOT` and the `.career-ops-data` marker are internal identifiers the engine and its tests depend on. Do not rename them for branding.
 
-- **Agent work follows ADR 0017.** A worker edits only the files its brief lists, and nothing merges without the advisor's review.
+- **Agent work follows ADR 0017 and 0018.** A worker edits only the files its brief lists, and nothing merges without the advisor's review. From Phase 1, workers run only targeted tests; full suites run in the test wave.
 
 ## Verifying changes
 

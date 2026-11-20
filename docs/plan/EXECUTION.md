@@ -126,7 +126,7 @@ The `en.ts` rule changes: code tasks only append keys; P0-3b is the single edito
 - Engine: no failure added relative to `docs/reviews/test-baseline.md`.
 - The advisor's phase review: a fresh read of the launch-review P0 and P1 items, each marked fixed, still open (with a reason) or moved.
 - Still open by design: the grievance contact value and the legal review of the notice.
-- **Result:** see `phase-0-exit.md`. Advisor verdict: approve building Phase 1 with four conditions. Waiting on the owner's sign-off.
+- **Result:** see `phase-0-exit.md`. The owner approved Phase 1 on 2026-11-20 on the advisor's four conditions, and changed the delivery model to build first, then test (ADR 0018).
 
 ## Phase 1: bring your own key, free trial, first engine port, Google Cloud
 
