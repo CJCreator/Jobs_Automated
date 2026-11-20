@@ -1,0 +1,4 @@
+Data Scientist
+Requirements: machine learning, NLP, PyTorch, scikit-learn, Pandas, NumPy, SQL.
+Fine-tuning LLMs and building RAG systems is a strong plus. Experience with MLOps,
+MLflow and Spark preferred. Prompt engineering a bonus. C++ or Rust helpful.
