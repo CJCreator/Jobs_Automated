@@ -261,3 +261,4 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - **ADR 0009 amendment.** Private IP, encrypted connections only, certificate verification later. Accepted.
   - **App CI.** It becomes a required check only after a green Phase 1 exit.
   - **Questions.** The owner asked to be asked any open question at any time. Ask as decisions arise.
+  - **Email-link limit.** Rate-limited addresses stay silent: they see the same "check your email" page and are not sent an email. P1-24 adds a line to that page saying links can take a few minutes and that requests are limited.
