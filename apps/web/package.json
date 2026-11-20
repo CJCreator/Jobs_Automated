@@ -12,7 +12,8 @@
     "test:flow": "node tests/integration/run.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
     "test:prod": "node tests/integration/prod-smoke.mjs",
-    "purge:inactive": "node scripts/purge-inactive.mjs"
+    "purge:inactive": "node scripts/purge-inactive.mjs",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "engines": {
     "node": "^22.18.0 || >=23.6.0"
