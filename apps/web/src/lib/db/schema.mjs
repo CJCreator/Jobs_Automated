@@ -155,4 +155,21 @@ ALTER TABLE consents ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT '';
 ALTER TABLE consents DROP CONSTRAINT IF EXISTS consents_user_id_notice_version_purpose_key;
 CREATE UNIQUE INDEX IF NOT EXISTS consents_user_version_purpose_provider_key
   ON consents (user_id, notice_version, purpose, provider);
+
+-- P1-3
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'rolewright_system') THEN
+    CREATE ROLE rolewright_system NOLOGIN;
+  END IF;
+END $$;
+CREATE TABLE IF NOT EXISTS rate_events (
+  id bigserial PRIMARY KEY,
+  bucket text NOT NULL,
+  subject text NOT NULL,
+  cost integer NOT NULL DEFAULT 1,
+  at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rate_events_lookup_idx ON rate_events (bucket, subject, at);
+GRANT SELECT, INSERT, DELETE ON rate_events TO rolewright_system;
+GRANT USAGE, SELECT ON SEQUENCE rate_events_id_seq TO rolewright_system;
 `;

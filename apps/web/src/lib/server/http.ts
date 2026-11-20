@@ -38,7 +38,7 @@ const LLM_STATUS: Record<string, number> = {
 
 /** Errors from the plain .mjs modules carry `status` and `code` but are not HttpErrors. */
 type StatusError = Error & { status: number; code: string };
-const SAFE_NAMES = new Set(["TailoringError", "PdfTextError", "PdfRenderError", "EngineUnavailableError"]);
+const SAFE_NAMES = new Set(["TailoringError", "PdfTextError", "PdfRenderError", "EngineUnavailableError", "RateLimitUnavailableError"]);
 const isStatusError = (e: unknown): e is StatusError =>
   e instanceof Error && SAFE_NAMES.has(e.name) && typeof (e as StatusError).status === "number" && typeof (e as StatusError).code === "string";
 
