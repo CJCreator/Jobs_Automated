@@ -520,7 +520,7 @@ async function fetchJsonMeta(url, { timeoutMs = 12_000, source = '' } = {}) {
 
 function tagValue(xml, names) {
   for (const name of names) {
-    const escaped = name.replace(':', '\\:');
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(`<${escaped}\\b[^>]*>([\\s\\S]*?)<\\/${escaped}>`, 'i');
     const match = String(xml || '').match(re);
     if (match?.[1]) return xmlText(match[1]);

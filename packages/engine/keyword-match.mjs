@@ -438,15 +438,26 @@ export function archivedJdText(reportText, root) {
  * @returns {string} Visible text.
  */
 export function htmlToText(html) {
-  return String(html || '')
-    // Strip comments first so a comment can't shelter a tag from the strips below.
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    // Match the full opening tag (incl. attributes) before the lazy body, and
-    // accept whitespace and attributes in the closing tag (`</script >`,
-    // `</script foo>`), as a browser does. `\b` keeps `</scriptx>` from closing it.
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
+  // Repeat a strip until nothing changes: one pass can splice a fresh tag or comment out of the
+  // pieces it leaves behind ("<scr<b>ipt>", "<!<!---->-- x -->").
+  const strip = (text, re) => {
+    for (let prev = null; prev !== text; ) {
+      prev = text;
+      text = text.replace(re, ' ');
+    }
+    return text;
+  };
+  let text = String(html || '');
+  // Strip comments first so a comment can't shelter a tag from the strips below.
+  // `--!>` also closes a comment, as a browser reads it.
+  text = strip(text, /<!--[\s\S]*?--!?>/g);
+  // Match the full opening tag (incl. attributes) before the lazy body, and
+  // accept whitespace and attributes in the closing tag (`</script >`,
+  // `</script foo>`), as a browser does. `\b` keeps `</scriptx>` from closing it.
+  text = strip(text, /<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/gi);
+  text = strip(text, /<style\b[^>]*>[\s\S]*?<\/style\b[^>]*>/gi);
+  text = strip(text, /<[^>]+>/g);
+  return text
     .replace(/&nbsp;/gi, ' ')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')

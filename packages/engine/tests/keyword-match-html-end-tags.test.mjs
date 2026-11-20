@@ -26,3 +26,10 @@ for (const [name, block] of cases) {
 test('htmlToText keeps text after a longer tag name that only starts with script', () => {
   assert.equal(htmlToText('<script>a()</scriptx>b</script>c'), 'c');
 });
+
+// LG-2: a single strip pass can splice a new tag or comment out of what it leaves behind.
+test('htmlToText strips to a fixed point and honours --!> comment ends', () => {
+  assert.ok(!htmlToText('<scr<b>ipt>x</script>').includes('<'));
+  assert.ok(!/<[a-z!]/i.test(htmlToText('<<!---->!-- hidden --><p>shown</p>')));
+  assert.equal(htmlToText('a<!-- x --!>b'), 'a b');
+});

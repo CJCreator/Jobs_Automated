@@ -41,6 +41,7 @@
 // Pure functions, no I/O, so `node --test` can import this file directly.
 
 import { numberClaims, cleanText, isPlainPhraseWord } from "./claims.mjs";
+import { escapeRegExp } from "./regex-escape.mjs";
 
 /** Words either side of a figure that count as its context. */
 const CONTEXT_WINDOW = 2;
@@ -151,7 +152,7 @@ function locate(sentence, lowered, claim, from) {
   // The text was rewritten before reading ("30 per cent", "30-45%"): find its digits.
   const digits = /\d[\d,]*(?:\.\d+)?/.exec(raw)?.[0];
   if (digits) {
-    const re = new RegExp(`(?<![\\p{L}\\p{N}])${digits.replace(/[.,]/g, "\\$&")}(?!\\d)`, "gu");
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(digits)}(?!\\d)`, "gu");
     re.lastIndex = from;
     const m = re.exec(sentence);
     if (m) return [m.index, m.index + digits.length];

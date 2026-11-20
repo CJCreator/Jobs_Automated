@@ -2,6 +2,8 @@
 // inside a delimited block with the closing tag stripped out of it, and the
 // system prompt says the block is data only.
 
+import { escapeRegExp } from "../regex-escape.mjs";
+
 export const PARSE_MARKER = "ROLEWRIGHT_TASK:PARSE_RESUME";
 export const TAILOR_MARKER = "ROLEWRIGHT_TASK:TAILOR_LINES";
 
@@ -10,8 +12,14 @@ const MAX_RESUME = 60000;
 
 /** Cap the text and remove any copy of the delimiter so it cannot close its own block. */
 function fence(text, tag, max) {
-  const s = String(text ?? "").slice(0, max);
-  return s.replace(new RegExp(`</?\\s*${tag}\\s*>`, "gi"), "");
+  const re = new RegExp(`</?\\s*${escapeRegExp(tag)}\\s*>`, "gi");
+  let s = String(text ?? "").slice(0, max);
+  // Repeat until stable: removing "<res<resume>ume>" once would leave a fresh "<resume>".
+  for (let prev = null; prev !== s; ) {
+    prev = s;
+    s = s.replace(re, "");
+  }
+  return s;
 }
 
 export function parseResumePrompt(resumeText) {
