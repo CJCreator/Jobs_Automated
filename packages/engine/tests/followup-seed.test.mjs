@@ -15,6 +15,7 @@
 import { execFileSync } from 'child_process';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, existsSync, utimesSync } from 'fs';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { tmpdir } from 'os';
 import { pathToFileURL } from 'url';
 import { pass, fail, ROOT } from './helpers.mjs';
@@ -77,7 +78,7 @@ function makeSandbox() {
   const dir = mkdtempSync(join(tmpdir(), 'co-seed-'));
   const tracker = join(dir, 'applications.md');
   const followups = join(dir, 'follow-ups.md');
-  const lock = join(dir, `career-ops-followups-test-${Math.random().toString(36).slice(2)}.lock`);
+  const lock = join(dir, `career-ops-followups-test-${randomUUID()}.lock`);
   return { dir, tracker, followups, lock };
 }
 

@@ -103,7 +103,7 @@ test('the prompt-file checks read the CODE root, not the data root', () => {
   try {
     const r = runAgainst(dir);
     for (const name of ['_shared.md', '_writing.md', 'batch-prompt.md']) {
-      assert.doesNotMatch(r.all, new RegExp(`${name.replace('.', '\\.')} not found`),
+      assert.doesNotMatch(r.all, new RegExp(`${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} not found`),
         `${name} was looked for under the DATA root instead of the code root`);
     }
   } finally {

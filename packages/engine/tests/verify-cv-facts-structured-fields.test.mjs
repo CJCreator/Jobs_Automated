@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -49,7 +50,7 @@ writeFileSync(source, CV);
 const options = (extra = {}) => ({ sourcePaths: [source], configPath: join(tmp, 'none.json'), ...extra });
 
 function build(script, payload, ext) {
-  const input = join(tmp, `${script}-${Math.random().toString(36).slice(2)}.json`);
+  const input = join(tmp, `${script}-${randomUUID()}.json`);
   const output = `${input}.${ext}`;
   writeFileSync(input, JSON.stringify(payload));
   const run = spawnSync(process.execPath, [join(ROOT, script), input, output], { encoding: 'utf-8' });
