@@ -384,6 +384,10 @@ export const en = {
     linesCut: (total: number, sent: number) => `Your resume has ${total} confirmed lines. The first ${sent} were considered.`,
     rewritesCut: (returned: number, shown: number) => `The AI suggested ${returned} changes. The first ${shown} are shown.`,
   },
+  // P1-1
+  header: {
+    aiInUse: "AI in use:",
+  },
 } as const;
 
 export type Strings = typeof en;

@@ -4,7 +4,7 @@
 // reaches a URL is the model id (validated); keys travel in headers only;
 // redirects are refused; and no provider response text is ever put in an error.
 import Anthropic from "@anthropic-ai/sdk";
-import { LlmError, errorForStatus, scrub } from "./errors.mjs";
+import { LlmError, errorForResponse, errorForStatus, scrub } from "./errors.mjs";
 import { mockComplete, mockVerifyKey } from "./mock.mjs";
 import { strictEnv } from "../server/env-guard.mjs";
 
@@ -30,9 +30,23 @@ const COMPLETE_MS = 120_000;
 const RECOMMEND = { gemini: /flash/i, openai: /mini/i, groq: /llama.*70b|versatile/i };
 const NON_CHAT = /embed|whisper|tts|dall-e|moderation|audio|image|realtime|transcribe|search|similarity/i;
 
+const LAUNCH_IDS = ["gemini", "openrouter", "anthropic"];
+const EXTRA_IDS = ["openai", "groq"];
+
+/**
+ * The providers offered to users: Gemini, OpenRouter and Anthropic, plus any of
+ * openai and groq named in ROLEWRIGHT_EXTRA_PROVIDERS (comma list; unknown names
+ * are ignored). The development test provider is handled separately.
+ */
+export function launchProviders(env = process.env) {
+  const asked = new Set(String(env?.ROLEWRIGHT_EXTRA_PROVIDERS ?? "").split(",").map((s) => s.trim().toLowerCase()));
+  const ids = [...LAUNCH_IDS, ...EXTRA_IDS.filter((id) => asked.has(id))];
+  return ids.flatMap((id) => PROVIDERS.filter((p) => p.id === id));
+}
+
 export function isProviderAllowed(id) {
   if (id === "mock") return process.env.ROLEWRIGHT_ALLOW_MOCK_LLM === "1" && !strictEnv(process.env);
-  return PROVIDERS.some((p) => p.id === id);
+  return launchProviders().some((p) => p.id === id);
 }
 
 function assertAllowed(provider) {
@@ -86,7 +100,7 @@ async function geminiVerify(key) {
   const res = await call(`${BASES.gemini}/models?pageSize=200`, { method: "GET", headers: geminiHeaders(key) }, key, LABELS.gemini, VERIFY_MS);
   // Gemini answers 400 (not 401) for a malformed or unknown key.
   if (res.status === 400) throw new LlmError("invalid_key", `${LABELS.gemini} did not accept this key. Check that you copied the whole key.`, 400);
-  if (!res.ok) throw errorForStatus(res.status, LABELS.gemini);
+  if (!res.ok) throw await errorForResponse(res, LABELS.gemini);
   const body = await readJson(res);
   const models = (Array.isArray(body?.models) ? body.models : [])
     .filter((m) => Array.isArray(m?.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent") && typeof m.name === "string")
@@ -108,7 +122,7 @@ async function geminiComplete({ key, model, system, user, json }) {
     // A 400 here is a bad request or a bad key; the verify step has already proved the key.
     throw new LlmError("provider_error", `${LABELS.gemini} rejected the request. Try another model.`, 400);
   }
-  if (!res.ok) throw errorForStatus(res.status, LABELS.gemini);
+  if (!res.ok) throw await errorForResponse(res, LABELS.gemini);
   const body = await readJson(res);
   if (body?.promptFeedback?.blockReason || !Array.isArray(body?.candidates) || body.candidates.length === 0) {
     throw new LlmError("refused", `${LABELS.gemini} declined to answer this request.`);

@@ -32,13 +32,13 @@ export function maskKey(key) {
 }
 
 /** Map an HTTP status to a plain-words error. */
-export function errorForStatus(status, providerLabel = "The provider") {
+export function errorForStatus(status, providerLabel = "The provider", reportedStatus = status) {
   switch (status) {
     case 401:
     case 403:
       return new LlmError("invalid_key", `${providerLabel} did not accept this key. Check that you copied the whole key.`, status);
     case 402:
-      return new LlmError("quota", `${providerLabel} says this account has no credit left. Add credit or use another key.`, status);
+      return new LlmError("quota", `${providerLabel} says this key has no quota or credit left. Add credit, wait for the quota to reset, or use another key.`, reportedStatus);
     case 404:
       return new LlmError("model_not_found", `${providerLabel} does not have that model. Pick another one from the list.`, status);
     case 429:
@@ -47,6 +47,27 @@ export function errorForStatus(status, providerLabel = "The provider") {
       if (status >= 500) return new LlmError("provider_error", `${providerLabel} had a problem on its side. Try again shortly.`, status);
       return new LlmError("provider_error", `${providerLabel} could not process the request.`, status);
   }
+}
+
+/**
+ * Map a failed Response. Like errorForStatus, but a Gemini 429 is a quota error
+ * (not a rate limit) when its JSON body says error.status is RESOURCE_EXHAUSTED
+ * with a QuotaFailure detail whose quota ids are present and none is per-minute or per-second. Only
+ * those fixed fields are read; no text from the body is ever copied.
+ */
+export async function errorForResponse(res, providerLabel = "The provider") {
+  if (res.status === 429) {
+    try {
+      const err = (await res.json())?.error;
+      if (err?.status === "RESOURCE_EXHAUSTED" && Array.isArray(err.details)) {
+        const failures = err.details.filter((d) => typeof d?.["@type"] === "string" && d["@type"].endsWith("google.rpc.QuotaFailure"));
+        const violations = failures.flatMap((d) => (Array.isArray(d.violations) ? d.violations : []));
+        const ids = violations.map((v) => v?.quotaId).filter((q) => typeof q === "string");
+        if (ids.length > 0 && !ids.some((q) => /PerMinute|PerSecond/i.test(q))) return errorForStatus(402, providerLabel, 429);
+      }
+    } catch { /* body is not JSON: treat it as a plain rate limit */ }
+  }
+  return errorForStatus(res.status, providerLabel);
 }
 
 /** Find the first balanced {...} in text, skipping braces inside strings. */

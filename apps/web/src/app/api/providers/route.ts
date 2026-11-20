@@ -1,14 +1,14 @@
-import { PROVIDERS, isProviderAllowed } from "@/lib/llm/index.mjs";
+import { isProviderAllowed, launchProviders } from "@/lib/llm/providers.mjs";
 import { json, route } from "@/lib/server/http";
 import { requireUser } from "@/lib/server/session";
 
 export const runtime = "nodejs";
 
-// The server owns the provider list. The test provider is added only when the
+// The server owns the provider list: only the launch providers (ADR 0003). The test provider is added only when the
 // development flag allows it, so it can never show up in production.
 export const GET = route("providers.get", async (_req, { state }) => {
   await requireUser(state);
-  const providers: { id: string; label: string; keyUrl: string; keyHint: string }[] = PROVIDERS.map((p: { id: string; label: string; keyUrl: string; keyHint: string }) => ({
+  const providers: { id: string; label: string; keyUrl: string; keyHint: string }[] = launchProviders().map((p: { id: string; label: string; keyUrl: string; keyHint: string }) => ({
     id: p.id,
     label: p.label,
     keyUrl: p.keyUrl,

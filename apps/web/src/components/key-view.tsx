@@ -88,16 +88,12 @@ export function KeyView() {
 
   const onSave = () => {
     if (!verified || !canSave || !model) return;
-    const ok = setLlmKey({ provider: verified.provider, key: verified.key, model, verifiedAt: new Date().toISOString() });
-    if (ok) {
-      setKeyInput("");
-      setVerified(null);
-      setShow(false);
-      setStatus({ tone: "ok", text: t.saved });
-      setFocusTarget("saved-key-title");
-    } else {
-      setStatus({ tone: "danger", text: t.saveFailed });
-    }
+    setLlmKey({ provider: verified.provider, key: verified.key, model, verifiedAt: new Date().toISOString() });
+    setKeyInput("");
+    setVerified(null);
+    setShow(false);
+    setStatus({ tone: "ok", text: t.saved });
+    setFocusTarget("saved-key-title");
   };
 
   const onCheckSaved = async () => {
@@ -189,7 +185,9 @@ export function KeyView() {
               <Input
                 id={f.id}
                 type={show ? "text" : "password"}
-                autoComplete="off"
+                autoComplete="new-password"
+                data-1p-ignore
+                data-lpignore="true"
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
