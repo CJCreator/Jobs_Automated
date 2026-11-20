@@ -10,6 +10,7 @@ import { readLlmHeaders, requireTrialAccess, trialHttpError } from "@/lib/server
 import { pdfText } from "@/lib/server/pdf-text.mjs";
 import { takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
+import { track } from "@/lib/server/track.mjs";
 import { runWithTrial, withReservation } from "@/lib/server/trial.mjs";
 import { en } from "@/i18n/en";
 
@@ -88,5 +89,6 @@ export const POST = route("resume.upload", async (req, { state }) => {
   } catch (err) {
     throw trialHttpError(err);
   }
+  await track(userId, "resume_uploaded", { provider: llm.provider });
   return json({ facts, counts: confirmationCounts(facts) });
 });

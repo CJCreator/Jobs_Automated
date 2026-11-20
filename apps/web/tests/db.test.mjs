@@ -592,13 +592,13 @@ test("a database that was never migrated is refused at start, naming the missing
 
 // ---- per-table isolation, structure and privileges -----------------------------
 
-const USER_TABLES = ["resumes", "fact_bases", "jobs", "tailorings", "consents", "trial_counters"];
+const USER_TABLES = ["resumes", "fact_bases", "jobs", "tailorings", "consents", "trial_counters", "events"];
 const IDENTITY_TABLES = ["users", "accounts", "verification_tokens"];
 const newId = () => crypto.randomUUID();
 
 /** One row per user-data table for `user`, written inside that user's own scope. Returns the ids. */
 async function seedUser(d, user) {
-  const ids = { resume: newId(), job: newId(), tailoring: newId(), consent: newId() };
+  const ids = { resume: newId(), job: newId(), tailoring: newId(), consent: newId(), event: newId() };
   await d.withUser(user, async (tx) => {
     await tx.query("INSERT INTO resumes (id, user_id, filename, raw_text) VALUES ($1, $2, 'f.pdf', 'text')", [ids.resume, user]);
     await tx.query("INSERT INTO fact_bases (user_id, facts) VALUES ($1, '{\"marker\":\"original\"}'::jsonb)", [user]);
@@ -607,6 +607,7 @@ async function seedUser(d, user) {
       "INSERT INTO tailorings (id, user_id, job_id, suggestions) VALUES ($1, $2, $3, '[]'::jsonb)", [ids.tailoring, user, ids.job]);
     await tx.query("INSERT INTO consents (id, user_id, notice_version, purpose) VALUES ($1, $2, 'v1', 'ai_processing')", [ids.consent, user]);
     await tx.query("INSERT INTO trial_counters (user_id, tailorings_used) VALUES ($1, 1)", [user]);
+    await tx.query("INSERT INTO events (id, user_id, name) VALUES ($1, $2, 'tailoring_created')", [ids.event, user]);
   });
   return ids;
 }
@@ -647,19 +648,20 @@ test("per table, B's scope cannot select, update or delete A's rows, nor insert 
     tailorings: [`INSERT INTO tailorings (id, user_id, job_id, suggestions) VALUES ($1, $2, $3, '[]'::jsonb)`, [id, owner, job]],
     consents: [`INSERT INTO consents (id, user_id, notice_version, purpose) VALUES ($1, $2, 'v2', 'x')`, [id, owner]],
     trial_counters: [`INSERT INTO trial_counters (user_id) VALUES ($1)`, [owner]],
+    events: [`INSERT INTO events (id, user_id, name) VALUES ($1, $2, 'export_blocked')`, [id, owner]],
   })[table];
   // Each statement runs in its own scope: a refused one aborts its transaction.
   const inB = (sql, params = []) => d.withUser(b, async (tx) => (await tx.query(sql, params)).rows);
-  const aRowKey = { resumes: ids.resume, fact_bases: a, jobs: ids.job, tailorings: ids.tailoring, consents: ids.consent, trial_counters: a };
-  const keyCol = { resumes: "id", fact_bases: "user_id", jobs: "id", tailorings: "id", consents: "id", trial_counters: "user_id" };
-  const setClause = { resumes: "filename = 'hijacked'", fact_bases: "facts = '{}'::jsonb", jobs: "title = 'hijacked'", tailorings: "provider = 'hijacked'", consents: "purpose = 'hijacked'", trial_counters: "tailorings_used = 0" };
+  const aRowKey = { resumes: ids.resume, fact_bases: a, jobs: ids.job, tailorings: ids.tailoring, consents: ids.consent, trial_counters: a, events: ids.event };
+  const keyCol = { resumes: "id", fact_bases: "user_id", jobs: "id", tailorings: "id", consents: "id", trial_counters: "user_id", events: "id" };
+  const setClause = { resumes: "filename = 'hijacked'", fact_bases: "facts = '{}'::jsonb", jobs: "title = 'hijacked'", tailorings: "provider = 'hijacked'", consents: "purpose = 'hijacked'", trial_counters: "tailorings_used = 0", events: "name = 'export_blocked'" };
 
   for (const table of USER_TABLES) {
     const where = `${keyCol[table]} = $1`;
     assert.equal((await inB(`SELECT 1 FROM ${table} WHERE ${where}`, [aRowKey[table]])).length, 0, `${table}: select by A's key`);
     assert.deepEqual((await inB(`SELECT user_id FROM ${table}`)).map((r) => r.user_id), [b], `${table}: scan shows only B`);
 
-    if (table === "consents") {
+    if (table === "consents" || table === "events") {
       // The app role is append-only here: it has no UPDATE or DELETE at all.
       await assert.rejects(inB(`UPDATE ${table} SET ${setClause[table]} WHERE ${where}`, [aRowKey[table]]), /permission denied/, `${table}: update`);
       await assert.rejects(inB(`DELETE FROM ${table} WHERE ${where}`, [aRowKey[table]]), /permission denied/, `${table}: delete`);
@@ -744,7 +746,7 @@ test("rolewright_app holds exactly the intended privileges on the user-data tabl
       const { rows } = await db.system.query("SELECT has_table_privilege('rolewright_app', $1, $2) AS ok", [t, priv]);
       if (rows[0].ok) granted.push(priv);
     }
-    const expected = t === "consents" ? ["SELECT", "INSERT"] : t === "trial_counters" ? ["SELECT", "INSERT", "UPDATE"] : ["SELECT", "INSERT", "UPDATE", "DELETE"];
+    const expected = t === "consents" || t === "events" ? ["SELECT", "INSERT"] : t === "trial_counters" ? ["SELECT", "INSERT", "UPDATE"] : ["SELECT", "INSERT", "UPDATE", "DELETE"];
     assert.deepEqual(granted, expected, `${t}`);
   }
 });
@@ -761,7 +763,7 @@ async function seedEverything(d, email) {
 }
 const tokenCount = async (d, email) =>
   (await d.system.query("SELECT count(*)::int AS n FROM verification_tokens WHERE identifier = $1", [email])).rows[0].n;
-const ALL_ONE = { resumes: 1, fact_bases: 1, jobs: 1, tailorings: 1, consents: 1, trial_counters: 1, accounts: 1, users: 1 };
+const ALL_ONE = { resumes: 1, fact_bases: 1, jobs: 1, tailorings: 1, consents: 1, trial_counters: 1, events: 1, accounts: 1, users: 1 };
 const ALL_ZERO = Object.fromEntries(Object.keys(ALL_ONE).map((k) => [k, 0]));
 
 test("deleteUserData cascades through every table under forced RLS (checked on a connection that bypasses it)", async () => {

@@ -206,4 +206,24 @@ CREATE POLICY trial_counters_isolation ON trial_counters
   USING (user_id = current_setting('app.user_id')::uuid)
   WITH CHECK (user_id = current_setting('app.user_id')::uuid);
 GRANT SELECT, INSERT, UPDATE ON trial_counters TO rolewright_app;
+
+-- P2-1
+CREATE TABLE IF NOT EXISTS events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  name text NOT NULL CHECK (name IN ('resume_uploaded','tailoring_created','export_succeeded','export_blocked')),
+  props jsonb NOT NULL DEFAULT '{}'::jsonb,
+  at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS events_user_id_idx ON events (user_id);
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS events_isolation ON events;
+CREATE POLICY events_isolation ON events TO rolewright_app
+  USING (user_id = NULLIF(current_setting('app.user_id', true), '')::uuid)
+  WITH CHECK (user_id = NULLIF(current_setting('app.user_id', true), '')::uuid);
+DROP POLICY IF EXISTS events_report ON events;
+CREATE POLICY events_report ON events FOR SELECT TO rolewright_system USING (true);
+GRANT SELECT, INSERT ON events TO rolewright_app;
+GRANT SELECT ON events TO rolewright_system;
 `;
