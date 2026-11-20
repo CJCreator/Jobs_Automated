@@ -83,13 +83,17 @@ test('new claim words block when the source lacks them', () => {
 });
 
 test('plain business phrases that contain a claim word are not blocked', () => {
-  for (const line of ['Wrote the executive summary for close', 'Enterprise reporting for month-end close', 'Award-winning close team']) {
+  for (const line of ['Wrote the executive summary for close', 'Enterprise reporting for month-end close']) {
     const result = gate(line, 'Analyst. Month-end close reporting.');
     assert.equal(result.unsupportedFacts.length, 0, line);
   }
   // The exemption is for the exact phrase only.
   assert.ok(gate('Executive reporting for close', 'Analyst.').unsupportedFacts.length > 0);
   assert.ok(gate('Award for close', 'Analyst.').unsupportedFacts.length > 0);
+  // Owner decision (P1-19c): award-winning is no longer exempt. It is the
+  // award family, so it needs award, awards or awarded in the facts.
+  assert.ok(gate('Award-winning close team', 'Analyst. Month-end close reporting.').unsupportedFacts.length > 0);
+  assert.equal(gate('Award-winning close team', 'Analyst. Won the CFO Excellence Award 2022.').unsupportedFacts.length, 0);
 });
 
 test('the lists are exported for the sync test', () => {
@@ -114,13 +118,11 @@ test('plural Indian magnitudes are magnitudes, not modifiers', () => {
   assert.equal(blocks('Served 5lakh customers', 'Served 5 lakh customers'), false);
 });
 
-// Known false blocks, pending P1-19c. The engine no longer backs a bare
-// `<n> crore|lakh <word>` claim from the same figure stated as money ("Handled
-// budgets of ₹2 crore"): the rule that did (P1-19, currencyAmountClaims) was
-// removed by owner decision (P1-19d), so the gate errs toward blocking. Each
-// of these honest lines blocks today. P1-19c rebuilds the rule and must flip
-// every entry to pass, then delete this list.
-const KNOWN_FALSE_BLOCKS_PENDING_P1_19C = [
+// Formerly known false blocks, pending P1-19c. P1-19c rebuilt the rule: a
+// rupee amount the facts state as money backs the same lakh or crore figure
+// of the money word next to it ("Handled budgets of ₹2 crore" backs
+// "Handled 2 crore budgets"). Each of these honest lines must now pass.
+const HONEST_CRORE_LINES = [
   ['Handled 2 crore budgets', SOURCE],
   ['Handled ₹ 2 crore budgets', SOURCE],
   ['Handled 2 Cr budgets', SOURCE],
@@ -132,9 +134,11 @@ const KNOWN_FALSE_BLOCKS_PENDING_P1_19C = [
   ['Handled 2 crore budgets', 'Managed a team of 4 analysts, handled budgets of ₹2 crore'],
 ];
 
-test('known false blocks pending P1-19c: these honest crore lines block today', () => {
-  for (const [line, source] of KNOWN_FALSE_BLOCKS_PENDING_P1_19C) {
-    assert.ok(gate(line, source).invented.length > 0, `${line} | ${source === SOURCE ? 'SOURCE' : source}`);
+test('honest crore lines pass (formerly known false blocks pending P1-19c)', () => {
+  for (const [line, source] of HONEST_CRORE_LINES) {
+    const result = gate(line, source);
+    assert.deepEqual(result.invented, [], `${line} | ${source === SOURCE ? 'SOURCE' : source}`);
+    assert.notEqual(result.verdict, 'block', `${line} | ${source === SOURCE ? 'SOURCE' : source}`);
   }
 });
 
