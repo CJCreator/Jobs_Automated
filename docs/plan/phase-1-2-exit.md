@@ -119,7 +119,7 @@ Phase 0 risks 5, 6 and 11 are closed:
 | ID | Item | When |
 |---|---|---|
 | LG-1 | Runbook: run the migration before the first revision | Before P1-7 |
-| LG-2 | CodeQL triage by path; regex-escape hardening in `number-context.mjs` | Before staging |
+| LG-2 | CodeQL: LG-2 and LG-2b hardened the likely matches (regex escapes, the prompt fence, `htmlToText`, test helpers). Alerts went from 7 to 6 (1 critical, 1 high, 4 medium remain). The owner deferred the rest: list them by path in GitHub, then fix them | Open condition before staging (owner, 2026-11-20) |
 | LG-3 | ADR 0005 amendment listing what the gate misses, linked from the README | Launch gate |
 | LG-4 | ADR on consent withdrawal and a deletion tombstone | Launch gate |
 | LG-5 | `env-guard`: require the grievance contact on every deployed host | Launch gate |
