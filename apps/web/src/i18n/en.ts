@@ -478,6 +478,31 @@ export const en = {
     failed: "We could not prepare your file. Try again in a moment.",
     fallbackName: "rolewright-data.json",
   },
+  // P2-3
+  segment: {
+    title: "Which sounds most like you?",
+    hint: "Optional. It only changes the tip we show you. You can skip it or change it later.",
+    options: {
+      fresher: { label: "Fresher", detail: "Starting out, with projects, internships or education to show." },
+      experienced: { label: "Experienced", detail: "Working already, and applying to similar roles." },
+      switcher: { label: "Career switcher", detail: "Moving to a different field." },
+    },
+    save: "Save",
+    saving: "Saving",
+    change: "Change",
+    saved: "Saved.",
+    cleared: "Choice cleared.",
+    clear: "Clear my choice",
+    failed: "Your choice could not be saved. Try again.",
+    loadFailed: "Your choice could not be loaded. You can carry on without it.",
+    yours: "Your situation",
+    tipLink: "Open your resume",
+    tips: {
+      fresher: "Add your projects, internships and education as facts. You can type them in by hand.",
+      experienced: "Upload your resume, confirm what it says, then tailor it to each job.",
+      switcher: "Confirm your transferable skills. Lines are reworded for the new field, and experience is never invented.",
+    },
+  },
 } as const;
 
 export type Strings = typeof en;

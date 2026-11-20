@@ -206,4 +206,7 @@ CREATE POLICY trial_counters_isolation ON trial_counters
   USING (user_id = current_setting('app.user_id')::uuid)
   WITH CHECK (user_id = current_setting('app.user_id')::uuid);
 GRANT SELECT, INSERT, UPDATE ON trial_counters TO rolewright_app;
+
+-- P2-3
+ALTER TABLE users ADD COLUMN IF NOT EXISTS segment text CHECK (segment IN ('fresher','experienced','switcher'));
 `;
