@@ -14,7 +14,7 @@ All engine runs are `node test-all.mjs --quick` from `packages/engine` (or the r
 | After the skill rename | `97fd9d1` | 18,316 | 117 | The rename also rewrote some regex literals; reverted in the next commit. |
 | After Phase 0 (all tasks merged) | `3922e19` | 19,678 | 28 | All failures on the pre-existing list below; lint passes (1,951 files). |
 | After test repairs | `9d6c104` | 19,509 | 28 | Every inline section runs to the end; earlier runs stopped at a crash reading the removed `modes/zh`, which hid later sections. All 28 failures are on the pre-existing list below. |
-| After engine baseline cleanup (P1-25) | `PLACEHOLDER` | 19,704 | 0 | `npm run lint` passes. No known failures remain; see the list below for what was done to each. |
+| After engine baseline cleanup (P1-25) | `6dbbf71` | 19,704 | 0 | `npm run lint` passes. No known failures remain; see the list below for what was done to each. |
 
 ## The app
 
