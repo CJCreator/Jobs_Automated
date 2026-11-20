@@ -6,7 +6,7 @@ Based on the open-source career-ops project (MIT licence).
 
 ## Run it locally
 
-Needs Node 22.13 or later. Dependencies for this app are in `apps/web/node_modules`; the PDF export also needs the engine package (`packages/engine`) with its own `node_modules` and Playwright's Chromium installed (`npx playwright install chromium` in that folder).
+Needs Node 22.18 or later (the tests import TypeScript files directly, which Node runs without a flag from 22.18). Dependencies for this app are in `apps/web/node_modules`; the PDF export also needs the engine package (`packages/engine`) with its own `node_modules` and Playwright's Chromium installed (`npx playwright install chromium` in that folder).
 
 Two development flags turn on a sign-in that needs no email or Google account, and a fake AI provider that needs no key:
 
