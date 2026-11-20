@@ -15,7 +15,9 @@
 // sentence is read whole, verbs included, so "reduction" in a line can be backed
 // by "Reduced" in a fact. A fact that is only the figure and its noun phrase
 // ("12 analysts") supports that phrase, which is how a user attests a blocked
-// figure: `value` is that phrase.
+// figure: `value` is that phrase. figureContexts gives the same phrase for every
+// figure without reading the facts, so claims.mjs can offer it ("12 analysts") when
+// the figure is absent from the facts altogether.
 //
 // Covered: a count, percentage or amount that the facts hold only about a
 // different subject; the key must be in the facts (a figure absent from the
@@ -31,14 +33,14 @@
 // "Led 12 analysts, auditing branches", "Led 12" then a line break). Known
 // false block: "Supported statutory audit for 12 locations".
 //
-// Measured on the HONEST fixture (116 lines, 92 non-year figures), against the
+// Measured on the HONEST fixture (142 lines, 98 non-year figures), against the
 // source alone and with the extra facts the tests add: 0 false blocks, with
 // every must-block and must-pass case holding. Stop words do not use up the
 // window; CONTEXT_WINDOW counts other words, and a preposition ends the scan.
 //
 // Pure functions, no I/O, so `node --test` can import this file directly.
 
-import { numberClaims, cleanText } from "./claims.mjs";
+import { numberClaims, cleanText, isPlainPhraseWord } from "./claims.mjs";
 
 /** Words either side of a figure that count as its context. */
 const CONTEXT_WINDOW = 2;
@@ -225,6 +227,37 @@ function indexFacts(sourceText) {
 }
 
 /**
+ * The figure with its nearest clean noun ("12 analysts"), at most 60 characters, or null.
+ * A noun that is itself a claim (a claim word, a name, a look-alike letter) is skipped, so
+ * confirming the phrase can never also confirm "senior", "Deloitte" or "expеrts".
+ * One rule for both exports.
+ */
+const phraseOf = (fig, nouns) => {
+  const head = nouns.find((n) => isPlainPhraseWord(n.written));
+  return head ? `${fig.raw} ${head.written}`.slice(0, 60) : null;
+};
+
+/**
+ * Every figure in `text` with the phrase that says what it is about, by the same
+ * sentence, window and noun rules as unsupportedNumberContexts. Reads no facts.
+ * Years are skipped; `value` is null when no noun is near the figure.
+ *
+ * @param {string} text
+ * @returns {{ key: string, raw: string, value: string|null }[]}
+ */
+export function figureContexts(text) {
+  const out = [];
+  for (const sentence of sentences(text)) {
+    const all = words(sentence);
+    for (const fig of figures(sentence)) {
+      const nouns = nearbyNouns(all, fig);
+      out.push({ key: fig.key, raw: fig.raw, value: phraseOf(fig, nouns) });
+    }
+  }
+  return out;
+}
+
+/**
  * Figures in `text` that the facts hold only about something else.
  *
  * Judges only figures whose key (value and unit) is in the facts; a figure the
@@ -248,8 +281,8 @@ export function unsupportedNumberContexts(text, sourceText) {
       if (!nouns.length) continue;
       const stems = nouns.map((n) => stem(n.word));
       if (holders.some((set) => stems.some((s) => set.has(s)))) continue;
-      const head = nouns[0];
-      const value = `${fig.raw} ${head.written}`.slice(0, 60);
+      // No clean noun: the bare figure, which launders nothing.
+      const value = phraseOf(fig, nouns) ?? fig.raw;
       if (seen.has(value)) continue;
       seen.add(value);
       out.push({ value, raw: fig.raw });

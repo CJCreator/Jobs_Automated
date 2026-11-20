@@ -224,7 +224,7 @@ for (const text of KNOWN_GAPS) {
 }
 
 test("probe: an ordinal is a position, not a count", () => {
-  assert.equal(check("Ranked 1st in month-end close reporting").verdict, "pass");
+  assert.equal(check("Closed the 1st quarter books in month-end close reporting").verdict, "pass");
 });
 
 // --------------------------------------------------------------- checkText API

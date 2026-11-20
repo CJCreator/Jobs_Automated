@@ -5,7 +5,7 @@
 //
 // Pure functions, no I/O. The engine gate is passed in so tests can stub it.
 
-import { checkText } from "./claims.mjs";
+import { attestLeftovers, checkText } from "./claims.mjs";
 import { MAX_FACT_BASE_CHARS, buildResume, factBaseText } from "./facts.mjs";
 
 const randomUUID = () => globalThis.crypto.randomUUID();
@@ -183,7 +183,8 @@ function recheckAll(suggestions, ctx) {
 
 /** The issue on this suggestion, freshly computed, whose value is `value`. */
 function currentIssue(suggestion, ctx, value) {
-  return checkSuggestion(suggestion, ctx).check.issues.find((i) => sameText(i.value, value)) ?? null;
+  // An issue with no value names nothing the user could confirm, so it is never a match.
+  return value ? checkSuggestion(suggestion, ctx).check.issues.find((i) => i.value && sameText(i.value, value)) ?? null : null;
 }
 
 function requireValue(value) {
@@ -248,14 +249,26 @@ export function applyAction(facts, suggestions, sid, { action, text, value } = {
       const issue = currentIssue(target, ctxNow, v);
       if (!issue) throw new TailoringError(400, "not_an_issue", "You can only confirm an item that is flagged on this change.");
       const extras = Array.isArray(facts.extras) ? facts.extras : [];
-      const existing = extras.find((x) => sameText(x.text, issue.value));
+      // A bare figure is stored with what it is about ("12 analysts"); the phrase comes from
+      // the issue just recomputed on the server, never from the request.
+      const stated = issue.attestAs ?? issue.value;
+      // The phrase is checked against "can't confirm" too: "12" may be new while "12 analysts" was refused.
+      if (stated !== issue.value && (facts.cannotConfirm ?? []).some((c) => sameText(c, stated))) {
+        throw new TailoringError(409, "cannot_confirm", "You marked this as something you can't confirm, so it can't be added as a fact.");
+      }
+      // The stored string backs every later line, so it may carry nothing unconfirmed beyond
+      // this issue: "12 senior", "2 crore directors" or a look-alike letter would launder a claim.
+      if (attestLeftovers(stated, ctxNow.sourceText, issue).length) {
+        throw new TailoringError(409, "confirm_others_first", "This item carries other flagged words. Confirm the other flagged items first, or edit the line.");
+      }
+      const existing = extras.find((x) => sameText(x.text, stated));
       if (!existing && extras.length >= MAX_EXTRAS) {
         throw new TailoringError(409, "too_many_facts", "You have added the most extra facts allowed. Remove one from your facts page first.");
       }
       const statedAt = isoDate(ctx.now);
       const nextExtras = existing
         ? extras.map((x) => (x === existing ? { ...x, confirmed: true, source: "user", statedAt } : x))
-        : [...extras, { id: randomUUID(), text: issue.value, confirmed: true, source: "user", statedAt }];
+        : [...extras, { id: randomUUID(), text: stated, confirmed: true, source: "user", statedAt }];
       const nextFacts = { ...facts, extras: nextExtras };
       if (factBaseText(nextFacts).length > MAX_FACT_BASE_CHARS) throw tooLargeError();
       return { facts: nextFacts, suggestions: recheckAll(list, contextFor(nextFacts, ctx)), factsChanged: true };
