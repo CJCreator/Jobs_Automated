@@ -13,6 +13,7 @@ locals {
     "ROLEWRIGHT_TRIAL_GEMINI_KEY",
     "ROLEWRIGHT_TRIAL_OPENROUTER_KEY",
     "ROLEWRIGHT_SIGNUP_ALLOWLIST",
+    "ROLEWRIGHT_RATE_LIMIT_KEY",
   ]
   # Only the migrate job reads this one (the owner role connection string).
   migrate_secret = "ROLEWRIGHT_MIGRATE_DATABASE_URL"

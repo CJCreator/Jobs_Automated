@@ -10,18 +10,17 @@ resource "google_monitoring_notification_channel" "email" {
   depends_on = [google_project_service.enabled]
 }
 
-# Cloud Run request logs: a POST to the purge route that did not return 2xx.
-# (Anyone can send an unauthenticated POST, which answers 401 and also counts;
-# the runbook uses that to test the alert.)
+# Cloud Run request logs: a POST to the purge route that failed on the server
+# (5xx). A 401 or 403 from a bad token is caught by the scheduler metric below.
 resource "google_logging_metric" "purge_call_failed" {
   name        = "rolewright_purge_call_failed"
-  description = "Calls to /api/internal/purge that failed"
+  description = "Calls to /api/internal/purge that returned a server error"
   filter      = <<-EOT
     resource.type="cloud_run_revision"
     resource.labels.service_name="${local.service_name}"
     httpRequest.requestMethod="POST"
     httpRequest.requestUrl:"/api/internal/purge"
-    httpRequest.status>=400
+    httpRequest.status>=500
   EOT
 
   metric_descriptor {

@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1
 #
+# BuildKit is required: it reads apps/web/Dockerfile.dockerignore for the
+# repo-root context (DOCKER_BUILDKIT=1 on older Docker).
+#
 # The Rolewright app image (ADR 0009). Build from the REPOSITORY ROOT so the
 # engine is inside the context:
 #
@@ -60,4 +63,4 @@ USER rolewright
 
 # Cloud Run sets PORT (the Terraform sets 8080). No NODE_OPTIONS.
 EXPOSE 8080
-CMD ["sh", "-c", "exec npm run start -- -p \"${PORT:-8080}\""]
+CMD ["sh", "-c", "exec node_modules/.bin/next start -p \"${PORT:-8080}\""]
