@@ -113,8 +113,23 @@ const isNoun = (w) => w.length > 1 && !STOP.has(w) && !NUMBER_WORD.has(w) && !is
 
 const WORD_RE = /\p{L}+(?:['’]\p{L}+)?/gu;
 
-function words(text) {
-  return [...text.matchAll(WORD_RE)].map((m) => ({ word: m[0].toLowerCase(), written: m[0], start: m.index, end: m.index + m[0].length }));
+// A preposition ends the scan: what follows it is another phrase.
+const PREP = new Set("across in at for on to from into within over per while and".split(" "));
+
+// Per-word flags, worked out once so the window scans are plain integer tests.
+const F_PREP = 1;
+const F_STOP = 2;
+const F_BARRIER = 4;
+const F_NOUN = 8;
+
+function wordsOf(text) {
+  const out = [];
+  for (const m of text.matchAll(WORD_RE)) {
+    const word = m[0].toLowerCase();
+    const flags = (PREP.has(word) ? F_PREP : 0) | (STOP.has(word) ? F_STOP : 0) | (BARRIERS.has(word) ? F_BARRIER : 0) | (isNoun(word) ? F_NOUN : 0);
+    out.push({ word, written: m[0], start: m.index, end: m.index + m[0].length, flags });
+  }
+  return out;
 }
 
 // A sentence ends at ". " before a capital, at the end of text, and at ; | a bullet or a line break.
@@ -145,7 +160,7 @@ function locate(sentence, lowered, claim, from) {
 }
 
 /** Figures in a sentence with where they sit: { key, raw, start, end }. */
-function figures(sentence) {
+function figuresOf(sentence) {
   const lowered = sentence.toLowerCase();
   const out = [];
   let from = 0;
@@ -159,25 +174,58 @@ function figures(sentence) {
   return out;
 }
 
-// A preposition ends the scan: what follows it is another phrase.
-const PREP = new Set("across in at for on to from into within over per while and".split(" "));
 
-/** Words from the figure outwards that count as its context: stop words are free, `window` others are kept. */
-function reach(side, window) {
+// A long sentence is read for words and figures once, however many times it comes up (the
+// same text as facts and as wording, or the same facts across many lines). Both results are
+// read-only. Short sentences are cheaper to redo than to look up.
+const MEMO_MIN = 256;
+const MEMO_MAX = 8;
+const memo = new Map();
+
+function entryFor(sentence) {
+  if (sentence.length < MEMO_MIN) return { all: null, figs: null };
+  let hit = memo.get(sentence);
+  if (hit) {
+    memo.delete(sentence); // refresh recency
+  } else {
+    hit = { all: null, figs: null };
+    if (memo.size >= MEMO_MAX) memo.delete(memo.keys().next().value);
+  }
+  memo.set(sentence, hit);
+  return hit;
+}
+
+// The two views are separate so a fact sentence with no figure is never split into words.
+const words = (sentence, entry = entryFor(sentence)) => (entry.all ??= wordsOf(sentence));
+const figures = (sentence, entry = entryFor(sentence)) => (entry.figs ??= figuresOf(sentence));
+
+const SCAN = 12; // words examined each side before the window rule applies
+
+/**
+ * One side of a figure, outwards: stop words are free, `window` other words are kept.
+ * A preposition or a tool/method word ends the scan. Returns the kept words that are
+ * nouns, tagged with their position (`dist`) among the kept words.
+ */
+function sideNouns(all, from, step, stop, window, figStart, side) {
   const out = [];
   let used = 0;
-  for (const w of side) {
-    if (PREP.has(w.word)) break;
-    if (!STOP.has(w.word)) {
+  let dist = 0;
+  for (let j = from, seen = 0; j !== stop && seen < SCAN; j += step, seen++) {
+    const w = all[j];
+    // Left of the figure, a word that overlaps the figure itself ("INR 5") is not context.
+    if (step < 0 && w.end > figStart) continue;
+    const f = w.flags;
+    if (f & F_PREP) break;
+    if (!(f & F_STOP)) {
       if (used === window) break;
       used++;
     }
-    out.push(w);
+    if (f & F_BARRIER) break;
+    if (f & F_NOUN) out[dist] = { word: w.word, written: w.written, dist, side };
+    dist++;
   }
-  return out;
+  return { out, dist };
 }
-
-const SCAN = 12; // words examined each side before the window rule applies
 
 /** The nouns that sit within the window of a figure, nearest first. `all` is the sentence's words. */
 function nearbyNouns(all, fig, window = CONTEXT_WINDOW) {
@@ -189,19 +237,16 @@ function nearbyNouns(all, fig, window = CONTEXT_WINDOW) {
     if (all[mid].start >= fig.end) hi = mid;
     else lo = mid + 1;
   }
-  const rightSide = all.slice(lo, lo + SCAN);
-  const leftSide = all.slice(Math.max(0, lo - SCAN), lo).filter((w) => w.end <= fig.start).reverse();
-  const take = (side) => {
-    const kept = [];
-    for (const w of side) {
-      if (BARRIERS.has(w.word)) break;
-      kept.push(w);
-    }
-    return kept;
-  };
-  const r = take(reach(rightSide, window)).map((w, i) => ({ ...w, dist: i, side: "right" }));
-  const l = take(reach(leftSide, window)).map((w, i) => ({ ...w, dist: i, side: "left" }));
-  return [...r, ...l].filter((w) => isNoun(w.word)).sort((a, b) => a.dist - b.dist || (a.side === "right" ? -1 : 1));
+  const right = sideNouns(all, lo, 1, Math.min(all.length, lo + SCAN), window, fig.start, "right");
+  const left = sideNouns(all, lo - 1, -1, Math.max(0, lo - SCAN) - 1, window, fig.start, "left");
+  const nouns = [];
+  const n = Math.max(right.dist, left.dist);
+  // Nearest first; on a tie the right side comes first.
+  for (let d = 0; d < n; d++) {
+    if (right.out[d]) nouns.push(right.out[d]);
+    if (left.out[d]) nouns.push(left.out[d]);
+  }
+  return nouns;
 }
 
 // Index of the facts: figure key -> one entry per fact sentence holding it, each a set of stems.
