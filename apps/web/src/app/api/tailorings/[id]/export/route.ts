@@ -1,15 +1,14 @@
 import { getDb } from "@/lib/db/index.mjs";
 import { getFacts, getTailoring } from "@/lib/db/repo.mjs";
-import { buildResume } from "@/lib/facts.mjs";
-import { resumeFilename, resumeHtml } from "@/lib/resume-html.mjs";
+import { resumeFilename } from "@/lib/resume-html.mjs";
 import { loadFactGate } from "@/lib/server/engine.mjs";
 import { HttpError, route } from "@/lib/server/http";
+import { gateAndRender } from "@/lib/server/pdf-bundle.mjs";
 import { renderPdf } from "@/lib/server/pdf.mjs";
 import { chargeGate, takeRateLimit } from "@/lib/server/rate-limit";
 import { requireUser } from "@/lib/server/session";
 import { track } from "@/lib/server/track.mjs";
 import { flattenBlockers, notFound } from "@/lib/server/views";
-import { exportBlockers } from "@/lib/tailoring.mjs";
 import { coverageFor } from "../coverage/coverage-for.mjs";
 
 export const runtime = "nodejs";
@@ -31,29 +30,30 @@ export const POST = route<{ id: string }>("tailorings.export", async (_req, { pa
 
   // Every changed line is checked again here, from scratch, against the facts
   // as they are now. Stored checks and decisions alone never let text through.
-  const blockers = await chargeGate(userId, (timed) =>
-    timed(() => exportBlockers(facts, tailoring.suggestions, { jdText: tailoring.jdText ?? "", engineGate })),
-  );
-  if (blockers.length === 1 && blockers[0].issues.length === 1 && blockers[0].issues[0].kind === "facts_too_large") {
+  // The same function builds every PDF in the data export bundle.
+  const result = await gateAndRender(facts, tailoring, {
+    engineGate,
+    runGate: (fn: () => unknown) => chargeGate(userId, (timed) => timed(fn)),
+    render: renderPdf,
+  });
+  if (!result.ok && result.reason === "facts_too_large") {
     await track(userId, "export_blocked", { reason: "facts_too_large" });
-    throw new HttpError(409, "facts_too_large", blockers[0].issues[0].message);
+    throw new HttpError(409, "facts_too_large", result.blockers[0].issues[0].message);
   }
-  if (blockers.length) {
+  if (!result.ok && result.reason === "fact_gate") {
     await track(userId, "export_blocked", { reason: "fact_gate" });
     throw new HttpError(
       409,
       "blocked",
       "Some accepted changes say things that are not in your confirmed facts. Edit or reject them, then export again.",
-      { issues: flattenBlockers(blockers) },
+      { issues: flattenBlockers(result.blockers) },
     );
   }
-
-  const { resume } = buildResume(facts, tailoring.suggestions);
-  if (!resume.contact && !resume.summary && !resume.experience.length && !resume.education.length && !resume.skills.length) {
+  if (!result.ok) {
     await track(userId, "export_blocked", { reason: "nothing_confirmed" });
     throw new HttpError(409, "nothing_confirmed", "Confirm your facts before exporting a resume.");
   }
-  const pdf = await renderPdf(resumeHtml(resume));
+  const { resume, pdf } = result;
   // Coverage is for information only; a failure here never changes the export.
   const props: { coverage_before?: number; coverage_after?: number } = {};
   try {
