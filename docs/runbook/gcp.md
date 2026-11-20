@@ -44,18 +44,23 @@ Each environment is its own Google Cloud project in `asia-south1`, with its own 
    - `ROLEWRIGHT_SIGNUP_ALLOWLIST`: comma list of addresses and `@domain` entries (can be a single space-free placeholder until you decide)
    The private IP is the `cloud_sql_private_ip` Terraform output. Secret values are never in Terraform, its state, tfvars or the repo.
 5. **GitHub environment.** In the repository settings create environments named exactly `staging` and `production` (production with required reviewers). The names matter: the workload identity condition only accepts a token from the `main` branch in the environment whose name matches the project's `environment` variable. In each, set the variables `GCP_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER` (output `workload_identity_provider`) and `GCP_DEPLOYER_SERVICE_ACCOUNT` (output `deployer_service_account`).
-6. **First image.** The service needs an image to exist. Build and push once by hand, or run the Deploy workflow (it will fail at "Run the migrations" because the job does not exist yet; the push has still happened):
+6. **First image.** The service needs an image to exist. Build and push once by hand, or run the Deploy workflow (it will fail at "Run the migrations" because the job does not exist yet; the push has still happened). Later deploys use the workflow, which always runs the migrate job before it updates the service:
    ```
    gcloud auth configure-docker asia-south1-docker.pkg.dev
    docker build -f apps/web/Dockerfile -t asia-south1-docker.pkg.dev/$PROJECT/rolewright/rolewright:first .
    docker push asia-south1-docker.pkg.dev/$PROJECT/rolewright/rolewright:first
    ```
-7. **Second apply: workloads.** Add `-var enable_workloads=true -var image=asia-south1-docker.pkg.dev/$PROJECT/rolewright/rolewright:first` and the settings to your command from step 2 (set the grievance name and email, `email_from`, and the trial model ids in the tfvars file first). This creates the Cloud Run service, the `rolewright-migrate` job, and the daily purge scheduler job. (The purge alerts and the notification channel are not gated: they are created in step 2. If the first apply fails on a just-created log metric, apply again.)
-8. **Migrate, then deploy.** Run the Deploy workflow (Actions, Deploy, choose the environment). It builds, pushes, runs the migrate job with the new image, then updates the service. Check `<service_url>/api/health` answers `{"ok":true}`.
-9. **Register the sign-in callbacks.** In the Google OAuth client add `<AUTH_URL>/api/auth/callback/google`. In Resend verify the `EMAIL_FROM` domain.
-10. **Before opening sign-ups.** Sign-ups stay on the allowlist. Do not set `signups = "open"` until the grievance contact is set (the app refuses it otherwise) and the privacy notice has had its legal review (ADR 0004).
+7. **Second apply: the migrate job only.** Add `-var enable_workloads=true -var image=asia-south1-docker.pkg.dev/$PROJECT/rolewright/rolewright:first` to your command from step 2 (leave `create_service` at its default, false). This creates the `rolewright-migrate` job and nothing else new: no Cloud Run service and no purge scheduler yet. The service must not exist before the first migration, because the app refuses an unmigrated database and its start-up probe (`/api/health`) would fail, failing the apply with it. (The purge alerts and the notification channel are not gated: they are created in step 2. If the first apply fails on a just-created log metric, apply again.)
+8. **First migration.** Run the job as the owner login and wait for it to succeed:
+   ```
+   gcloud run jobs execute rolewright-migrate --project $PROJECT --region asia-south1 --wait
+   ```
+   Do not go on until it reports success. If it fails, read its logs (`gcloud run jobs executions list --job rolewright-migrate --project $PROJECT --region asia-south1`), fix the cause (usually a wrong `ROLEWRIGHT_MIGRATE_DATABASE_URL` or the roles from step 3), and run it again.
+9. **Third apply: the service.** Repeat the step 7 command with `-var create_service=true` added (set the grievance name and email, `email_from`, and the trial model ids in the tfvars file first). This creates the Cloud Run service and the daily purge scheduler job. Check `<service_url>/api/health` answers `{"ok":true}`.
+10. **Register the sign-in callbacks.** In the Google OAuth client add `<AUTH_URL>/api/auth/callback/google`. In Resend verify the `EMAIL_FROM` domain.
+11. **Before opening sign-ups.** Sign-ups stay on the allowlist. Do not set `signups = "open"` until the grievance contact is set (the app refuses it otherwise) and the privacy notice has had its legal review (ADR 0004).
 
-After the first apply the Terraform ignores the image, so later deploys are the workflow only. Run Terraform again for any other change (variables, scaling, a new secret), keeping `enable_workloads=true` and passing a current `image` value (the value is ignored after creation, but must be non-empty).
+After the first apply the Terraform ignores the image, so later deploys are the workflow only. Run Terraform again for any other change (variables, scaling, a new secret), keeping `enable_workloads=true` and `create_service=true` and passing a current `image` value (the value is ignored after creation, but must be non-empty).
 
 ## Add an address to the sign-up allowlist
 
