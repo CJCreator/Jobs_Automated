@@ -572,6 +572,49 @@ try {
     );
     await ctx.close();
   });
+
+  await step("14. PWA: /manifest.webmanifest is public with the right type, icons are PNGs, /icons/7 is 404, the head links the manifest, no CSP violation", async () => {
+    const res = await request(null, "GET", "/manifest.webmanifest");
+    assert.equal(res.status, 200, "signed out");
+    assert.match(res.headers.get("content-type") ?? "", /^application\/(manifest\+json|json)/);
+    const manifest = JSON.parse(res.data);
+    assert.equal(manifest.start_url, "/app");
+    assert.equal(manifest.display, "standalone");
+    assert.ok(manifest.icons.some((i) => i.src === "/icons/192") && manifest.icons.some((i) => i.src === "/icons/512" && i.purpose === "maskable"));
+    for (const size of [192, 512]) {
+      const icon = await fetch(`${base}/icons/${size}`, { redirect: "manual", signal: AbortSignal.timeout(120_000) });
+      assert.equal(icon.status, 200, `/icons/${size} signed out`);
+      assert.equal(icon.headers.get("content-type"), "image/png");
+      assert.match(icon.headers.get("cache-control") ?? "", /max-age=\d{6,}/, "a long cache lifetime");
+      const bytes = Buffer.from(await icon.arrayBuffer());
+      assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `/icons/${size} is a PNG`);
+      assert.equal(bytes.readUInt32BE(16), size, `/icons/${size} is ${size} wide`);
+      assert.equal(bytes.readUInt32BE(20), size, `/icons/${size} is ${size} high`);
+    }
+    for (const bad of ["7", "256", "0", "abc"]) {
+      assert.equal((await fetch(`${base}/icons/${bad}`, { redirect: "manual" })).status, 404, `/icons/${bad}`);
+    }
+
+    // In Chromium: the head has the manifest link, the manifest loads under the CSP, nothing is reported.
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, baseURL: base });
+    try {
+      const page = await ctx.newPage();
+      const problems = [];
+      page.on("console", (m) => {
+        if (/content security policy|refused to (execute|load|apply|connect)/i.test(m.text())) problems.push(m.text().slice(0, 300));
+      });
+      for (const route of ["/", "/sign-in"]) {
+        await page.goto(route, { waitUntil: "networkidle" });
+        const href = await page.locator('head link[rel="manifest"]').getAttribute("href");
+        assert.ok(href && new URL(href, base).pathname === "/manifest.webmanifest", `${route} head links the manifest (${href})`);
+      }
+      const fetched = await page.evaluate(() => fetch(document.querySelector('link[rel="manifest"]').href).then((r) => r.status));
+      assert.equal(fetched, 200, "the page can fetch its manifest under the CSP");
+      assert.deepEqual(problems, [], "no Content Security Policy violation");
+    } finally {
+      await ctx.close();
+    }
+  });
 } catch {
   // Reported by step().
 } finally {
