@@ -7,12 +7,12 @@
 // captured so the key-hygiene step can prove no key ever reaches a log.
 
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assertCleanStart, killTree } from "../e2e/helpers.mjs";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "../../packages/engine");
@@ -117,19 +117,6 @@ function everyItemUnconfirmed(facts) {
   return items.length > 5 && items.every((i) => i.confirmed === false);
 }
 
-async function freePort(preferred) {
-  const tryPort = (port) =>
-    new Promise((resolve) => {
-      const srv = net.createServer();
-      srv.once("error", () => resolve(null));
-      srv.listen(port, () => {
-        const { port: got } = srv.address();
-        srv.close(() => resolve(got));
-      });
-    });
-  return (await tryPort(preferred)) ?? (await tryPort(0));
-}
-
 function startServer(port, dataDir) {
   const env = {
     ...process.env,
@@ -146,24 +133,17 @@ function startServer(port, dataDir) {
     delete env[k];
   }
   const nextBin = path.join(appDir, "node_modules", "next", "dist", "bin", "next");
-  const child = spawn(process.execPath, [nextBin, "dev", "-p", String(port)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const child = spawn(process.execPath, [nextBin, "dev", "-p", String(port)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
   child.stdout.on("data", (d) => (serverOutput += d.toString()));
   child.stderr.on("data", (d) => (serverOutput += d.toString()));
   return child;
 }
 
 async function stopServer(child) {
-  if (!child || child.exitCode !== null) return;
-  const exited = new Promise((resolve) => child.once("exit", resolve));
-  if (process.platform === "win32") {
-    try {
-      execFileSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    } catch {
-      // Already gone.
-    }
-  } else {
-    child.kill("SIGTERM");
-  }
+  if (!child) return;
+  const exited = child.exitCode === null ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
+  // The whole process group, as next-server is a child of the next CLI.
+  killTree(child);
   await Promise.race([exited, new Promise((r) => setTimeout(r, 15_000))]);
 }
 
@@ -255,13 +235,7 @@ const state = {};
 
 // If the run is interrupted, still stop the server.
 function killServerSync() {
-  if (!child || child.exitCode !== null) return;
-  try {
-    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    else child.kill("SIGKILL");
-  } catch {
-    // Already gone.
-  }
+  killTree(child);
 }
 process.once("exit", killServerSync);
 for (const signal of ["SIGINT", "SIGTERM"]) {
@@ -270,7 +244,8 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 try {
   await step("1. next dev starts with the dev sign-in, the mock AI and a temp database", async () => {
-    const port = await freePort(3111);
+    const port = Number(process.env.FLOW_PORT) || 3111;
+    await assertCleanStart(appDir, port);
     base = `http://localhost:${port}`;
     child = startServer(port, dbDir);
     await waitForServer(child);

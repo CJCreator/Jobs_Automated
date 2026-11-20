@@ -7,6 +7,11 @@
 //
 // Prints PASS or FAIL per step and exits non-zero on any failure. The server is
 // always stopped.
+//
+// Remote mode: SMOKE_BASE_URL=https://<deployed host> builds and starts nothing and runs only the steps
+// that need no sign-in and write nothing. See runRemote() below. Optional and opt-in: SMOKE_SESSION_COOKIE
+// (the owner's own staging session, read from the environment and never printed) with SMOKE_TAILORING_ID
+// times one GET of that tailoring.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
@@ -17,6 +22,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { encode } from "next-auth/jwt";
+import { assertCleanStart, killTree } from "../e2e/helpers.mjs";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 process.env.CAREER_OPS_CODE_ROOT ||= path.resolve(appDir, "../../packages/engine");
@@ -29,7 +35,13 @@ const { MOCK_RESUME } = await load("src/lib/llm/mock.mjs");
 const { pdfText } = await load("src/lib/server/pdf-text.mjs");
 
 const PORT = 3124;
-const base = `http://localhost:${PORT}`;
+// Remote mode: https only, origin only.
+const REMOTE = process.env.SMOKE_BASE_URL ? new URL(process.env.SMOKE_BASE_URL) : null;
+if (REMOTE && REMOTE.protocol !== "https:") {
+  console.error("SMOKE_BASE_URL must be an https URL.");
+  process.exit(2);
+}
+const base = REMOTE ? REMOTE.origin : `http://localhost:${PORT}`;
 const SECRET = "prod-smoke-secret-not-for-real-use-0123456789abcdef";
 // Over plain http Auth.js names the cookie without the __Secure- prefix, and uses the name as the encryption salt.
 const COOKIE = "authjs.session-token";
@@ -74,16 +86,6 @@ function serverEnv() {
 
 const nextBin = path.join(appDir, "node_modules", "next", "dist", "bin", "next");
 
-function killTree(proc) {
-  if (!proc || proc.exitCode !== null) return;
-  try {
-    if (process.platform === "win32") execFileSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
-    else proc.kill("SIGKILL");
-  } catch {
-    // Already gone.
-  }
-}
-
 process.once("exit", () => {
   killTree(child);
   restoreGenerated();
@@ -91,8 +93,8 @@ process.once("exit", () => {
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => process.exit(130));
 
 async function stopServer() {
-  if (!child || child.exitCode !== null) return;
-  const exited = new Promise((resolve) => child.once("exit", resolve));
+  if (!child) return;
+  const exited = child.exitCode === null ? new Promise((resolve) => child.once("exit", resolve)) : Promise.resolve();
   killTree(child);
   await Promise.race([exited, new Promise((r) => setTimeout(r, 15_000))]);
 }
@@ -157,6 +159,7 @@ async function mintCookie(userId, email) {
 
 async function request(cookie, method, route, { json, headers = {} } = {}) {
   const h = { ...headers };
+  if (REMOTE && Object.keys(h).some((k) => k.toLowerCase() === "x-llm-key")) throw new Error("remote mode never sends an x-llm-key header");
   if (cookie) h.cookie = cookie;
   let body;
   if (json !== undefined) {
@@ -188,9 +191,106 @@ async function step(name, fn) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Remote mode (SMOKE_BASE_URL): read-only checks of a deployed host. No build, no server, no database, no
+// sign-in, no x-llm-key header. Everything it sends is a GET, or a POST that must be refused.
+
+async function runRemote() {
+  const csp = (res) => res.headers.get("content-security-policy") ?? "";
+  const assertNonceCsp = (res, route) =>
+    assert.match(csp(res), /script-src[^;]*'nonce-[A-Za-z0-9+/=_-]{16,}'/, `${route} CSP carries a script nonce: ${csp(res)}`);
+  const assertHsts = (res, route) => assert.match(res.headers.get("strict-transport-security") ?? "", /max-age=\d+/, `${route} sends HSTS`);
+
+  console.log(`Remote mode: ${base}`);
+  try {
+    await step("R1. / and /sign-in: 200, HSTS, a nonce CSP, no development sign-in form", async () => {
+      for (const route of ["/", "/sign-in"]) {
+        const res = await request(null, "GET", route);
+        assert.equal(res.status, 200, `${route} answered ${res.status}`);
+        assertHsts(res, route);
+        assertNonceCsp(res, route);
+        assert.ok(!String(res.data).includes('id="dev-email"'), `${route} has no development sign-in form`);
+      }
+    });
+
+    await step("R2. /privacy: 200; the grievance contact follows ROLEWRIGHT_EXPECT_GRIEVANCE", async () => {
+      const res = await request(null, "GET", "/privacy");
+      assert.equal(res.status, 200);
+      assertHsts(res, "/privacy");
+      assertNonceCsp(res, "/privacy");
+      if (process.env.ROLEWRIGHT_EXPECT_GRIEVANCE === "1") {
+        assert.ok(!res.data.includes('data-testid="grievance-unset"'), "the grievance contact is configured (ROLEWRIGHT_EXPECT_GRIEVANCE=1)");
+        const email = process.env.ROLEWRIGHT_GRIEVANCE_EMAIL ?? "";
+        assert.ok(email && res.data.includes(`mailto:${email}`), "/privacy shows the grievance email");
+      } else {
+        assert.ok(res.data.includes('data-testid="grievance-unset"'), "with no grievance contact configured, /privacy says so");
+      }
+    });
+
+    await step("R3. GET /api/health is 200 { ok: true }", async () => {
+      const res = await request(null, "GET", "/api/health");
+      assert.equal(res.status, 200, JSON.stringify(res.data).slice(0, 300));
+      assert.deepEqual(res.data, { ok: true });
+    });
+
+    await step("R4. no cookie: GET /api/facts and GET /api/providers are 401; POST /api/internal/purge with no token is 401", async () => {
+      assert.equal((await request(null, "GET", "/api/facts")).status, 401, "/api/facts");
+      assert.equal((await request(null, "GET", "/api/providers")).status, 401, "/api/providers");
+      const purge = await request(null, "POST", "/api/internal/purge");
+      assert.equal(purge.status, 401, JSON.stringify(purge.data));
+    });
+
+    await step("R5. the development sign-in (POST /api/auth/callback/dev) is refused: no session cookie is set", async () => {
+      const csrf = await fetch(`${base}/api/auth/csrf`, { signal: AbortSignal.timeout(30_000) });
+      const { csrfToken } = await csrf.json();
+      const csrfCookie = csrf.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+      const res = await fetch(`${base}/api/auth/callback/dev`, {
+        method: "POST",
+        headers: { cookie: csrfCookie, "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ csrfToken, email: "remote-smoke@example.invalid", callbackUrl: `${base}/app` }),
+        redirect: "manual",
+        signal: AbortSignal.timeout(30_000),
+      });
+      const cookies = res.headers.getSetCookie();
+      assert.ok(!cookies.some((c) => c.includes("session-token") && !/max-age=0|expires=thu, 01 jan 1970/i.test(c)), "no session cookie was set");
+      const where = res.headers.get("location") ?? "";
+      assert.ok(!/^\/app(\/|$)/.test(new URL(where || base, base).pathname), `the dev sign-in did not lead into /app (status ${res.status}, location ${where})`);
+    });
+
+    const cookie = process.env.SMOKE_SESSION_COOKIE;
+    const tailoringId = process.env.SMOKE_TAILORING_ID;
+    if (cookie && tailoringId) {
+      await step("R6. signed in (opt-in): time one GET of the tailoring (the gate-timing line for P1-7)", async () => {
+        assert.match(tailoringId, /^[A-Za-z0-9_-]+$/, "SMOKE_TAILORING_ID looks like an id");
+        const started = performance.now();
+        const res = await request(cookie, "GET", `/api/tailorings/${tailoringId}`);
+        const ms = Math.round(performance.now() - started);
+        console.log(`     gate timing: GET /api/tailorings/<id> took ${ms} ms (status ${res.status})`);
+        assert.equal(res.status, 200, `the tailoring answered ${res.status}`);
+      });
+    }
+
+    console.log("\nSkipped in remote mode:");
+    console.log("  - build, start and the embedded database: nothing is started");
+    console.log("  - steps 1 to 10, 12, 13: they seed a database, mint a session or write data");
+    console.log("  - 11 (sign-in security headers beyond R1) and the Chromium CSP step: need a local server");
+    if (!(cookie && tailoringId)) console.log("  - the gate-timing step: set SMOKE_SESSION_COOKIE and SMOKE_TAILORING_ID to run it");
+  } catch {
+    // Reported by step().
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  }
+  const passed = steps.filter(([, ok]) => ok).length;
+  console.log(`\n${failures ? "FAIL" : "PASS"}: ${passed} of ${steps.length} steps passed${failures ? "" : " (all)"}`);
+  process.exit(failures ? 1 : 0);
+}
+
+if (REMOTE) await runRemote();
+
 const state = {};
 
 try {
+  await assertCleanStart(appDir, PORT);
   await step("1. seed the database directly: two users, A's confirmed facts, a job and a tailoring", async () => {
     const raw = {
       contact: { ...MOCK_RESUME.contact, confirmed: true },
@@ -256,12 +356,13 @@ try {
     assert.ok(await portIsFree(PORT), `port ${PORT} is free`);
     const env = { ...serverEnv(), K_SERVICE: "x" };
     let out = "";
-    const proc = (child = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true }));
+    const proc = (child = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" }));
     proc.stdout.on("data", (d) => (out += d.toString()));
     proc.stderr.on("data", (d) => (out += d.toString()));
     const code = await new Promise((resolve) => {
       const timer = setTimeout(() => {
         killTree(proc);
+        child = null;
         resolve("timeout");
       }, 90_000);
       proc.once("close", (c) => {
@@ -277,7 +378,7 @@ try {
   });
 
   await step("3. next start with NODE_ENV=production answers", async () => {
-    child = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env: serverEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    child = spawn(process.execPath, [nextBin, "start", "-p", String(PORT)], { cwd: appDir, env: serverEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
     child.stdout.on("data", (d) => (serverOutput += d.toString()));
     child.stderr.on("data", (d) => (serverOutput += d.toString()));
     await waitForServer();
@@ -381,6 +482,8 @@ try {
     assert.ok(res.data.includes(`nonce="${nonce(res.headers)}"`), "inline and framework scripts in the HTML carry the nonce");
   });
 
+  // ROLEWRIGHT_GRIEVANCE_* in the parent environment without ROLEWRIGHT_EXPECT_GRIEVANCE=1 fails this step:
+  // the server inherits them, so /privacy shows the contact and the "grievance-unset" assertion below fails.
   await step("11b. signed-out /privacy is 200 with a nonce CSP; / and /sign-in link to it; purge without a token is 401", async () => {
     const res = await request(null, "GET", "/privacy");
     assert.equal(res.status, 200);
