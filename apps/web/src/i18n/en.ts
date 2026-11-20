@@ -471,7 +471,7 @@ export const en = {
   // P2-2
   dataExport: {
     title: "Download your data",
-    body: "One JSON file with everything we hold for you: your account details, confirmed facts, uploaded resume text, job descriptions, tailorings and their suggestions, your consent records and your trial counts. It never includes an API key or sign-in token.",
+    body: "One JSON file with what we hold for you: your account details and sign-in method, your facts, uploaded resume text, job descriptions, tailorings and their suggestions, your consent records and your trial counts. It leaves out the short-lived records that count your requests. It never includes an API key or sign-in token.",
     button: "Download my data",
     working: "Preparing your file",
     done: "Your data file has been downloaded.",

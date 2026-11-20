@@ -23,6 +23,10 @@ function withoutSecrets(row) {
 export async function exportUserData(db, userId, { now = new Date() } = {}) {
   const { rows: accountRows } = await db.system.query("SELECT to_jsonb(u) AS account FROM users u WHERE id = $1", [userId]);
   const account = withoutSecrets(accountRows[0]?.account);
+  const { rows: signIns } = await db.system.query(
+    "SELECT provider, provider_account_id FROM accounts WHERE user_id = $1 ORDER BY provider, provider_account_id",
+    [userId],
+  );
 
   const own = await db.withUser(userId, async (q) => {
     const all = async (sql) => (await q.query(sql, [userId])).rows;
@@ -47,6 +51,7 @@ export async function exportUserData(db, userId, { now = new Date() } = {}) {
     version: EXPORT_VERSION,
     exportedAt: now.toISOString(),
     account,
+    signIns,
     facts: own.facts ? clean(own.facts) : null,
     resumes: own.resumes.map(clean),
     jobs: own.jobs.map(clean),
