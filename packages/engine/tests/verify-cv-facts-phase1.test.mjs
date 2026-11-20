@@ -132,6 +132,32 @@ test('a crore or lakh amount without a currency mark is backed by the same amoun
   }
 });
 
+test('a crore amount backs only the words next to it, never a word another number counts', () => {
+  const blocks = (line, source) => gate(line, source).invented.length > 0;
+  assert.ok(blocks('Managed 2 crore customers', 'Handled ₹2 crore budgets for 300 customers'));
+  assert.ok(blocks('Managed 2 crore analysts', 'Managed a team of 4 analysts, handled budgets of ₹2 crore'));
+  assert.ok(blocks('Managed 2 crore analysts', 'Led 4 analysts handling ₹2 crore'));
+  assert.ok(blocks('Managed 2 crore vendors', 'Handled ₹2 crore budgets across the north and south zones with vendors'));
+  assert.equal(blocks('Handled 2 crore budgets', 'Handled ₹2 crore budgets for 300 customers'), false);
+  assert.equal(blocks('Handled 2 crore budgets', 'Managed a team of 4 analysts, handled budgets of ₹2 crore'), false);
+});
+
+// Every amount backs a bounded number of keys, so a source of many amounts on
+// one unpunctuated line costs time linear in its length. Unbounded, this
+// source took 8 s and 1.3 GB.
+test('a source of 1,500 crore amounts on one line is checked in under 500 ms', () => {
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  const word = (i) => `${letters[i % 26]}${letters[Math.floor(i / 26) % 26]}${letters[Math.floor(i / 676) % 26]}q`;
+  let source = '';
+  for (let i = 0; i < 1500; i++) source += `₹${i + 1} crore ${word(i)} `;
+  source += `${Date.now()}`;
+  assert.ok(source.length < 30000);
+  const started = performance.now();
+  gate('Handled 2 crore budgets', source);
+  const ms = performance.now() - started;
+  assert.ok(ms < 500, `${ms.toFixed(0)} ms`);
+});
+
 test('a plain source number backs a rewritten count only on its own line and never as money', () => {
   const blocks = (line, source) => gate(line, source).invented.length > 0;
   for (const source of ['Budget Rs 50000 invoices were processed', 'Budget Rs. 50000 invoices were processed',
@@ -179,5 +205,5 @@ test('a warm call on a 30,000-character source reuses the source work', (t) => {
     }
   }
   t.diagnostic(`cold ${cold.toFixed(2)} ms, warm ${warm.toFixed(2)} ms`);
-  assert.ok(warm * 3 <= cold || warm < 5, `cold ${cold.toFixed(2)} ms, warm ${warm.toFixed(2)} ms`);
+  assert.ok(warm * 3 <= cold, `cold ${cold.toFixed(2)} ms, warm ${warm.toFixed(2)} ms`);
 });
