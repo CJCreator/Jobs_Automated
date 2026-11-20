@@ -1,6 +1,13 @@
 // The database schema as a string, so it is bundled like any other module and
 // never read from disk at runtime (a file read breaks inside Next server bundles).
 // Safe to run on every start: every statement is idempotent.
+// Tables without row-level security: sign-in identity and rate limits. The app
+// reaches them through rolewright_system, and rolewright_app (the role every
+// user-data query runs as) holds no privilege on them. Every other table in
+// public must have forced row-level security, a policy and a user_id column
+// (tests/db-structure.test.mjs).
+export const SYSTEM_TABLES = Object.freeze(["users", "accounts", "verification_tokens", "rate_events"]);
+
 export const SCHEMA_SQL = `-- Rolewright schema. Safe to run on every start: every statement is idempotent.
 --
 -- Isolation model: user-data tables have row-level security, and the app only
@@ -172,4 +179,16 @@ CREATE TABLE IF NOT EXISTS rate_events (
 CREATE INDEX IF NOT EXISTS rate_events_lookup_idx ON rate_events (bucket, subject, at);
 GRANT SELECT, INSERT, DELETE ON rate_events TO rolewright_system;
 GRANT USAGE, SELECT ON SEQUENCE rate_events_id_seq TO rolewright_system;
+
+-- P1-17
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'rolewright_system') THEN
+    CREATE ROLE rolewright_system NOLOGIN;
+  END IF;
+END $$;
+DO $$ BEGIN
+  EXECUTE format('GRANT rolewright_system TO %I', current_user);
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+GRANT SELECT, INSERT, UPDATE, DELETE ON users, accounts, verification_tokens TO rolewright_system;
 `;

@@ -12,10 +12,21 @@
 //
 // ROLEWRIGHT_REQUIRE_PG=1 (set in CI) makes the run fail, rather than quietly
 // fall back to PGlite, when no Postgres URL is set.
+//
+// Non-owner mode (the deployed shape, P1-17): also set
+//
+//   ROLEWRIGHT_TEST_OWNER_URL=postgres://<owner login>:<pw>@host:port/postgres
+//
+// Each test database is then owned by that login and migrated through it
+// (migrateDatabase, as `npm run db:migrate` does), and every test runs through
+// ROLEWRIGHT_TEST_DATABASE_URL as a login that owns nothing and starts without
+// running any DDL (createDb with migrate: false, which runs the role check).
+// Statements a test needs as the owner (DDL) go through the owner URL.
 
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { createDb } from "../src/lib/db/index.mjs";
+import { createDb, migrateDatabase } from "../src/lib/db/index.mjs";
+import { UnsafeEnvironmentError } from "../src/lib/server/env-guard.mjs";
 import * as repo from "../src/lib/db/repo.mjs";
 import { emptyFacts, normalizeFacts } from "../src/lib/facts.mjs";
 
@@ -23,6 +34,8 @@ const PG_URL = process.env.ROLEWRIGHT_TEST_DATABASE_URL || "";
 const PG_ADMIN_URL = process.env.ROLEWRIGHT_TEST_ADMIN_URL || PG_URL;
 const PG = Boolean(PG_URL);
 const REQUIRE_PG = process.env.ROLEWRIGHT_REQUIRE_PG === "1";
+const OWNER_URL = process.env.ROLEWRIGHT_TEST_OWNER_URL || "";
+const NON_OWNER = PG && Boolean(OWNER_URL);
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function adminQuery(sql) {
@@ -39,18 +52,25 @@ async function adminQuery(sql) {
 const quoteIdent = (s) => `"${String(s).replace(/"/g, '""')}"`;
 const open = [];
 const createdDatabases = [];
+const createdRoles = [];
 const databaseNames = new WeakMap();
+
+/** The same server URL pointed at another database. */
+function inDatabase(base, name) {
+  const url = new URL(base);
+  url.pathname = `/${name}`;
+  return url.toString();
+}
 
 async function freshDb() {
   let db;
   if (PG) {
     const name = `rw_test_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
-    const owner = decodeURIComponent(new URL(PG_URL).username);
+    const owner = decodeURIComponent(new URL(NON_OWNER ? OWNER_URL : PG_URL).username);
     await adminQuery(`CREATE DATABASE ${quoteIdent(name)} OWNER ${quoteIdent(owner)}`);
     createdDatabases.push(name);
-    const url = new URL(PG_URL);
-    url.pathname = `/${name}`;
-    db = await createDb({ connectionString: url.toString() });
+    if (NON_OWNER) await migrateDatabase({ connectionString: inDatabase(OWNER_URL, name) });
+    db = await createDb({ connectionString: inDatabase(PG_URL, name), migrate: !NON_OWNER });
     databaseNames.set(db, name);
   } else {
     db = await createDb();
@@ -58,6 +78,24 @@ async function freshDb() {
   open.push(db);
   return db;
 }
+
+/** Run a statement as the tables' owner: the owner login in non-owner mode, else the app's own connection. */
+async function asOwner(d, sql) {
+  if (!NON_OWNER) return d.system.query(sql);
+  const { default: pg } = await import("pg");
+  const client = new pg.Client({ connectionString: inDatabase(OWNER_URL, databaseNames.get(d)) });
+  await client.connect();
+  try {
+    return await client.query(sql);
+  } finally {
+    await client.end();
+  }
+}
+
+/** Apply the schema again, the way this mode applies it. */
+const reapplySchema = (d) => (NON_OWNER
+  ? migrateDatabase({ connectionString: inDatabase(OWNER_URL, databaseNames.get(d)) })
+  : d.applySchema());
 
 let db;
 let A;
@@ -92,6 +130,7 @@ before(async () => {
 after(async () => {
   for (const d of open) await d.close();
   for (const name of createdDatabases) await adminQuery(`DROP DATABASE IF EXISTS ${quoteIdent(name)} WITH (FORCE)`);
+  for (const role of createdRoles) await adminQuery(`DROP ROLE IF EXISTS ${quoteIdent(role)}`);
 });
 
 test("emails are lower-cased and trimmed, and the user is found either way", async () => {
@@ -173,8 +212,8 @@ test("negative control: with permissive policies the same read DOES leak", async
   // Sanity: the policies hold before we break them.
   assert.equal((await leaky.withUser(b, async (tx) => (await tx.query("SELECT * FROM jobs")).rows)).length, 0);
 
-  await leaky.system.query("DROP POLICY jobs_isolation ON jobs");
-  await leaky.system.query("CREATE POLICY jobs_isolation ON jobs USING (true) WITH CHECK (true)");
+  await asOwner(leaky, "DROP POLICY jobs_isolation ON jobs");
+  await asOwner(leaky, "CREATE POLICY jobs_isolation ON jobs USING (true) WITH CHECK (true)");
   const seen = await leaky.withUser(b, async (tx) => (await tx.query("SELECT title FROM jobs")).rows);
   assert.equal(seen.length, 1, "the isolation tests can fail: a permissive policy exposes A's job to B");
   assert.equal(seen[0].title, "secret");
@@ -205,8 +244,8 @@ test("running the schema again does not throw and keeps the policies working", a
   const u = (await repo.upsertUserByEmail(again, { email: "c@example.com" })).id;
   const v = (await repo.upsertUserByEmail(again, { email: "d@example.com" })).id;
   await repo.createJob(again, u, { title: "t", company: "c", jdText: "j" });
-  await again.applySchema();
-  await again.applySchema();
+  await reapplySchema(again);
+  await reapplySchema(again);
   assert.equal((await again.withUser(v, async (tx) => (await tx.query("SELECT * FROM jobs")).rows)).length, 0);
   assert.equal((await again.withUser(u, async (tx) => (await tx.query("SELECT * FROM jobs")).rows)).length, 1);
 });
@@ -437,6 +476,120 @@ test("on Postgres the login is neither a superuser nor able to bypass row-level 
   assert.deepEqual(app, { rolsuper: false, rolbypassrls: false, rolcanlogin: false });
 });
 
+// ---- the start-up role check and the owner split (P1-17) ------------------------
+
+test("ROLEWRIGHT_TEST_OWNER_URL needs ROLEWRIGHT_TEST_DATABASE_URL too", () => {
+  assert.ok(!OWNER_URL || PG, "ROLEWRIGHT_TEST_OWNER_URL is set but ROLEWRIGHT_TEST_DATABASE_URL is not: the non-owner leg would silently run on PGlite");
+  if (REQUIRE_PG && OWNER_URL) assert.equal(NON_OWNER, true);
+});
+
+test("a deployed host is refused before any DDL if asked to migrate in the app", async () => {
+  const saved = process.env.K_SERVICE;
+  process.env.K_SERVICE = "web";
+  try {
+    // Port 1 on loopback: nothing listens, so a connection attempt would fail with ECONNREFUSED instead.
+    await assert.rejects(
+      createDb({ connectionString: "postgres://nobody@127.0.0.1:1/none", migrate: true }),
+      (e) => e instanceof UnsafeEnvironmentError && /db:migrate/.test(e.message),
+    );
+  } finally {
+    if (saved === undefined) delete process.env.K_SERVICE;
+    else process.env.K_SERVICE = saved;
+  }
+});
+
+const ownedRelations = async (d) => (await d.system.query(`
+  SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND pg_has_role(current_user, c.relowner, 'MEMBER')`)).rows[0].n;
+
+test("the login's ownership matches the mode; as a non-owner it cannot change any table's security", { skip: !PG && "PGlite always runs as a superuser" }, async () => {
+  // The app role never inherits the system role, so a user scope cannot reach the identity tables.
+  const { rows: [m] } = await db.system.query("SELECT pg_has_role('rolewright_app', 'rolewright_system', 'MEMBER') AS m");
+  assert.equal(m.m, false);
+  const name = databaseNames.get(db);
+  if (NON_OWNER) {
+    assert.equal(await ownedRelations(db), 0, "the app login owns a relation");
+    await assert.rejects(db.system.query("DROP POLICY jobs_isolation ON jobs"), /must be owner/);
+    await assert.rejects(db.system.query("ALTER TABLE jobs NO FORCE ROW LEVEL SECURITY"), /must be owner/);
+    await assert.rejects(db.system.query("ALTER TABLE jobs DISABLE ROW LEVEL SECURITY"), /must be owner/);
+    await assert.rejects(db.system.query("ALTER TABLE users ENABLE ROW LEVEL SECURITY"), /must be owner/);
+    await assert.rejects(db.system.query("CREATE TABLE planted (x int)"), /permission denied/);
+    await assert.rejects(db.applySchema(), /migrat/);
+    // The identity tables are reached through rolewright_system, not ownership.
+    const { rows: [u] } = await db.system.query("SELECT count(*)::int AS n FROM users");
+    assert.ok(u.n >= 1);
+  } else {
+    assert.ok(await ownedRelations(db) > 0, "owner mode: the login owns the tables it migrated");
+    // The same login is refused when it starts as a deployed host would, without migrating.
+    await assert.rejects(
+      createDb({ connectionString: inDatabase(PG_URL, name), migrate: false }),
+      (e) => e instanceof UnsafeEnvironmentError && /owns/.test(e.message) && /jobs/.test(e.message),
+    );
+  }
+});
+
+/** Wait until no session of `role` is left on the server (the refused pool was closed). */
+async function sessionsOf(role) {
+  for (let i = 0; i < 40; i++) {
+    const { rows: [r] } = await adminQuery(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE usename = '${role}'`);
+    if (r.n === 0) return 0;
+    await pause(50);
+  }
+  return (await adminQuery(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE usename = '${role}'`)).rows[0].n;
+}
+
+test("a login with BYPASSRLS, or a superuser, is refused at start; the same login without BYPASSRLS starts", { skip: !PG && "needs a real Postgres server and its admin login" }, async () => {
+  const name = databaseNames.get(db);
+  const role = `rw_bypass_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  const password = crypto.randomUUID();
+  createdRoles.push(role);
+  await adminQuery(`CREATE ROLE ${quoteIdent(role)} LOGIN BYPASSRLS PASSWORD '${password}'`);
+  await adminQuery(`GRANT rolewright_app, rolewright_system TO ${quoteIdent(role)}`);
+  const url = new URL(inDatabase(PG_URL, name));
+  url.username = role;
+  url.password = password;
+
+  await assert.rejects(createDb({ connectionString: url.toString(), migrate: false }), (e) => {
+    assert.ok(e instanceof UnsafeEnvironmentError, String(e));
+    assert.match(e.message, /BYPASSRLS/);
+    assert.ok(!e.message.includes(password) && !e.message.includes(role), "the refusal names no credential");
+    return true;
+  });
+  assert.equal(await sessionsOf(role), 0, "the refused pool was closed");
+
+  // Positive control: nothing else about this login is wrong.
+  await adminQuery(`ALTER ROLE ${quoteIdent(role)} NOBYPASSRLS`);
+  const ok = await createDb({ connectionString: url.toString(), migrate: false });
+  open.push(ok);
+  assert.ok((await ok.system.query("SELECT count(*)::int AS n FROM users")).rows[0].n >= 1);
+
+  // The admin login is a superuser: refused the same way.
+  await assert.rejects(
+    createDb({ connectionString: inDatabase(PG_ADMIN_URL, name), migrate: false }),
+    (e) => e instanceof UnsafeEnvironmentError && /superuser/.test(e.message),
+  );
+});
+
+test("a database that was never migrated is refused at start, naming the missing tables", { skip: !PG && "needs a real Postgres server" }, async () => {
+  const name = `rw_test_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  const owner = decodeURIComponent(new URL(NON_OWNER ? OWNER_URL : PG_URL).username);
+  await adminQuery(`CREATE DATABASE ${quoteIdent(name)} OWNER ${quoteIdent(owner)}`);
+  createdDatabases.push(name);
+  await assert.rejects(
+    createDb({ connectionString: inDatabase(PG_URL, name), migrate: false }),
+    (e) => e instanceof UnsafeEnvironmentError && /users/.test(e.message) && /tailorings/.test(e.message),
+  );
+  // Nothing was created by the refused start.
+  const { default: pg } = await import("pg");
+  const client = new pg.Client({ connectionString: inDatabase(PG_ADMIN_URL, name) });
+  await client.connect();
+  try {
+    assert.equal((await client.query("SELECT to_regclass('public.users') AS t")).rows[0].t, null);
+  } finally {
+    await client.end();
+  }
+});
+
 // ---- per-table isolation, structure and privileges -----------------------------
 
 const USER_TABLES = ["resumes", "fact_bases", "jobs", "tailorings", "consents"];
@@ -552,13 +705,13 @@ test("every table with a user_id column (except accounts) has forced row-level s
 
 test("negative control: the structural check flags a new user table that skips row-level security", async () => {
   const d = await freshDb();
-  await d.system.query("CREATE TABLE notes (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users (id))");
+  await asOwner(d, "CREATE TABLE notes (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users (id))");
   assert.deepEqual((await unprotectedUserTables(d)).bad, ["notes"]);
-  await d.system.query("ALTER TABLE notes ENABLE ROW LEVEL SECURITY");
+  await asOwner(d, "ALTER TABLE notes ENABLE ROW LEVEL SECURITY");
   assert.deepEqual((await unprotectedUserTables(d)).bad, ["notes"], "enabled but not forced and without a policy is still flagged");
-  await d.system.query("ALTER TABLE notes FORCE ROW LEVEL SECURITY");
+  await asOwner(d, "ALTER TABLE notes FORCE ROW LEVEL SECURITY");
   assert.deepEqual((await unprotectedUserTables(d)).bad, ["notes"], "forced but without a policy is still flagged");
-  await d.system.query("CREATE POLICY notes_isolation ON notes USING (user_id = current_setting('app.user_id')::uuid)");
+  await asOwner(d, "CREATE POLICY notes_isolation ON notes USING (user_id = current_setting('app.user_id')::uuid)");
   assert.deepEqual((await unprotectedUserTables(d)).bad, []);
 });
 
