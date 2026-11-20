@@ -267,3 +267,15 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 - **P1-T1: sign-in limit override.** Every harness sign-in will count against `signInIp` at 20 per 10 minutes, landing in `unknown` when no `x-forwarded-for` is sent. Add a test-only limit override that `env-guard` refuses on strict environments.
   - **Contact details on "also delete facts".** Contact details stay, and the copy says so. Follow-up: record a source for each contact field so it can be deleted with the resume (`facts.mjs`, `fact-source.mjs`, `facts-edit.mjs`, plus a rule for existing rows).
 - **Follow-up: jobs shared between tailorings.** When a future task lets tailorings share a job, add `SELECT 1 FROM jobs WHERE id = $1 FOR UPDATE` before the conditional job delete in `deleteTailoring`. Today jobs and tailorings are one-to-one, so the race can't happen.
+- **Owner decision, 2026-11-20: split P1-19.**
+  - **P1-19d (Opus):** removes the crore/lakh-money-without-₹ rule (`currencyAmountClaims`) and keeps all other P1-19 work. It records the seven honest crore lines as known false blocks pending P1-19c, so the gate errs toward blocking.
+  - **P1-19c** rebuilds the rule. Its scope adds the advisor's seven acceptance criteria from the second P1-19b review:
+    - year-shaped counts block;
+    - a comma is a real stop;
+    - the counted window reaches the noun;
+    - spelled-out numbers count;
+    - digits glued to text (FY23, Q3, B2B) are not counters;
+    - a label backs its amount ("Budget: ₹2 crore");
+    - everything that works today keeps working.
+  - P1-19c also carries the earlier rupee-amount scope.
+- **P1-25** reached 0 engine failures, down from 28; 19,704 tests pass. It is in review round 2 for the id-list message port and the baseline wording.
