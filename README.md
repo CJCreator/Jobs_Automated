@@ -1,6 +1,6 @@
 # Rolewright
 
-Rework your resume from the experience you actually have, tailor it to a job description, and get past the first screen. Every claim in the exported resume is checked against the facts you confirmed. The export is refused when a changed line states something your confirmed facts do not. The check catches invented employers, figures, credentials and seniority words; it does not understand meaning, so you still review every change.
+Rework your resume from the experience you actually have, tailor it to a job description, and get past the first screen. Every claim in the exported resume is checked against the facts you confirmed. The export is refused when a changed line states something your confirmed facts do not. The check catches invented employers, figures, credentials and seniority words; it does not understand meaning, so you still review every change. What it does not catch yet is listed in [ADR 0005](docs/adr/0005-fact-gate-hard-export-gate.md#amendment-2026-11-20-owner-what-the-gate-does-not-catch).
 
 Built for job seekers in India: freshers, experienced hires and career switchers.
 
