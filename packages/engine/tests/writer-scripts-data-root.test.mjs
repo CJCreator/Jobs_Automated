@@ -166,7 +166,7 @@ const CLOSURE = {
     // triggers a JD-archive check via these two (#4523), which in turn need
     // their own lib/ helpers.
     'check-jd-archive.mjs', 'jd-capture.mjs', 'lib/cli-flags.mjs', 'lib/is-main-module.mjs',
-    'lib/jd-archive-section.mjs',
+    'lib/jd-archive-section.mjs', 'lib/services/tracker-service.mjs',
     // Runtime assets, not imports: an import scan does not see these and each
     // one only announces itself by crashing the child.
     'tracker-aliases.json',
@@ -183,7 +183,7 @@ function markerFixture(script) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'career-ops-marker-')));
   const codeRoot = join(dir, 'code');
   const dataRoot = join(dir, 'data');
-  for (const sub of ['lib', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
+  for (const sub of ['lib', 'lib/services', 'templates']) mkdirSync(join(codeRoot, sub), { recursive: true });
   mkdirSync(join(dataRoot, 'data'), { recursive: true });
   mkdirSync(join(dataRoot, 'output'), { recursive: true });
 

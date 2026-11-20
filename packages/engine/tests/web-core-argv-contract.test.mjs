@@ -51,12 +51,8 @@ const CALL_SITES = [
     args: ['--json'],
     probe: 'run',
   },
-  {
-    source: 'web/src/app/api/doctor/route.ts',
-    script: 'doctor.mjs',
-    args: ['--json'],
-    probe: 'run',
-  },
+  // No entry for web/src/app/api/doctor/route.ts: it reads doctorState() in
+  // process and no longer spawns doctor.mjs, so there is no argv to probe.
   {
     // Before the set-status probe, which moves row 1 off Applied.
     source: 'web/src/lib/core-cli.ts',

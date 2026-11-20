@@ -37,7 +37,7 @@ export function BottomNav() {
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium transition-colors",
               active
-                ? "text-brand"
+                ? "text-brand-text"
                 : "text-muted hover:text-foreground"
             )}
           >
@@ -54,7 +54,7 @@ export function BottomNav() {
         className="flex flex-col items-center justify-center gap-0.5 rounded-lg py-1 px-3 text-[10px] font-medium text-muted transition-colors hover:text-foreground focus:outline-none"
         aria-label="Open AI Assistant"
       >
-        <Sparkles className="size-5 text-brand" />
+        <Sparkles className="size-5 text-brand-text" />
         <span>Ask AI</span>
       </button>
 

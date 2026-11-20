@@ -521,6 +521,24 @@ export const SYSTEM_PATHS = [
   'opencode.example.json',
   'seed-fixture.mjs',
   'test-fixtures/',
+  // Rolewright additions: files this fork added or moved into the engine.
+  'PROJECT_STRUCTURE.md',
+  'lib/agent-events.mjs',
+  'lib/ast/fact-verifier.mjs',
+  'lib/scanners/ghost-job-detector.mjs',
+  'lib/services/tracker-service.mjs',
+  'lib/storage/markdown-projector.mjs',
+  'lib/storage/schema.sql',
+  'lib/storage/sqlite-client.mjs',
+  'scripts/docs-gen/gen-ai-docs.mjs',
+  'scripts/docs-gen/gen-arch-docs.mjs',
+  'scripts/docs-gen/gen-backend-docs.mjs',
+  'scripts/docs-gen/gen-deployment-docs.mjs',
+  'scripts/docs-gen/gen-dev-docs.mjs',
+  'scripts/docs-gen/gen-frontend-docs.mjs',
+  'scripts/docs-gen/gen-project-structure.mjs',
+  'scripts/docs-gen/gen-testing-docs.mjs',
+  'scripts/security-audit.mjs',
 ];
 
 // Frozen after the literal, not with `Object.freeze([...])` around it, so the

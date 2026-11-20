@@ -12,8 +12,9 @@
  *  5. Data contract compliance (user-layer files vs system-layer immutability).
  */
 
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, resolve, relative } from 'node:path';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, relative, basename } from 'node:path';
+import { walkTree } from '../lib/walk-tree.mjs';
 
 const ROOT = process.cwd();
 
@@ -42,21 +43,16 @@ let violations = 0;
 let scannedFiles = 0;
 
 function walkAndCheck(dir) {
-  const entries = readdirSync(dir, { withFileTypes: true });
+  // lib/walk-tree.mjs is the repository's one directory walker: it keeps a
+  // nested checkout or scratch copy from feeding a second tree into the audit.
+  const files = walkTree(dir, { skip: (entry) => entry.isDirectory() && IGNORED_DIRS.has(entry.name) });
 
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
+  for (const fullPath of files) {
     const rel = relative(ROOT, fullPath);
-
-    if (entry.isDirectory()) {
-      if (!IGNORED_DIRS.has(entry.name)) {
-        walkAndCheck(fullPath);
-      }
-      continue;
-    }
+    const name = basename(fullPath);
 
     // Only audit source and config files
-    if (!/\.(mjs|js|ts|tsx|json|yml|yaml|md)$/i.test(entry.name)) {
+    if (!/\.(mjs|js|ts|tsx|json|yml|yaml|md)$/i.test(name)) {
       continue;
     }
 

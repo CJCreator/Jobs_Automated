@@ -779,17 +779,16 @@ function runSelfTest() {
   check(!hasEmbeddedJdArchive(
     "## Job Description (archived verbatim)\n(the posting's full text,\n   pasted verbatim — see requirement below)\n\n## Machine Summary"),
     'hasEmbeddedJdArchive rejects the English placeholder when it was re-wrapped on paste');
+  // The localized placeholders are read from the locale templates still shipped
+  // (modes/hi/naukri.md); the zh and de templates were removed from this fork.
   check(!hasEmbeddedJdArchive(
-    '## Job Description (archived verbatim)\nPosted: 2026-10-20 (shown as 1 week ago)\n（职位描述全文，\n逐字粘贴——见下方要求）\n\n## Machine Summary'),
-    'hasEmbeddedJdArchive rejects a Chinese placeholder re-wrapped between two CJK characters, under a Posted line that lifts it past MIN_ARCHIVE_CHARS (CodeRabbit, PR #5926)');
+    '## Job Description (archived verbatim)\nPosted: 2026-10-20 (shown as 1 week ago)\n(offer का पूरा text,\n   word-for-word paste किया हुआ\n-- नीचे requirement देखें)\n\n## Machine Summary'),
+    'hasEmbeddedJdArchive rejects a Hindi placeholder re-wrapped on paste, under a Posted line that lifts it past MIN_ARCHIVE_CHARS (CodeRabbit, PR #5926)');
   check(!hasEmbeddedJdArchive(
-    '## Job Description (archived verbatim)\n（职位描述全文，逐字粘贴——见下方要求）\n\n## Machine Summary'),
-    'hasEmbeddedJdArchive rejects the unfilled modes/zh/oferta.md placeholder, read from the template itself (full-width parentheses)');
+    '## Job Description (archived verbatim)\n(offer का पूरा text, word-for-word paste किया हुआ -- नीचे requirement देखें)\n\n## Machine Summary'),
+    'hasEmbeddedJdArchive rejects the unfilled modes/hi/naukri.md placeholder, read from the template itself');
   check(!hasEmbeddedJdArchive(
-    '## Job Description (archived verbatim)\n(der vollständige Text der Stellenanzeige, wortgleich eingefügt — siehe Anforderung unten)\n\n## Machine Summary'),
-    'hasEmbeddedJdArchive rejects the unfilled modes/de/angebot.md placeholder, read from the template itself');
-  check(!hasEmbeddedJdArchive(
-    '## Job Description (archived verbatim)\nPosted: 3 days ago\n(der vollständige Text der Stellenanzeige, wortgleich eingefügt — siehe Anforderung unten)\n\n## Machine Summary'),
+    '## Job Description (archived verbatim)\nPosted: 3 days ago\n(offer का पूरा text, word-for-word paste किया हुआ -- नीचे requirement देखें)\n\n## Machine Summary'),
     'hasEmbeddedJdArchive rejects a placeholder left under a filled-in "Posted:" line (CodeRabbit, PR #5926)');
   check(!hasEmbeddedJdArchive(
     "## Job Description (archived verbatim)\nPosted: not visible in source\n(the posting's full text, pasted verbatim — see requirement below)\n\n## Machine Summary"),
@@ -808,12 +807,18 @@ function runSelfTest() {
       mkdirSync(join(modesDir, 'xx'));
       writeFileSync(join(modesDir, 'xx', 'guide.md'),
         '## Job Description (archived verbatim)\nThis heading is followed by prose, not a placeholder, so nothing is collected.\n');
+      // Full-width parentheses, as the removed modes/zh template used.
+      mkdirSync(join(modesDir, 'cc'));
+      writeFileSync(join(modesDir, 'cc', 'guide.md'),
+        '## Job Description (archived verbatim)\n（职位描述全文，逐字粘贴——见下方要求）\n');
       const found = collectTemplatePlaceholders(modesDir);
+      check(found.has(normalizePlaceholder('（职位描述全文，逐字粘贴——见下方要求）')),
+        'collectTemplatePlaceholders reads a full-width-parenthesis placeholder');
       check(found.has(normalizePlaceholder('(ilanın tam metni, olduğu gibi yapıştırılır — aşağıdaki gereksinime bakın)')),
         'collectTemplatePlaceholders reads a Turkish placeholder from a modes/tr template');
       check(found.has(normalizePlaceholder("(the posting's full text, pasted verbatim — see requirement below)")),
         'collectTemplatePlaceholders always keeps the English placeholder');
-      check(found.size === 2,
+      check(found.size === 3,
         'collectTemplatePlaceholders collects only parenthesized lines directly under the heading');
       check(collectTemplatePlaceholders(join(modesDir, 'missing')).size === 1,
         'collectTemplatePlaceholders falls back to the English placeholder when modes/ cannot be read');

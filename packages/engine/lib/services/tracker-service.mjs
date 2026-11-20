@@ -209,10 +209,14 @@ export async function executeSetStatus(options = {}) {
   if (selector !== null) {
     const idList = trackerIdList(selector);
     if (idList) {
-      throw new TrackerServiceError('Multiple tracker IDs passed in selector. Update one row per command.', {
-        code: 'id-list-passed',
-        exitCode: EXIT_USAGE,
-      });
+      const nums = idList.filter((part) => part !== '');
+      const suffix = undo ? '--undo' : requestedStatus;
+      const lines = nums.map((num) => `  node set-status.mjs --row ${num} ${suffix}`);
+      const empty = idList.includes('') ? ' The list has an empty slot (a stray comma); finish it or drop the comma.' : '';
+      throw new TrackerServiceError(
+        `"${selector}" is a list of tracker numbers, not a company. Run one command per row:\n${lines.join('\n')}${empty}`,
+        { code: 'usage', exitCode: EXIT_USAGE },
+      );
     }
   }
 
@@ -395,7 +399,11 @@ export async function executeSetStatus(options = {}) {
           {
             code: 'report-number-ambiguous',
             exitCode: EXIT_AMBIGUOUS,
-            details: { trackerNum: target.num, reportNum: num },
+            details: {
+              trackerNum: target.num,
+              reportNum: num,
+              linkedBy: linkers.map((r) => ({ num: r.num, company: r.company, role: r.role })),
+            },
           },
         );
       }

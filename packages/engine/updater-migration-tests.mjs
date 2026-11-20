@@ -169,6 +169,10 @@ function runApplyWithEnv(env, args = ['apply']) {
       CAREER_OPS_UPDATE_BACKUP_BRANCH: '',
       CAREER_OPS_UPDATE_REEXEC_MARKER: '',
       CAREER_OPS_UPDATE_REEXEC_TOKEN: '',
+      // This fork disables upstream updates (.no-upstream-updates, ADR 0013).
+      // The sanctioned override turns them back on so these cases still reach
+      // the confirmation logic they are about.
+      CAREER_OPS_ALLOW_UPSTREAM_UPDATES: '1',
       ...env,
     },
   });
@@ -264,6 +268,14 @@ try {
 // inside it. Add an entry to ALLOWED_MISSING_ENTRIES only with a comment
 // justifying why it may legitimately be absent.
 const ALLOWED_MISSING_ENTRIES = new Set([
+  // Upstream community, governance and release files removed from this fork
+  // (ADR 0013), plus repo-root files that live above packages/engine after the
+  // monorepo move. The manifest is upstream's list and the updater is disabled,
+  // so these stay listed rather than diverge from it.
+  '.gitattributes', '.editorconfig', 'hired-share.mjs', 'hired-wall-build.mjs', 'HIRED.md',
+  'MANIFESTO.md', 'manifesto.mjs', 'MAINTAINERS.md', 'CHANGELOG.md', 'CODE_OF_CONDUCT.md',
+  'CONTRIBUTORS.md', '.all-contributorsrc', 'GOVERNANCE.md', 'SUPPORT.md', 'TRADEMARK.md',
+  'CITATION.cff', 'funding.json',
   // Retired by #3765, which moved these four suites into tests/. They are kept
   // in SYSTEM_PATHS deliberately so `staleSystemFiles` can still prune an
   // upgrading install's leftover copies (see the "Retired paths" block in
@@ -315,11 +327,7 @@ const requiredSystemPaths = [
   '.antigravitycli/skills/',
   '.grok/skills/',
   'updater-migration-tests.mjs',
-  'README.ar.md',
-  'README.de.md',
-  'README.hi.md',
-  'README.ja.md',
-  'README.ua.md',
+  // README.{ar,de,hi,ja,ua}.md: upstream translations, removed from this fork (ADR 0013).
   'CHANGELOG.md',
   'CODE_OF_CONDUCT.md',
   'GOVERNANCE.md',

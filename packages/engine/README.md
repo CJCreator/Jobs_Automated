@@ -83,13 +83,17 @@ The system will:
 4. If score $\ge 4.0$, tailor your CV and compile a verified PDF into `output/`.
 5. Record the application row in `data/applications.md` and transition ledger.
 
+### Codex
+
+Slash commands are not guaranteed in Codex, so use plain language or paste a prompt. For a headless run, `codex exec "Evaluate this JD: <url>"` works from the project folder. See `CODEX.md` for the Codex-specific setup.
+
 ### Command Reference
 
 | Stage | Mode / Script | Action |
 | :--- | :--- | :--- |
 | **Discovery** | `scan` / `scan:full` | Scans configured portals or sweeps full ATS public databases. |
 | **Triage** | `pipeline` | Evaluates pending URLs in `data/pipeline.md` sequentially. |
-| **Evaluation** | `oferta` / `job` | Full 8-block analysis (CV match, comp, culture, ghost check). |
+| **Evaluation** | `oferta` | Full 8-block analysis (CV match, comp, culture, ghost check). |
 | **Application** | `apply` | Generates verified form answers and outreach emails. |
 | **Tracking** | `tracker` | Inspects and filters your application pipeline. |
 | **Cadence** | `followup` | Identifies overdue follow-ups and drafts polite check-in notes. |
