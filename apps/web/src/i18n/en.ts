@@ -379,6 +379,12 @@ export const en = {
     error: "Tick the box to continue.",
     saveFailed: "Your agreement could not be saved. Try again.",
   },
+
+  // P1-15
+  consentStorage: {
+    lead: "I agree that Rolewright stores what I enter here, as described in the privacy notice.",
+    error: "Tick the box to save your changes.",
+  },
 } as const;
 
 export type Strings = typeof en;

@@ -144,4 +144,10 @@ CREATE POLICY consents_isolation ON consents
 -- Privileges: user-data tables only. Nothing on users, accounts or verification_tokens.
 GRANT SELECT, INSERT, UPDATE, DELETE ON resumes, fact_bases, jobs, tailorings TO rolewright_app;
 GRANT SELECT, INSERT ON consents TO rolewright_app;
+
+-- P1-15
+ALTER TABLE consents ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT '';
+ALTER TABLE consents DROP CONSTRAINT IF EXISTS consents_user_id_notice_version_purpose_key;
+CREATE UNIQUE INDEX IF NOT EXISTS consents_user_version_purpose_provider_key
+  ON consents (user_id, notice_version, purpose, provider);
 `;

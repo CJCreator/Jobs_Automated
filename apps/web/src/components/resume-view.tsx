@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/client/api";
+import { useApi } from "@/lib/client/use-api";
 import { useLlmKey } from "@/lib/client/llm-key";
 import { providerLabel, useProviders } from "@/lib/client/providers";
 import type { Facts, FactsResponse, FactsSave } from "@/lib/client/types";
@@ -19,6 +20,12 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export function ResumeView() {
   const { llm, ready } = useLlmKey();
   const { providers } = useProviders();
+
+  // Keyed on the provider, so choosing another one asks again.
+  const consentState = useApi<{ noticeVersion: string; accepted: boolean; storageAccepted: boolean }>(
+    llm ? `/api/consent?provider=${encodeURIComponent(llm.provider)}` : "/api/consent",
+  );
+  const [storageAgreed, setStorageAgreed] = useState(false);
 
   const [facts, setFacts] = useState<Facts | null>(null);
   const [saved, setSaved] = useState("");
@@ -105,8 +112,12 @@ export function ResumeView() {
     let consentSaved = false;
     try {
       // The server records the agreement and refuses the upload without it.
-      await api<{ accepted: boolean }>("/api/consent", { method: "POST", json: { noticeVersion: NOTICE_VERSION } });
+      await api<{ accepted: boolean }>("/api/consent", {
+        method: "POST",
+        json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: llm?.provider ?? "" },
+      });
       consentSaved = true;
+      consentState.setData({ noticeVersion: NOTICE_VERSION, accepted: true, storageAccepted: true });
       const form = new FormData();
       form.append("file", file);
       const res = await api<FactsResponse>("/api/resume", { method: "POST", form });
@@ -136,11 +147,29 @@ export function ResumeView() {
     }
   });
 
+  // Loaded with the provider's consent; until it answers, ask rather than assume.
+  const needStorage = !consentState.data?.storageAccepted;
+
   const onSave = async () => {
     if (!facts) return;
+    if (needStorage && !storageAgreed) {
+      setSaveMessage({ tone: "danger", text: en.consentStorage.error });
+      return;
+    }
     setSaving(true);
     setSaveMessage(null);
     try {
+      if (needStorage) {
+        await api<{ accepted: boolean }>("/api/consent", {
+          method: "POST",
+          json: { noticeVersion: NOTICE_VERSION, purpose: "storage" },
+        });
+        consentState.setData({
+          noticeVersion: NOTICE_VERSION,
+          accepted: consentState.data?.accepted ?? false,
+          storageAccepted: true,
+        });
+      }
       // The server keeps its own can't-confirm list; entries the user removed here are named explicitly.
       const stored = JSON.parse(saved) as Facts;
       const removeCannotConfirm = stored.cannotConfirm.filter((c) => !facts.cannotConfirm.includes(c));
@@ -150,6 +179,13 @@ export function ResumeView() {
       setSaved(JSON.stringify(res.facts));
       setSaveMessage({ tone: "ok", text: t.saveDone });
     } catch (e) {
+      if (e instanceof ApiError && e.code === "storage_consent_required") {
+        consentState.setData({
+          noticeVersion: NOTICE_VERSION,
+          accepted: consentState.data?.accepted ?? false,
+          storageAccepted: false,
+        });
+      }
       setSaveMessage({ tone: "danger", text: e instanceof ApiError ? e.message : t.saveFailed });
     } finally {
       setSaving(false);
@@ -285,6 +321,26 @@ export function ResumeView() {
                 </Button>
               </div>
             </div>
+            {needStorage && !consentState.loading ? (
+              <div className="mt-3">
+                <Checkbox
+                  id="storage-consent"
+                  checked={storageAgreed}
+                  onChange={(e) => {
+                    setStorageAgreed(e.target.checked);
+                    if (e.target.checked) setSaveMessage(null);
+                  }}
+                  label={
+                    <>
+                      {en.consentStorage.lead}{" "}
+                      <Link href="/privacy" target="_blank" className="inline-block min-h-6 font-semibold text-brand underline underline-offset-4">
+                        {en.consent.linkText}
+                      </Link>
+                    </>
+                  }
+                />
+              </div>
+            ) : null}
             <div role="status" aria-live="polite" className="mt-2 empty:hidden">
               {saveMessage ? <Notice tone={saveMessage.tone}>{saveMessage.text}</Notice> : null}
             </div>

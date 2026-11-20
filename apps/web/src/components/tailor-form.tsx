@@ -13,6 +13,8 @@ import { NOTICE_VERSION } from "@/lib/notice.mjs";
 import { Button, Card, Checkbox, ErrorBlock, Field, Input, LoadingBlock, Notice, Spinner, Textarea } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
 
+type ConsentState = { noticeVersion: string; accepted: boolean; storageAccepted: boolean };
+
 const t = en.app.tailor;
 const MIN = 200;
 const MAX = 20000;
@@ -22,7 +24,8 @@ export function TailorForm() {
   const { llm, ready } = useLlmKey();
   const { providers } = useProviders();
   const facts = useApi<FactsResponse>("/api/facts");
-  const consent = useApi<{ noticeVersion: string; accepted: boolean }>("/api/consent");
+  // Keyed on the provider: choosing another provider asks again.
+  const consent = useApi<ConsentState>(llm ? `/api/consent?provider=${encodeURIComponent(llm.provider)}` : "/api/consent");
   const [agreed, setAgreed] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -87,9 +90,12 @@ export function TailorForm() {
     let consentSaved = !needConsent;
     try {
       if (needConsent) {
-        await api<{ accepted: boolean }>("/api/consent", { method: "POST", json: { noticeVersion: NOTICE_VERSION } });
+        await api<{ accepted: boolean }>("/api/consent", {
+          method: "POST",
+          json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: llm.provider },
+        });
         consentSaved = true;
-        consent.setData({ noticeVersion: NOTICE_VERSION, accepted: true });
+        consent.setData({ noticeVersion: NOTICE_VERSION, accepted: true, storageAccepted: true });
       }
       const res = await api<{ id: string }>("/api/tailorings", {
         method: "POST",
@@ -98,7 +104,7 @@ export function TailorForm() {
       router.push(`/app/tailor/${res.id}`);
     } catch (err) {
       // A tab left open across a notice change: ask again.
-      if (err instanceof ApiError && err.code === "consent_required") consent.setData({ noticeVersion: NOTICE_VERSION, accepted: false });
+      if (err instanceof ApiError && err.code === "consent_required") consent.setData({ noticeVersion: NOTICE_VERSION, accepted: false, storageAccepted: consent.data?.storageAccepted ?? false });
       setServerError(err instanceof ApiError ? err.message : consentSaved ? en.common.loadError : en.consent.saveFailed);
       setBusy(false);
     }
