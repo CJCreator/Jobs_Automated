@@ -304,7 +304,7 @@ try {
 
     // No consent yet: the upload is refused before any AI call.
     assertError(await request(state.A, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() }), 403, "consent_required");
-    assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: false });
+    assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: false, storageAccepted: false });
     // Consent comes before the body is read or checked: a bad file or a short job description gets 403, not 415 or 400.
     assertError(
       await request(state.A, "POST", "/api/resume", { form: pdfForm(new TextEncoder().encode("not a pdf"), "resume.pdf"), headers: ai() }),
@@ -319,11 +319,13 @@ try {
     assertError(await request(state.A, "POST", "/api/consent", { json: { noticeVersion: "1999-01-01.0" } }), 400, "stale_notice");
     assertError(await request(state.A, "POST", "/api/consent", { json: {} }), 400, "stale_notice");
     assertError(await request(null, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } }), 401, "unauthorized");
-    const agreed = await request(state.A, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } });
+    // Agreeing to AI processing names the provider (the mock provider here, as in ai()); it also records storage consent.
+    const agreeBody = { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: "mock" };
+    const agreed = await request(state.A, "POST", "/api/consent", { json: agreeBody });
     assert.equal(agreed.status, 200);
-    assert.deepEqual(agreed.data, { accepted: true });
-    assert.equal((await request(state.A, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } })).status, 200, "agreeing twice is fine");
-    assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: true });
+    assert.deepEqual(agreed.data, { accepted: true, storageAccepted: true });
+    assert.equal((await request(state.A, "POST", "/api/consent", { json: agreeBody })).status, 200, "agreeing twice is fine");
+    assert.deepEqual((await request(state.A, "GET", "/api/consent")).data, { noticeVersion: NOTICE_VERSION, accepted: true, storageAccepted: true });
 
     const up = await request(state.A, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() });
     assert.equal(up.status, 200, JSON.stringify(up.data).slice(0, 300));
@@ -350,7 +352,7 @@ try {
   await step("4b. an item the upload lacks is labelled model; a re-upload keeps confirmations and ids", async () => {
     const allItems = (f) => [f.summary, ...f.experience, ...f.experience.flatMap((e) => e.bullets), ...f.education, ...f.skills];
     const jar = await signIn("cora.flow@example.com");
-    assert.equal((await request(jar, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } })).status, 200);
+    assert.equal((await request(jar, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: "mock" } })).status, 200);
     const first = await request(jar, "POST", "/api/resume", { form: pdfForm(state.fixturePdf), headers: ai() });
     assert.equal(first.status, 200, JSON.stringify(first.data).slice(0, 300));
     assert.ok(allItems(first.data.facts).every((i) => i.source !== "model"), "the first upload has no model items");
@@ -607,7 +609,7 @@ try {
       403,
       "consent_required",
     );
-    assert.equal((await request(state.B, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION } })).status, 200);
+    assert.equal((await request(state.B, "POST", "/api/consent", { json: { noticeVersion: NOTICE_VERSION, purpose: "ai_processing", provider: "mock" } })).status, 200);
     const up = await request(state.B, "POST", "/api/resume", { form: pdfForm(state.fixturePdf, "bala.pdf"), headers: ai(SENTINEL) });
     assert.equal(up.status, 200);
     const put = await request(state.B, "PUT", "/api/facts", { json: { facts: confirmAll(up.data.facts) } });
@@ -654,8 +656,17 @@ try {
       }
       const { rows: bRows } = await db.system.query("SELECT count(*)::int AS n FROM tailorings WHERE user_id = $1", [state.bId]);
       assert.equal(bRows[0].n, 1, "B's rows (written with the key) were scanned");
-      const { rows: consents } = await db.system.query("SELECT notice_version, purpose FROM consents WHERE user_id = $1", [state.bId]);
-      assert.deepEqual(consents, [{ notice_version: NOTICE_VERSION, purpose: "ai_processing" }], "B's consent is stored once, with the notice version");
+      // Agreeing to AI processing records two rows: the AI row with the provider, and the storage row (provider "").
+      const { rows: consents } = await db.system.query("SELECT notice_version, purpose, provider FROM consents WHERE user_id = $1", [state.bId]);
+      const byPurpose = (a, b) => a.purpose.localeCompare(b.purpose);
+      assert.deepEqual(
+        [...consents].sort(byPurpose),
+        [
+          { notice_version: NOTICE_VERSION, purpose: "ai_processing", provider: "mock" },
+          { notice_version: NOTICE_VERSION, purpose: "storage", provider: "" },
+        ].sort(byPurpose),
+        "B's consent is stored once per purpose and provider, with the notice version",
+      );
     } finally {
       await db.close();
     }

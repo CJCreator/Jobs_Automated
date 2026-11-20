@@ -272,19 +272,19 @@ export function DuplexSparring({
               STAR Structure Rigor
             </h4>
             <div className="space-y-2 text-xs">
-              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.situation ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border text-muted"}`}>
+              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.situation ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "border-border text-muted"}`}>
                 <span>[S] Situation</span>
                 {starState.situation ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <span className="text-[10px] text-faint">Pending</span>}
               </div>
-              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.task ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border text-muted"}`}>
+              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.task ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "border-border text-muted"}`}>
                 <span>[T] Task</span>
                 {starState.task ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <span className="text-[10px] text-faint">Pending</span>}
               </div>
-              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.action ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border text-muted"}`}>
+              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.action ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "border-border text-muted"}`}>
                 <span>[A] Action (Your Decisions)</span>
                 {starState.action ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <span className="text-[10px] text-faint">Pending</span>}
               </div>
-              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.result ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-border text-muted"}`}>
+              <div className={`flex items-center justify-between rounded-lg p-2 border ${starState.result ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "border-border text-muted"}`}>
                 <span>[R] Quantified Result</span>
                 {starState.result ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <span className="text-[10px] text-faint">Pending</span>}
               </div>
