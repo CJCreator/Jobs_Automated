@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SegmentCard } from "@/components/segment-card";
 import { HomeView } from "@/components/home-view";
 import { PageTitle } from "@/components/ui/primitives";
 import { en } from "@/i18n/en";
@@ -9,6 +10,7 @@ export default function AppHomePage() {
   return (
     <div className="space-y-6">
       <PageTitle>{en.app.home.title}</PageTitle>
+      <SegmentCard />
       <HomeView />
     </div>
   );
