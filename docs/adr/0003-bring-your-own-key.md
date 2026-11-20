@@ -22,3 +22,7 @@ Running the AI on our own keys for every user costs money we do not want to spen
 - A per-account trial counter is stored (a count, not content). Email verification is needed before the free key is used, or new accounts farm the trial.
 - The key-hygiene steps in `npm run test:flow` (no key in any log line or database column) must keep passing and gain a check that nothing is written to browser storage.
 - The user sees which model they are on, because free models may pass the fact check less often.
+
+## Amended
+
+- **2026-11-20 (owner):** The trial also pays for reading the user's resume: up to 3 resume readings per verified account (`TRIAL_UPLOADS = 3`), on top of the 5 tailorings, because a user with no key cannot otherwise load their resume. Same keys, same verification rule, same per-IP cap.

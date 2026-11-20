@@ -217,3 +217,16 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   3. Delete the legacy UI now (P1-26)? Runs only on owner approval.
   4. Should an unsourced title in the engine's title slot warn or block? Default: warn in the engine; the app already blocks it.
   5. Should App CI be a required check? Default: it stays informative until the Phase 1 exit.
+- Owner decisions, 2026-11-20 (these replace the defaults above):
+  - **Trial:** it also pays for up to 3 resume readings (ADR 0003 amended).
+  - **Node:** production runs Node 24. The gate-cost test is not relaxed, so P1-19 and P1-20 must still make it pass on 22.18.
+  - **Legacy UI:** keep it for now. P1-26 does not run. Web CI stays enabled and red.
+  - **Engine title slot:** an unconfirmed title warns.
+  - **Closed sign-ups:** an unknown email address gets the same "check your email" page as a known one, and no email is sent. Merged in P1-14.
+  - **Consent wording:** the consent sentence says the text is also stored. P1-24 makes the change and bumps `NOTICE_VERSION`.
+  - **IP and email subjects:** rate-limit subjects are HMAC-keyed with `ROLEWRIGHT_RATE_LIMIT_KEY`, a secret of at least 32 characters (P1-3). P1-6 adds the secret. P1-24 adds a notice sentence saying addresses are kept only as keyed hashes for rate limiting.
+- Still open with the owner:
+  - Switching on the dependency graph.
+  - Removing the leftover `/language:go` CodeQL configuration.
+  - Whether App CI becomes a required check (default: informative until the Phase 1 exit).
+
