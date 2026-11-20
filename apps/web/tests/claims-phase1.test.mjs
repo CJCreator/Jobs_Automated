@@ -95,6 +95,22 @@ test("number context: counts held only about something else block", () => {
   assert.ok(values(run("Led a team of 12 analysts", withExtra(SOURCE_V, "Reduced time to 12 minutes"))).includes("12 analysts"));
 });
 
+const CRORE_FACT = "Managed a team of 4 analysts, handled budgets of \u20b92 crore";
+test("2 crore analysts against the single combined fact blocks; money lines still pass", () => {
+  const src = `## Experience\n### Infosys\n**Analyst**\n- ${CRORE_FACT}`;
+  assert.ok(values(run("Managed 2 crore analysts", src)).includes("2 crore analysts"));
+  assert.equal(run("Handled budgets of 2 crore", src).issues.length, 0);
+  assert.equal(run(`Managed a team of 4 analysts and \u20b92 crore budgets`, src).issues.length, 0);
+});
+
+// Known gaps (documented, not closed here: P1-19c widens the rule): the noun must follow the figure directly and end in "s".
+test("KNOWN GAPS: crore counts the rule does not reach", () => {
+  const src = `## Experience\n### Infosys\n**Analyst**\n- ${CRORE_FACT}\n- Handled \u20b92 crore budgets for 300 customers`;
+  const passes = ["Managed 2 crore active customers", "Managed 2 crore people", "Managed 2 crore staff", "Managed 2 crore+ customers"];
+  const out = Object.fromEntries(passes.map((t) => [t, run(t, src).verdict]));
+  console.log("crore gap probe:", JSON.stringify(out));
+});
+
 test("a bare crore or lakh figure followed by a plural noun is a count, not money", () => {
   const a = run("Managed 2 crore analysts", SOURCE_V);
   assert.equal(a.verdict, "block");

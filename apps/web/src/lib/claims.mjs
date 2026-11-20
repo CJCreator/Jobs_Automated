@@ -101,8 +101,8 @@ export function cleanText(text) {
 const UNIT_PATTERN = "%|percent|pct|lakhs?|lacs?|crores?|cr|lpa|mn|bn|million|billion|k|m|x";
 
 /** `cleanText` plus the rewrites that make equal figures spell equally. */
-function prepNumbers(text) {
-  return cleanText(text)
+function prepNumbers(text, cleaned = cleanText(text)) {
+  return cleaned
     .replace(/\bper\s?cent\b/gi, "percent")
     // "1st", "2nd quarter": ordinals are positions, not counts.
     .replace(/(?<![\p{L}\p{N}])\d+(?:st|nd|rd|th)(?![\p{L}\p{N}])/giu, " ")
@@ -186,8 +186,12 @@ function scanNumbers(prepared) {
  * @returns {{ key: string, raw: string }[]}
  */
 export function numberClaims(text) {
+  return numberClaimsOf(text);
+}
+
+function numberClaimsOf(text, cleaned) {
   // "24/7" is an idiom, not two figures.
-  const prepared = prepNumbers(text).replace(/\b24\s?\/\s?7\b/g, " ");
+  const prepared = prepNumbers(text, cleaned).replace(/\b24\s?\/\s?7\b/g, " ");
   const claims = scanNumbers(prepared).map(({ key, raw }) => ({ key, raw }));
   // Number words are read inside hyphenated compounds too: "twelve-person team".
   for (const match of prepared.matchAll(/(?<![\p{L}\p{N}])\p{L}+(?:-\p{L}+)*(?![\p{L}\p{N}])/gu)) {
@@ -237,7 +241,7 @@ bridge unify transform modernise modernize overhaul revamp redesign rework refin
 responsible key lead team member part core main primary first
 second third last new next former current prior early late
 experienced skilled proven strong excellent successful dedicated results hands seasoned
-motivated driven focused oriented passionate detail analytical technical strategic creative
+motivated driven focused oriented passionate detail analytical technical strategic creative fluent
 operational financial commercial professional hardworking diligent accomplished versatile
 curious collaborative ambitious reliable meticulous adaptable bilingual
 currently previously recently also additionally independently successfully consistently
@@ -322,9 +326,9 @@ class ReadOnlySet extends Set {
 
 const cleanSource = (text) => fromSource(text, "clean", cleanText);
 
-function buildFactTokenSet(text) {
+function buildFactTokenSet(text, clean = cleanText(text)) {
   const set = new Set();
-  for (const { word } of wordTokens(cleanText(text))) {
+  for (const { word } of wordTokens(clean)) {
     const w = lower(word);
     set.add(w);
     for (const part of w.split(/[.]/)) if (part) set.add(part);
@@ -334,7 +338,7 @@ function buildFactTokenSet(text) {
 
 /** Lower-cased tokens of the confirmed facts, including the parts of hyphenated and slashed words. Read-only. */
 export function factTokenSet(sourceText) {
-  return fromSource(sourceText, "facts", (text) => new ReadOnlySet(buildFactTokenSet(text)));
+  return fromSource(sourceText, "facts", (text) => new ReadOnlySet(buildFactTokenSet(text, cleanSource(text))));
 }
 
 /** The facts mention this word, or its plural/singular ("Analyst" for "analysts"). */
@@ -547,9 +551,8 @@ const CLAIM_RE = new RegExp(
 const FORM_RES = new Map(CLAIM_FORMS.map(({ form }) => [form, new RegExp(`(?<![\\p{L}\\p{N}])${formPattern(form)}(?![\\p{L}\\p{N}])`, "iu")]));
 
 /** A predicate over claim forms: does this text contain the form (space and hyphen alike)? Answers are kept per form. */
-function formPredicate(text) {
-  const facts = buildFactTokenSet(text);
-  const clean = cleanText(text);
+function formPredicate(text, clean = cleanText(text)) {
+  const facts = buildFactTokenSet(text, clean);
   const answers = new Map();
   return (form) => {
     if (!answers.has(form)) {
@@ -561,10 +564,10 @@ function formPredicate(text) {
 
 // Seniority is a claim about a job, so only the places that state a job back it: a
 // title line (**...**), the summary, and the facts the candidate added.
-function seniorityText(sourceText) {
+function seniorityText(cleanedSource) {
   const out = [];
   let section = "";
-  for (const line of cleanText(sourceText).split("\n")) {
+  for (const line of cleanedSource.split("\n")) {
     const heading = /^\s*##\s+(.*?)\s*$/.exec(line);
     if (heading) {
       section = heading[1].toLowerCase();
@@ -575,8 +578,8 @@ function seniorityText(sourceText) {
   return out.join("\n");
 }
 
-const sourcePredicate = (src) => fromSource(src, "pred", formPredicate);
-const seniorityPredicate = (src) => fromSource(src, "senior", (text) => formPredicate(seniorityText(text)));
+const sourcePredicate = (src) => fromSource(src, "pred", (text) => formPredicate(text, cleanSource(text)));
+const seniorityPredicate = (src) => fromSource(src, "senior", (text) => formPredicate(seniorityText(cleanSource(text))));
 
 // ---- ranks and tenure: phrases, not words ------------------------------------------
 
@@ -637,7 +640,7 @@ function tenureHits(clean) {
 }
 
 const phraseHits = (clean) => [...rankHits(clean).map((v) => ({ kind: "rank", value: v })), ...tenureHits(clean).map((v) => ({ kind: "tenure", value: v }))];
-const sourcePhraseKeys = (src) => fromSource(src, "phrases", (text) => new Set(phraseHits(cleanText(text)).map(({ kind, value }) => `${kind}|${phraseKey(value)}`)));
+const sourcePhraseKeys = (src) => fromSource(src, "phrases", (text) => new Set(phraseHits(cleanSource(text)).map(({ kind, value }) => `${kind}|${phraseKey(value)}`)));
 
 /**
  * Every claim word and phrase in `text` (cleaned) with whether the facts back it.
@@ -707,7 +710,7 @@ function nonLatinTokens(clean) {
   }
   return out;
 }
-const sourceNonLatin = (src) => fromSource(src, "nonlatin", (text) => new Set(nonLatinTokens(cleanText(text)).map((t) => t.token)));
+const sourceNonLatin = (src) => fromSource(src, "nonlatin", (text) => new Set(nonLatinTokens(cleanSource(text)).map((t) => t.token)));
 
 /** True when the text has a token the fact check cannot read (mixed scripts, or non-Latin letters the facts do not contain). */
 function hasUnreadableText(clean, sourceText) {
@@ -764,7 +767,7 @@ export function checkText({ text, sourceText, before = "", jdText = "", cannotCo
     }
   }
 
-  const allowedNumbers = fromSource(sourceText, "numbers", (src) => new Set(numberClaims(src).map((c) => c.key)));
+  const allowedNumbers = fromSource(sourceText, "numbers", (src) => new Set(numberClaimsOf(src, cleanSource(src)).map((c) => c.key)));
   for (const claim of numberClaims(target)) {
     if (!allowedNumbers.has(claim.key)) {
       add("number", claim.raw, `The figure "${claim.raw}" is not in your confirmed facts.`);

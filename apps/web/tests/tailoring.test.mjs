@@ -384,6 +384,7 @@ for (const [name, text, value] of attestCases) {
     const out = applyAction(facts, list, list[0].id, { action: "attest", value }, ctx);
     const left = out.suggestions[0].check.issues.map((i) => i.value.toLowerCase());
     assert.ok(!left.includes(value.toLowerCase()), `${value} should be cleared, left ${JSON.stringify(left)}`);
+    assert.notEqual(out.suggestions[0].check.verdict, "block", `one attest unblocks it, left ${JSON.stringify(left)}`);
   });
 }
 
