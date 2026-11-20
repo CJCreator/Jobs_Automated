@@ -32,6 +32,11 @@ test("loading transitions keep context and only latest requests settle Today", {
   page.on("pageerror", (error) => errors.push(error.message));
   const tab = (label) => page.getByRole("button", { name: new RegExp(`^${label} \\d+$`) });
   const heading = page.getByRole("heading", { level: 1 });
+  // Next keeps the previous route entry mounted but hidden (display:none, in an
+  // <Activity> bfcache boundary) around a navigation, so the same search box can
+  // exist twice in the DOM. Users see exactly one; count only visible ones
+  // rather than weakening this to .first().
+  const visibleSearch = page.getByPlaceholder("Search company or role…").locator("visible=true");
   const updatesAlert = page.getByRole("alert").filter({ hasText: "could not be loaded." });
   async function until(check) {
     const started = Date.now();
@@ -76,7 +81,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     await tab("APPLIED").click();
     await until(() => held);
     assert.equal(await heading.innerText(), "Pipeline");
-    assert.equal(await page.getByPlaceholder("Search company or role…").isVisible(), true);
+    assert.equal(await visibleSearch.count(), 1);
     assert.equal(await tab("ALL").isVisible(), true);
     assert.equal(await page.locator('tbody[aria-busy="true"]').count(), 1);
     assert.ok(await page.locator('tbody[aria-busy="true"] tr').count() > 0);
@@ -100,7 +105,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     await page.getByRole("button", { name: /^Company/ }).click();
     await until(() => held);
     assert.equal(await heading.innerText(), "Follow-up Tracker");
-    assert.equal(await page.getByPlaceholder("Search company or role…").isVisible(), true);
+    assert.equal(await visibleSearch.count(), 1);
     assert.equal(await tab("ALL").isVisible(), true);
     assert.equal(await page.locator('tbody[aria-busy="true"]').count(), 1);
     assert.ok(await page.locator('tbody[aria-busy="true"] tr').count() > 0);
