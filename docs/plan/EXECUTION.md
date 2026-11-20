@@ -23,6 +23,7 @@ How the launch blockers (Phase 0) and bring-your-own-key, the free trial and the
 | Advisor | Fable | Writes the task graph and each brief; reviews each diff; runs the phase-exit review | Write product code |
 | Builder | Sonnet worker | Security, data, gate, auth, schema, infra tasks | Edit files outside its brief |
 | Clerk | Haiku worker | Copy, docs, config wiring, test triage | Touch auth, keys, schema or the gate |
+| Escalation | Opus worker | P1-17 from the start; any task that fails its second review round (P1-19, P1-20: after the first) | Edit files outside its brief |
 
 ## The loop for every task
 
@@ -31,12 +32,12 @@ advisor writes brief
   -> orchestrator starts worker in its own worktree (task branch)
   -> worker builds, adds tests, runs the brief's checks, reports
   -> advisor reviews the diff against the brief, the ADRs and the checklist
-       approve       -> orchestrator merges into the working branch and runs the app checks
+       approve       -> orchestrator merges into the working branch and runs typecheck only (from Phase 1, full suites wait for the TEST wave, ADR 0018)
        changes (<=2) -> back to the same worker with the advisor's notes
        third failure -> advisor re-briefs or splits the task
 ```
 
-At most 4 workers run at once. Two tasks in the same wave never edit the same file; the "Touches" column below is how the advisor checks that. One exception: `apps/web/src/i18n/en.ts` holds every user-facing string, so it is **append-only** in a wave: a task adds new keys under a comment naming its task ID and never edits existing keys. Only P0-3 (privacy page) and P0-4 (retention line) edit existing keys, and they run in different waves. The orchestrator merges in order and resolves append conflicts.
+At most 4 workers ran at once in Phase 0; from Phase 1, up to 6 (ADR 0018). Two tasks in the same wave never edit the same file; the "Touches" column below is how the advisor checks that. One exception: `apps/web/src/i18n/en.ts` holds every user-facing string, so it is **append-only** in a wave: a task adds new keys under a comment naming its task ID and never edits existing keys. Only P0-3 (privacy page) and P0-4 (retention line) edit existing keys, and they run in different waves. The orchestrator merges in order and resolves append conflicts.
 
 ### How the advisor is invoked
 
@@ -60,8 +61,7 @@ Inputs: the review finding it fixes (docs/reviews/...), reproduction steps.
 Steps: numbered, smallest first. Regression test before the fix.
 Done when:
   - named tests exist and pass
-  - apps/web: npm run typecheck && npm test && npm run test:flow
-  - packages/engine (if touched): node test-all.mjs --quick adds no failure vs docs/reviews/test-baseline.md
+  - the targeted commands named in the brief (node --test <files>, npm run typecheck); full suites run in the TEST wave (ADR 0018)
 Report: files changed, tests added, commands run with their pass/fail counts, anything left undone.
 ```
 
@@ -73,11 +73,13 @@ The advisor approves a diff only when every line holds:
 2. It matches the ADRs. A change to an accepted decision comes with a new ADR.
 3. No fabrication path: generated text still passes through the fact gate before export.
 4. Keys: no user key is written to the database, logs, errors, analytics or browser storage.
-5. Every new table has row-level security and a test that one user cannot read another's rows.
+5. Every new table that holds user data has row-level security and a test that one user cannot read another's rows. A table with no user data (for example `rate_events`) is named in `SYSTEM_TABLES`, gets no grant to `rolewright_app`, and the structural test covers it.
 6. User content (resume, job description, model output) is treated as data, never as instructions or SQL.
-7. The tests named in the brief exist, fail without the change and pass with it.
+7. The tests named in the brief exist, and the worker's report shows the targeted run: failing without the change, passing with it. Full suites are not run before merge; they run in the TEST wave.
 8. No unrelated refactors, renames or dependency upgrades.
 9. The user-facing text is plain English, and the privacy text still matches what the code does.
+10. The diff touches no test harness file (`tests/integration/run.mjs`, `tests/e2e/run.mjs`, `tests/integration/prod-smoke.mjs`) unless the brief lists it, and the report's "Harness impact" section says which harness steps the change will break.
+11. Names shared between briefs (environment variables, tables, columns, buckets, exported functions) match the "Shared names" table in `phase-1-briefs.md` exactly.
 
 ## Phase 0: launch blockers
 
@@ -130,32 +132,26 @@ The `en.ts` rule changes: code tasks only append keys; P0-3b is the single edito
 
 ## Phase 1: bring your own key, free trial, first engine port, Google Cloud
 
+Delivery follows ADR 0018 (amends ADR 0017): build first, test once at the end. Briefs are in [`phase-1-briefs.md`](phase-1-briefs.md).
+
+- **Build waves.** Workers write the tests their brief names and run only the targeted commands in it (`node --test <files>`, `npm run typecheck`). No full suite, dev server, browser, `test:flow`, `test:e2e`, `test:prod`, `next build`, Docker build or engine `test-all` during build.
+- **Workers.** Sonnet for security, gate, auth, consent, schema, rate-limit and infrastructure code. Haiku for copy, docs and config. Opus for P1-17 from the start, and for any task that fails its second review round (P1-19 and P1-20: after the first).
+- **Limits.** Up to 6 workers at once, each in its own worktree on `task/<ID>`. A wave may hold more than 6 tasks; the rest queue.
+- **Review.** The advisor reviews every diff plus the targeted test output before merge, at most 2 rounds.
+- **IDs.** P1-8 to P1-13 are not used as task IDs, because the launch review uses those numbers for findings. Findings are written "LR P1-9".
+- **Draft PR CI.** App CI runs on every push to PR #8. The orchestrator reads it after each wave merges. A red run does not block wave 2; each new failure is recorded for the TEST wave.
+
+### Shared files
+
+| File | Rule |
+|---|---|
+| `apps/web/src/i18n/en.ts` | Append only, under a `// P1-x` comment. P1-24 is the only editor of existing keys. Nothing is appended inside `en.app.privacy`, `en.notice` or `en.consent` (the notice lock hashes them) except by P1-24. |
+| `apps/web/src/lib/db/schema.mjs` | Append only, at the end of `SCHEMA_SQL`, under a `-- P1-x` comment. Each block is idempotent and creates any role it grants to. The DDL is fixed in the brief. |
+| `takeRateLimit` call sites | P1-3 makes it async. Every wave 1 task that owns a route writes `await takeRateLimit(...)`, which is valid before and after the merge. |
+| `tests/integration/run.mjs`, `tests/e2e/run.mjs`, `tests/integration/prod-smoke.mjs` | P1-22 only during build. Every other brief has a "Harness impact" line instead; P1-T1 applies those in the TEST wave. |
+| `README.md`, `apps/web/README.md` | P1-23 in wave 1, P1-24 in wave 2. |
+
 ### Task graph
-
-```
-Wave A (parallel)    P1-3  P1-5  P1-6
-Wave B (parallel)    P1-1 (after P1-3)
-Wave C (parallel)    P1-2 (after P1-1, P1-3)    P1-4 (after P1-1, P1-5)
-Wave D               P1-7 staging deploy (after all, owner-authorised) -> advisor phase review -> owner gate
-```
-
-### Tasks
-
-| ID | Task | Worker | Touches | Done when | From |
-|---|---|---|---|---|---|
-| P1-1 | **Launch providers.** Show only Gemini, OpenRouter and Anthropic; OpenAI and Groq stay in code behind `ROLEWRIGHT_EXTRA_PROVIDERS`. The key check (`/api/keys/verify`) gives a specific message for an invalid key, an exhausted quota and a provider outage, and applies the key-check limit that P1-3 provides (P1-1 owns this route). Show which model is in use. | Sonnet | `src/lib/llm/providers.mjs`, `src/app/api/providers`, `src/app/api/keys/verify`, the key UI, tests | Provider list test; each error class maps to its message; quota exhaustion says "bring your own key" | ADR 0003 |
-| P1-3 | **Shared rate limits.** Move the in-process limiter to Postgres (a `rate_events` table or a counter with a window), so limits hold across Cloud Run instances. Add a `keyCheck` bucket and limits for sign-in and export; P1-1 wires the key-check limit into its route. | Sonnet | `src/lib/server/rate-limit.ts`, schema, auth and export routes, tests (not `/api/keys/verify`) | Two app processes share one limit in the integration test; 429 carries `Retry-After` | Launch review P1-10, P1-11 |
-| P1-5 | **Port `keyword-match`.** Port `packages/engine/keyword-match.mjs` into `apps/web/src/lib` with a parity test that runs both on the same fixtures and compares output; show keyword coverage before and after tailoring. The engine script stays until the port is approved. | Sonnet | new `src/lib/keyword-match.mjs`, parity test, tailoring view | Parity test passes on every fixture; coverage shows in the UI | ADR 0012, ADR 0016 |
-| P1-6 | **Google Cloud setup as code.** A production Dockerfile for `apps/web` (Node 22, Chromium, the engine copied in), a scripted setup (Terraform or `gcloud` scripts, the advisor picks one in the brief) for Cloud Run, Cloud SQL (private IP, backups), Secret Manager, Cloud Scheduler and the purge service account, in `asia-south1`, for `staging` and `production`. A deploy workflow on manual dispatch. | Sonnet | `apps/web/Dockerfile`, `infra/`, `.github/workflows/deploy.yml`, `docs/` runbook | The image builds and serves `/` and a PDF export locally against Postgres; the scripts plan cleanly against an empty project | ADR 0009 |
-| P1-2 | **Free trial.** Our Gemini and OpenRouter keys from Secret Manager, used only when the user has no key, only for verified accounts. A per-account counter of 5 tailorings, incremented atomically in the same transaction as the tailoring; a per-IP daily cap behind it. The UI shows tailorings left and asks for a key at zero. | Sonnet | `src/lib/llm/index.mjs`, schema, tailorings route, the key UI, tests | Six concurrent requests from a fresh account produce exactly 5 trial tailorings; unverified accounts get no trial; server keys never reach the client or logs | ADR 0003 |
-| P1-4 | **Provider parity runs.** A script that runs the fixture resumes and job descriptions through each enabled provider (and each trial model) and records fact-gate pass rate and keyword coverage to `docs/reviews/provider-parity.md`. A provider stays hidden until its run is recorded and the owner accepts it. | Sonnet (script), Haiku (report) | `apps/web/scripts/provider-parity.mjs`, fixtures, the report | Runs offline against the mock provider in CI; the owner runs it once with real keys | ADR 0003 |
-| P1-7 | **Staging deploy and smoke.** Workers have no GCP credentials, so the owner runs the deploy (or authorises the deploy workflow) and the orchestrator runs the checks. Deploy to staging; run `test:prod` against the staging URL; confirm the purge job fires from Cloud Scheduler; confirm request logs do not contain `x-llm-key`. | Sonnet | none in code; a runbook entry | Smoke passes on staging; log check recorded | ADR 0009 |
-
-### Phase 1 exit
-
-- Everything in the Phase 0 exit, plus the staging smoke.
-- Provider parity table filled in for each launch provider, and accepted by the owner.
-- Open-source revisit (ADR 0014) is put to the owner.
 
 ## What the owner needs to supply
 
@@ -171,13 +167,12 @@ Wave D               P1-7 staging deploy (after all, owner-authorised) -> adviso
 
 The phase-exit reviews must not read as full coverage of the launch review. These stay open:
 
-- Erasure below account level: deleting one resume, job or tailoring (launch review P1-9).
 - Session revocation; sign-in uses a 7-day sliding JWT (launch review P1-10).
 - Data export and analytics (Phase 2).
 
 ## Assumptions the owner has not been asked about
 
-- At most 4 workers at once, 2 review rounds per task (ADR 0017).
+- At most 6 workers at once, 2 review rounds per task (ADR 0017, ADR 0018).
 - Separate `staging` and `production` GCP projects, which means two Cloud SQL instances billed every month. One project with two databases is cheaper; say so before P1-6 if you want that.
 
 ## Risks the plan carries
@@ -212,3 +207,13 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
 | P0-12 | `task/P0-12` | approve | 1 | `314d3ee` |
 | P0-11 | `task/P0-11` | approve | 2 | `13d54f6` |
 | P0-13 | `task/P0-13` | approve | 2 | `3922e19` |
+| P1-CI | `task/P1-CI` | approve (first CI run fixes: Windows pre-checkout step, Node floor 22.18) | 2 | `794dcc5` |
+
+### Phase 1 log
+
+- Step 0: the advisor wrote the Phase 1 section, `phase-1-briefs.md` and the follow-up map. Owner questions, each with the default the briefs assume:
+  1. Can the trial also pay for resume reading? Default: yes, up to 3 per account (`TRIAL_UPLOADS = 3`). Needs an ADR 0003 amendment.
+  2. Which Node version does production run? Default: Node 24. P1-19 and P1-20 must make the gate faster so `gate-cost.test.mjs` passes, unchanged, on 22.18 as well.
+  3. Delete the legacy UI now (P1-26)? Runs only on owner approval.
+  4. Should an unsourced title in the engine's title slot warn or block? Default: warn in the engine; the app already blocks it.
+  5. Should App CI be a required check? Default: it stays informative until the Phase 1 exit.
