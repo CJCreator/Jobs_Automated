@@ -327,10 +327,10 @@ export const en = {
         "A record of what you agreed to: when you first agreed, which version of this notice, what you agreed to (sending text to an AI provider, or storing what you enter), and for the AI provider, which one (or \"trial\" for the free trial).",
         "How many of your free-trial tailorings and resume readings you have used. This is a count, not content.",
         "Records that count your recent requests, so the limits on sign-ins, emails, uploads and AI requests can work. They are kept under your account ID. For sign-in and free-trial limits they are kept under a scrambled form of your IP address, or of your email address when you ask for a sign-in link. The scrambled form is made with a secret key, and Rolewright does not store your IP address in plain form for this. Each record counts for 24 hours at most. After that it is removed the next time the same limit is checked; until then it stays stored.",
-        "A short record of a few things you do: uploading a resume, making a tailored resume, exporting a PDF, or an export being stopped by the fact check. Each has the time, the AI provider used and, for an export, the keyword-match percentages. It never holds resume text, job descriptions or anything you typed.",
+        "A short record of a few things you do: uploading a resume, making a tailored resume, exporting a PDF, or an export being stopped by the fact check. Each has the time, the AI provider used and, for an export, the keyword-match percentages or a short code for why it was stopped. It never holds resume text, job descriptions or anything you typed.",
         "Which description you picked for yourself (first job, experienced, or changing field), if you picked one.",
       ],
-      exportLine: "You can download a copy of what we store as one file, and your tailored resumes as PDFs, from the privacy screen. Rate-limit records are not in the file.",
+      exportLine: "You can download a copy of what we store as one file, and your tailored resumes that pass the fact check as PDFs, from the privacy screen. Rate-limit records are not in the file.",
       notStoredTitle: "What we do not store",
       notStored: [
         "Your AI key. It is held in your browser tab's memory for the visit and sent with each AI request. The server does not save or log it.",

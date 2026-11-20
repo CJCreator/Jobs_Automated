@@ -91,7 +91,7 @@ test("notice: Phase 2 storage, export line and linked sign-in are stated", () =>
   assert.match(stored, /uploading a resume, making a tailored resume, exporting a PDF/);
   assert.match(stored, /first job, experienced, or changing field/);
   assert.match(stored, /Google account ID/);
-  assert.match(p.exportLine, /your tailored resumes as PDFs/);
+  assert.match(p.exportLine, /your tailored resumes that pass the fact check as PDFs/);
   assert.match(p.exportLine, /Rate-limit records are not in the file/);
   const tsx = readFileSync(new URL("../src/components/privacy-notice.tsx", import.meta.url), "utf8");
   assert.match(tsx, /t\.exportLine/);

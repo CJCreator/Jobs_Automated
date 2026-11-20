@@ -48,7 +48,7 @@ export function SegmentCard() {
     if (where === "radio" && !editing) return;
     focusAfter.current = null;
     if (where === "tip") tipHeading.current?.focus();
-    else form.current?.querySelector<HTMLInputElement>("input[type=radio]:checked, input[type=radio]")?.focus();
+    else { const f = form.current; (f?.querySelector<HTMLInputElement>("input[type=radio]:checked") ?? f?.querySelector<HTMLInputElement>("input[type=radio]"))?.focus(); }
   }, [editing, saved]);
 
   const save = async (next: Segment | null) => {
