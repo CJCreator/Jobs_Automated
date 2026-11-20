@@ -102,7 +102,7 @@ for (const file of ['follow-ups.md', 'active-interviews.md', 'status-log.tsv']) 
       assert.ok(exitedNonZero(r), describeSpawn(r, `an unreadable ${file} must stop the run`));
       // The message has to name the file. "something went wrong" would leave the
       // user with a half-understood refusal on a destructive command.
-      assert.match(`${r.stdout}${r.stderr}`, new RegExp(file.replace('.', '\\.')),
+      assert.match(`${r.stdout}${r.stderr}`, new RegExp(file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
         'the refusal must name the file it could not read');
       // THE POINT: nothing was written. Before the fix the run proceeded with
       // that protection switched off and rewrote the row to Discarded.

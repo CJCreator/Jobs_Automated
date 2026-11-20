@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
+import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,7 +14,7 @@ const NODE = process.execPath;
 
 // Windows IPC only listens on named pipes, the same kind of path the batch uses there.
 function testSocket(dir) {
-  if (process.platform === 'win32') return `\\\\.\\pipe\\career-ops-pdf-test-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  if (process.platform === 'win32') return `\\\\.\\pipe\\career-ops-pdf-test-${process.pid}-${randomUUID()}`;
   return join(dir, 'pdf.sock');
 }
 

@@ -69,7 +69,7 @@ function rules(css) {
 
 /** Whether any rule targeting `selector` declares `prop: value`. */
 function declares(parsed, selector, prop, value) {
-  const exact = new RegExp(`(^|\\s|>|\\+|~)${selector.replace('.', '\\.')}(\\s|$|:)`);
+  const exact = new RegExp(`(^|\\s|>|\\+|~)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$|:)`);
   const decl = new RegExp(`(^|[;{\\s])${prop}\\s*:\\s*${value}\\s*(;|$)`);
   return parsed.some((r) => r.selectors.some((s) => exact.test(s)) && decl.test(r.decls));
 }

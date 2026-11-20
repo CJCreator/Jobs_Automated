@@ -8,6 +8,7 @@
 // keeps them about the flag rather than about errors.
 import { execFileSync } from 'child_process';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
 import { pass, fail, ROOT, rmSync } from './helpers.mjs';
@@ -31,7 +32,7 @@ function run(args) {
     CAREER_OPS_PROFILE: join(dir, 'profile.yml'),
     CAREER_OPS_TRACKER: join(dir, 'applications.md'),
     CAREER_OPS_FOLLOWUPS: join(dir, 'follow-ups.md'),
-    CAREER_OPS_FOLLOWUPS_LOCK: join(dir, `career-ops-followups-json-${Math.random().toString(36).slice(2)}.lock`),
+    CAREER_OPS_FOLLOWUPS_LOCK: join(dir, `career-ops-followups-json-${randomUUID()}.lock`),
   };
   try {
     const stdout = execFileSync(NODE, [SCRIPT, ...args], { cwd: ROOT, env, encoding: 'utf-8', timeout: 30_000 });
