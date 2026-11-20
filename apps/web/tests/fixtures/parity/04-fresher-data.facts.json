@@ -1,0 +1,86 @@
+{
+  "contact": {
+    "name": "Arjun Menon",
+    "email": "04@example.com",
+    "phone": "",
+    "location": "Kochi",
+    "links": [],
+    "confirmed": true
+  },
+  "summary": {
+    "text": "Recent graduate in statistics with internship experience in data analysis.",
+    "confirmed": true
+  },
+  "experience": [
+    {
+      "id": "exp1",
+      "company": "Harbor Analytics",
+      "title": "Data Analyst Intern",
+      "location": "Kochi",
+      "start": "2024",
+      "end": "2024",
+      "confirmed": true,
+      "bullets": [
+        {
+          "id": "b1",
+          "text": "Cleaned and merged survey data in Python and pandas",
+          "confirmed": true
+        },
+        {
+          "id": "b2",
+          "text": "Built 5 charts in Tableau for a client presentation",
+          "confirmed": true
+        },
+        {
+          "id": "b3",
+          "text": "Wrote SQL queries to pull weekly sales numbers",
+          "confirmed": true
+        },
+        {
+          "id": "b4",
+          "text": "Documented the data sources in a shared team wiki",
+          "confirmed": true
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "ed1",
+      "degree": "B.Sc",
+      "field": "Statistics",
+      "school": "Maharaja's College",
+      "year": "2024",
+      "confirmed": true
+    }
+  ],
+  "skills": [
+    {
+      "id": "s1",
+      "name": "Python",
+      "confirmed": true
+    },
+    {
+      "id": "s2",
+      "name": "pandas",
+      "confirmed": true
+    },
+    {
+      "id": "s3",
+      "name": "SQL",
+      "confirmed": true
+    },
+    {
+      "id": "s4",
+      "name": "Tableau",
+      "confirmed": true
+    },
+    {
+      "id": "s5",
+      "name": "Excel",
+      "confirmed": true
+    }
+  ],
+  "extras": [],
+  "cannotConfirm": []
+}
