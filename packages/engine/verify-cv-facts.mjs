@@ -242,8 +242,22 @@ const SPELLED_MAGNITUDES = new Map([
   ['thousand', 'k'],
   ['million', 'm'],
   ['billion', 'b'],
+  // Indian-format and abbreviated magnitudes (P1-19). "5 lakh customers" must
+  // not read as "5 customers" with "lakh" swallowed by the modifier window.
+  ['lakh', 'lakh'],
+  ['lakhs', 'lakh'],
+  ['lac', 'lakh'],
+  ['lacs', 'lakh'],
+  ['crore', 'crore'],
+  ['crores', 'crore'],
+  ['cr', 'crore'],
+  ['mn', 'm'],
 ]);
-const SPELLED_MAGNITUDE_ALT = [...SPELLED_MAGNITUDES.keys()].join('|');
+// Longest first, so an alternation never settles on "lakh" inside "lakhs".
+const SPELLED_MAGNITUDE_ALT = [...SPELLED_MAGNITUDES.keys()].sort((a, b) => b.length - a.length).join('|');
+// Magnitudes written glued to the number that are not single-letter suffixes:
+// "14mn", "5cr", "5lakh", "3crores".
+const GLUED_MAGNITUDE_ALT = 'crores?|lakhs?|lacs?|mn|cr';
 
 const COUNT_CLAIM_RE = new RegExp(
   // LAZY (`{0,N}?`), so the number binds to the NEAREST noun in the window
@@ -280,7 +294,7 @@ const COUNT_CLAIM_RE = new RegExp(
   // window. `(?:[\p{L}\p{N}]+-)*` lets the counted noun close a hyphenated
   // compound ("318 TryHackMe-Rooms"): German writes the modifier and the noun
   // as one hyphenated token, which a whitespace-only window never saw.
-  String.raw`(?<![A-Za-z]-)\b(?!1C\b)(\d[\d,.]*(?:[kKmMbB]\b|\s+(?:${SPELLED_MAGNITUDE_ALT})\b)?)\s*\+?\s*(?:\p{L}[\p{L}\p{M}-]*\s+){0,${MODIFIER_WINDOW}}?(?:[\p{L}\p{N}]+-)*(${METRIC_NOUNS.join('|')})(?![\p{L}\p{N}])`,
+  String.raw`(?<![A-Za-z]-)\b(?!1C\b)(\d[\d,.]*(?:[kKmMbB]\b|(?:${GLUED_MAGNITUDE_ALT})\b|\s+(?:${SPELLED_MAGNITUDE_ALT})\b)?)\s*\+?\s*(?:\p{L}[\p{L}\p{M}-]*\s+){0,${MODIFIER_WINDOW}}?(?:[\p{L}\p{N}]+-)*(${METRIC_NOUNS.join('|')})(?![\p{L}\p{N}])`,
   'giu'
 );
 const NOUN_SYNONYMS = new Map([
@@ -1053,8 +1067,9 @@ function atEmployerClaims(text) {
 // Credential, seniority, scope and expertise words. A listed word the source
 // does not contain, in any form of its family, is an unsupported fact whether or
 // not a fact config is loaded. This is the twin of CLAIM_FAMILIES in
-// apps/web/src/lib/claims.mjs: change one list and change the other.
-const CLAIM_FAMILIES = {
+// apps/web/src/lib/claims.mjs: change one list and change the other. The control
+// is apps/web/tests/claim-lists-sync.test.mjs, which compares the two exports.
+export const CLAIM_FAMILIES = Object.freeze(Object.fromEntries(Object.entries({
   credential: [
     ["certified", "certification", "certifications", "certificate", "certificates"],
     ["chartered"],
@@ -1063,26 +1078,31 @@ const CLAIM_FAMILIES = {
     ["award", "awards", "awarded"],
     ["patent", "patents", "patented"],
     ["medalist", "medallist"],
-    ["topper"],
+    ["topper", "toppers"],
     ["scholarship", "scholarships"],
     ["fellowship", "fellowships"],
     ["mba", "m.b.a"],
-    ["phd", "ph.d", "doctorate"],
-    ["diploma"],
-    ["postgraduate"],
+    ["phd", "ph.d", "ph d", "doctorate"],
+    ["diploma", "diplomas"],
+    ["postgraduate", "post graduate", "post-graduate"],
   ],
   seniority: [
-    ["senior", "sr"],
-    ["principal"],
+    ["senior", "seniors", "sr"],
+    ["seniormost", "senior-most"],
+    ["principal", "principals"],
     ["director", "directors"],
-    ["head of"],
+    ["head of", "heads of"],
     ["chief"],
     ["ceo", "c.e.o"], ["cfo", "c.f.o"], ["cto", "c.t.o"], ["coo", "c.o.o"], ["cio", "c.i.o"], ["cmo", "c.m.o"],
     ["vp", "v.p", "vice president"],
+    ["avp"], ["svp"], ["evp"],
     ["president"],
-    ["manager", "managers"],
+    ["manager", "managers", "mgr"],
+    ["gm", "general manager"],
     ["executive", "executives"],
     ["founder", "cofounder", "co-founder"],
+    ["c-suite"],
+    ["cxo", "cxos"],
   ],
   scope: [
     ["global", "globally"],
@@ -1091,22 +1111,27 @@ const CLAIM_FAMILIES = {
     ["multinational"],
     ["national", "nationally", "nationwide", "nation-wide"],
     ["regional", "regionally"],
+    ["pan-india", "pan india"],
     ["enterprise"],
     ["entire"],
     ["sole", "solely"],
     ["single-handedly", "singlehandedly"],
   ],
   expertise: [
-    ["expert", "experts"],
-    ["guru"],
-    ["veteran"],
+    ["expert", "experts", "expertly"],
+    ["guru", "gurus"],
+    ["veteran", "veterans"],
     ["world-class"],
     ["thought leader"],
     ["best-in-class"],
     ["industry-leading"],
     ["top-performing"],
   ],
-};
+}).map(([kind, families]) => [kind, Object.freeze(families.map((family) => Object.freeze(family)))])));
+
+// Plain business phrases that contain a claim word and claim nothing: not read
+// as claim words. Exact phrases only; the bare word still blocks.
+const CLAIM_PHRASE_EXEMPTIONS = /(?<![\p{L}\p{N}])(?:executive\s+summary|enterprise\s+reporting|award[\s\p{Pd}]+winning)(?![\p{L}\p{N}])/giu;
 
 const CLAIM_FORMS = [];
 for (const [kind, families] of Object.entries(CLAIM_FAMILIES)) {
@@ -1123,13 +1148,44 @@ const CLAIM_WORD_RE = new RegExp(
   'giu',
 );
 
+// One RegExp per form, built once at module load. builtinClaimWordFacts used to
+// build one per form per call.
+const CLAIM_FORM_RES = new Map(CLAIM_FORMS.map(({ form }) => [
+  form,
+  new RegExp(`(?<![\\p{L}\\p{N}])${claimFormPattern(form)}(?![\\p{L}\\p{N}])`, 'iu'),
+]));
+
+// Everything the gate derives from the source alone, built once per source.
+// The app checks many target lines against one fact base, and every check used
+// to strip, split and scan the whole fact base again: at the 30,000-character
+// cap that was two thirds of each call. Each value is built on first use by
+// its builder function and kept with the source string it came from, so a
+// later call with an equal string (the app rebuilds it per call) reuses it.
+// One entry is enough. An empty source is cheap and is never cached, so a
+// call on '' (the title-field excuse in verifyFactsFromText) does not evict
+// the real source in the middle of a call. Builders return values the callers
+// only read; a caller that needs to add to one copies it first.
+let sourceMemo = { text: null, values: new Map() };
+function fromSource(sourceText, build) {
+  const text = String(sourceText ?? '');
+  if (!text) return build(text);
+  if (sourceMemo.text !== text) sourceMemo = { text, values: new Map() };
+  const { values } = sourceMemo;
+  if (!values.has(build)) values.set(build, build(text));
+  return values.get(build);
+}
+const strippedSource = (text) => stripMarkup(text);
+const normalizedSource = (text) => normalizeFact(fromSource(text, strippedSource));
+const sourceStatements = (text) => factStatements(text);
+const claimWordSource = (text) => fromSource(text, strippedSource).normalize('NFKC').replace(/\p{Cf}/gu, '');
+
 /** Claim words in the target that no form of their family appears next to in the source. */
 function builtinClaimWordFacts(targetText, sourceText) {
   // The role the letter is for is the job being applied to, not a claim about the candidate.
   const withoutRoleTitle = String(targetText ?? '').replace(/<div\b[^>]*\bclass="[^"]*\brole-title\b[^"]*"[^>]*>[\s\S]*?<\/div>/gi, ' ');
-  const target = stripMarkup(withoutRoleTitle).normalize('NFKC').replace(/\p{Cf}/gu, '');
-  const source = stripMarkup(sourceText).normalize('NFKC').replace(/\p{Cf}/gu, '');
-  const inSource = (form) => new RegExp(`(?<![\\p{L}\\p{N}])${claimFormPattern(form)}(?![\\p{L}\\p{N}])`, 'iu').test(source);
+  const target = stripMarkup(withoutRoleTitle).normalize('NFKC').replace(/\p{Cf}/gu, '').replace(CLAIM_PHRASE_EXEMPTIONS, ' ');
+  const source = fromSource(sourceText, claimWordSource);
+  const inSource = (form) => CLAIM_FORM_RES.get(form).test(source);
   const facts = [];
   for (const match of target.matchAll(CLAIM_WORD_RE)) {
     const entry = CLAIM_BY_FORM.get(claimFormKey(match[0]));
@@ -1426,6 +1482,25 @@ function attributionTokens(text) {
     .filter(token => token.length >= 3 && !ATTRIBUTION_STOP_WORDS.has(token));
 }
 
+/** The direct-work and delegated statements of a source, with their tokens. */
+function authorshipSources(text) {
+  const statements = fromSource(text, sourceStatements);
+  const directSources = statements
+    .filter(statement => DIRECT_AUTHORSHIP_SIGNAL_RE.test(statement))
+    .filter(statement => !THIRD_PARTY_EXECUTION_RE.test(statement))
+    .map(statement => new Set(attributionTokens(statement)));
+  const delegatedSources = statements
+    .filter(statement => DELEGATED_PARTY_RE.test(statement) && DELEGATION_RE.test(statement))
+    .filter(statement => (
+      !DIRECT_AUTHORSHIP_SIGNAL_RE.test(statement) || THIRD_PARTY_EXECUTION_RE.test(statement)
+    ))
+    .map(statement => ({
+      statement,
+      tokens: new Set(attributionTokens(statement)),
+    }));
+  return { directSources, delegatedSources };
+}
+
 /**
  * Detect a narrow authorship escalation: a source explicitly attributes
  * execution to a third party, while the generated rewrite claims direct
@@ -1439,20 +1514,7 @@ function attributionTokens(text) {
  * third-party execution evidence rather than candidate direct-work evidence.
  */
 export function delegatedAuthorshipClaims(targetText, sourceText) {
-  const sourceStatements = factStatements(sourceText);
-  const directSources = sourceStatements
-    .filter(statement => DIRECT_AUTHORSHIP_SIGNAL_RE.test(statement))
-    .filter(statement => !THIRD_PARTY_EXECUTION_RE.test(statement))
-    .map(statement => new Set(attributionTokens(statement)));
-  const delegatedSources = sourceStatements
-    .filter(statement => DELEGATED_PARTY_RE.test(statement) && DELEGATION_RE.test(statement))
-    .filter(statement => (
-      !DIRECT_AUTHORSHIP_SIGNAL_RE.test(statement) || THIRD_PARTY_EXECUTION_RE.test(statement)
-    ))
-    .map(statement => ({
-      statement,
-      tokens: new Set(attributionTokens(statement)),
-    }));
+  const { directSources, delegatedSources } = fromSource(sourceText, authorshipSources);
   if (!delegatedSources.length) return [];
 
   const claims = [];
@@ -1766,6 +1828,11 @@ const SCOPE_VERB_TIERS = new Map([
   ['contribute', 1], ['contributed', 1], ['contributes', 1], ['contributing', 1],
   ['help', 1], ['helped', 1], ['helps', 1], ['helping', 1],
   ['support', 1], ['supported', 1], ['supports', 1], ['supporting', 1],
+  ['assist', 1], ['assisted', 1], ['assists', 1], ['assisting', 1],
+  ['aid', 1], ['aided', 1], ['aids', 1], ['aiding', 1],
+  ['participate', 1], ['participated', 1], ['participates', 1], ['participating', 1],
+  ['shadow', 1], ['shadowed', 1], ['shadows', 1], ['shadowing', 1],
+  ['observe', 1], ['observed', 1], ['observes', 1], ['observing', 1],
   // Tier 2 — execution. Did the work, without claiming the mandate.
   ['build', 2], ['built', 2], ['builds', 2], ['building', 2],
   ['implement', 2], ['implemented', 2], ['implements', 2], ['implementing', 2],
@@ -1775,6 +1842,9 @@ const SCOPE_VERB_TIERS = new Map([
   ['own', 3], ['owned', 3], ['owns', 3], ['owning', 3],
   ['architect', 3], ['architected', 3], ['architects', 3], ['architecting', 3],
   ['drive', 3], ['drove', 3], ['drives', 3], ['driving', 3],
+  ['head', 3], ['headed', 3], ['heads', 3], ['heading', 3],
+  ['spearhead', 3], ['spearheaded', 3], ['spearheads', 3], ['spearheading', 3],
+  ['champion', 3], ['championed', 3], ['champions', 3], ['championing', 3],
 ]);
 
 // Bullet glyphs and list markers survive stripMarkup. They have to come off
@@ -1795,7 +1865,7 @@ function openingScopeVerb(statement) {
   const opening = text.match(/^([\p{L}]+)/u);
   if (!opening) return null;
   const verb = opening[1].toLowerCase();
-  const tier = SCOPE_VERB_TIERS.get(verb);
+  const tier = SCOPE_VERB_TIERS.get(verb) ?? openingPhraseTier(text);
   if (!tier) return null;
   // "Led to" is causation, not ownership: "led to a 40% speedup" claims a
   // result, not a mandate. Only reachable now that the target side is split
@@ -1819,7 +1889,7 @@ function openingScopeVerb(statement) {
 // "Lead a team of engineers" are present-tense ownership claims and stay
 // checked. The role noun is singular on purpose, so "Lead engineers through
 // the migration" still reads as the verb it is.
-const TITLE_BARE_FORM_RE = /^(?:lead|architect)$/iu;
+const TITLE_BARE_FORM_RE = /^(?:lead|architect|head)$/iu;
 const TITLE_PREPOSITIONS = new Set(['for', 'on', 'of', 'at', 'in', 'with']);
 const TITLE_DETERMINERS = new Set([
   'the', 'a', 'an', 'our', 'my', 'their', 'its', 'his', 'her', 'this', 'that',
@@ -1852,7 +1922,21 @@ function opensWithJobTitle(text) {
 const SCOPE_PHRASE_TIERS = [
   [/^worked\s+on\b/iu, 1],
   [/^part\s+of\s+the\s+team\b/iu, 1],
+  [/^involved\s+in\b/iu, 1],
+  [/^part\s+of\b/iu, 1],
+  [/^member\s+of\b/iu, 1],
+  // Ownership phrases: "Was in charge of ...", "Leader of ...".
+  [/^(?:(?:was|is|am|were|being)\s+)?in\s+charge\s+of\b/iu, 3],
+  [/^(?:(?:was|is|am|were)\s+)?(?:the\s+|a\s+)?leader\s+of\b/iu, 3],
 ];
+
+/** Tier of an ownership phrase a statement opens with, or 0. Tier 1 phrases are source evidence only. */
+function openingPhraseTier(text) {
+  for (const [pattern, tier] of SCOPE_PHRASE_TIERS) {
+    if (tier >= 2 && pattern.test(text)) return tier;
+  }
+  return 0;
+}
 
 const HEADING_RE = /^#{1,6}\s+/u;
 // First-person prose in article-digest.md opens with the subject, not the verb.
@@ -1914,7 +1998,29 @@ function sourceClauseTier(clause, heading) {
 
 /** Content tokens of a statement, with scope verbs removed so a tier word cannot link two entries. */
 function scopeObjectTokens(text) {
-  return attributionTokens(text).filter(token => !SCOPE_VERB_TIERS.has(token));
+  return attributionTokens(String(text ?? '').replace(SCOPE_PHRASE_WORDS_RE, ' ')).filter(token => !SCOPE_VERB_TIERS.has(token));
+}
+
+// The words of a scope phrase are the verb, not the work item, so they cannot
+// link two entries: "Was in charge of vendor contracts" shares only "contracts".
+const SCOPE_PHRASE_WORDS_RE = /\b(?:(?:was|is|am|were|being)\s+)?in\s+charge\s+of\b|\b(?:(?:was|is|am|were)\s+)?(?:the\s+|a\s+)?leader\s+of\b|\binvolved\s+in\b|\bpart\s+of\b|\bmember\s+of\b/giu;
+
+/** Each clause of a source with its scope tier and work-item tokens. */
+function scopeSourceClauses(text) {
+  return fromSource(text, sourceStatements)
+    .map(stripListMarker)
+    .flatMap((statement) => {
+      const heading = HEADING_RE.test(statement);
+      return scopeClauses(statement).map(clause => ({
+        // The whole statement is what gets quoted back, since a clause on its own
+        // reads as a fragment to whoever has to go and fix cv.md.
+        statement,
+        heading,
+        tier: sourceClauseTier(clause, heading),
+        tokens: new Set(scopeObjectTokens(clause)),
+      }));
+    })
+    .filter(source => source.tokens.size);
 }
 
 /**
@@ -1937,20 +2043,7 @@ export function scopeInflationClaims(targetText, sourceText) {
   // "Contributed to the billing migration and led the payments rewrite"
   // cleared "Led the billing migration" on the strength of a verb that was
   // never about the migration.
-  const sourceClauses = factStatements(sourceText)
-    .map(stripListMarker)
-    .flatMap((statement) => {
-      const heading = HEADING_RE.test(statement);
-      return scopeClauses(statement).map(clause => ({
-        // The whole statement is what gets quoted back, since a clause on its own
-        // reads as a fragment to whoever has to go and fix cv.md.
-        statement,
-        heading,
-        tier: sourceClauseTier(clause, heading),
-        tokens: new Set(scopeObjectTokens(clause)),
-      }));
-    })
-    .filter(source => source.tokens.size);
+  const sourceClauses = fromSource(sourceText, scopeSourceClauses);
   if (!sourceClauses.length) return [];
 
   const claims = [];
@@ -2071,6 +2164,12 @@ const ADOPTION_CHECKS = [
   },
 ];
 
+/** Whether the source evidences each ADOPTION_CHECKS entry, in order. */
+function adoptionEvidence(text) {
+  const source = fromSource(text, strippedSource);
+  return ADOPTION_CHECKS.map(({ source: evidence }) => evidence.test(source));
+}
+
 /**
  * Detect adoption or reach claims the sources never make.
  *
@@ -2082,7 +2181,7 @@ const ADOPTION_CHECKS = [
  * blocks generation.
  */
 export function adoptionClaims(targetText, sourceText) {
-  const source = stripMarkup(sourceText);
+  const evidenced = fromSource(sourceText, adoptionEvidence);
   // Matched per STATEMENT, not across the whole flattened document. Collapsing
   // the target first let a phrase form across a line break that neither line
   // contains, so "...we used" followed by "Daily standups ran on it" reported
@@ -2090,8 +2189,8 @@ export function adoptionClaims(targetText, sourceText) {
   // with nothing for the user to go and fix.
   const statements = factStatements(targetText).map(stripListMarker);
   const claims = [];
-  for (const { target, source: evidence } of ADOPTION_CHECKS) {
-    if (evidence.test(source)) continue;
+  for (const [index, { target }] of ADOPTION_CHECKS.entries()) {
+    if (evidenced[index]) continue;
     for (const statement of statements) {
       target.lastIndex = 0;
       for (const match of statement.matchAll(target)) {
@@ -2121,18 +2220,22 @@ export function adoptionClaims(targetText, sourceText) {
  * @param {string} raw
  * @returns {string}
  */
+const GLUED_MAGNITUDE_END_RE = new RegExp(String.raw`(\d)(${GLUED_MAGNITUDE_ALT})$`, 'i');
 function compactMagnitude(raw) {
-  return raw.replace(/\s+([A-Za-z]+)$/, (whole, word) => {
-    const suffix = SPELLED_MAGNITUDES.get(word.toLowerCase());
-    return suffix === undefined ? whole : suffix;
-  });
+  return raw
+    .replace(/\s+([A-Za-z]+)$/, (whole, word) => {
+      const suffix = SPELLED_MAGNITUDES.get(word.toLowerCase());
+      return suffix === undefined ? whole : suffix;
+    })
+    // Glued magnitudes that are not single-letter suffixes: "14mn", "5cr", "5lakhs".
+    .replace(GLUED_MAGNITUDE_END_RE, (whole, digit, word) => `${digit}${SPELLED_MAGNITUDES.get(word.toLowerCase())}`);
 }
 
 // "14M evaluations", "2 million sessions": a number with a magnitude is a count
 // of whatever follows it, even when the noun is not in METRIC_NOUNS. A currency
 // amount ("$2M and ...") is read by SIMPLE_CLAIM_PATTERNS and is skipped here.
 const MAGNITUDE_COUNT_RE = new RegExp(
-  String.raw`(?<![\p{L}\p{N}$€£₹.-])(?<!\b(?:Rs|INR|USD|EUR|GBP)\.?\s?)(\d[\d,.]*(?:[kKmMbB]|\s+(?:${SPELLED_MAGNITUDE_ALT})))(?![\p{L}\p{N}])\s*\+?\s*(\p{L}[\p{L}\p{M}-]*)`,
+  String.raw`(?<![\p{L}\p{N}$€£₹.-])(?<!\b(?:Rs|INR|USD|EUR|GBP)\.?\s?)(\d[\d,.]*(?:[kKmMbB]|${GLUED_MAGNITUDE_ALT}|\s+(?:${SPELLED_MAGNITUDE_ALT})))(?![\p{L}\p{N}])\s*\+?\s*(\p{L}[\p{L}\p{M}-]*)`,
   'giu',
 );
 // Words after a magnitude that are not what is counted.
@@ -2140,6 +2243,11 @@ const MAGNITUDE_NOT_A_NOUN = new Set(`a an and or but the to in of for with at b
   across between via into than each every vs versus is are was were has have had
   usd inr eur gbp rupees rupee dollars dollar euros euro pounds pound crore crores lakh lakhs lac lacs
   percent pct x k m b mn bn million billion thousand`.split(/\s+/));
+
+// A count claim's number that ends in a magnitude, and MAGNITUDE_COUNT_RE
+// anchored at one position. Both built once, at module load.
+const MAGNITUDE_WORD_END_RE = new RegExp(String.raw`\d(?:[kmb]|${GLUED_MAGNITUDE_ALT})$|\s(?:${SPELLED_MAGNITUDE_ALT})$`, 'iu');
+const MAGNITUDE_COUNT_AT_RE = new RegExp(MAGNITUDE_COUNT_RE.source, 'iyu');
 
 /** Extract metric-like claims that require source evidence. */
 export function metricClaims(text, { keepPlanHorizons = false } = {}) {
@@ -2151,8 +2259,23 @@ export function metricClaims(text, { keepPlanHorizons = false } = {}) {
   // Where each COUNT_CLAIM_RE number starts: it already binds that number to its
   // noun, so "2M active users" is not a second claim "2m active".
   const counted = new Set([...clean.matchAll(COUNT_CLAIM_RE)].map((m) => m.index + m[0].indexOf(m[1])));
+  // "14M evaluations for users": the counted thing is the word right after the
+  // magnitude. The modifier window reached across "for" to the metric noun
+  // "users" and reported "14m users". When a stop word sits between the number
+  // and the noun the window found, and the word right after the number is a
+  // plausible noun, the magnitude pattern below owns that figure.
   for (const match of countMatches(clean, { keepPlanHorizons })) {
     const noun = match[2].toLowerCase();
+    if (MAGNITUDE_WORD_END_RE.test(match[1])) {
+      const numberAt = match.index + match[0].indexOf(match[1]);
+      const between = match[0].slice(match[0].indexOf(match[1]) + match[1].length).toLowerCase().match(/\p{L}+/gu) ?? [];
+      MAGNITUDE_COUNT_AT_RE.lastIndex = numberAt;
+      const found = MAGNITUDE_COUNT_AT_RE.exec(clean);
+      if (found && !MAGNITUDE_NOT_A_NOUN.has(found[2].toLowerCase()) && between.slice(0, -1).some((word) => MAGNITUDE_NOT_A_NOUN.has(word))) {
+        counted.delete(numberAt);
+        continue;
+      }
+    }
     claims.add(normalizeClaim(`${compactMagnitude(match[1])} ${NOUN_SYNONYMS.get(noun) ?? noun}`));
   }
   for (const match of clean.matchAll(MAGNITUDE_COUNT_RE)) {
@@ -2272,7 +2395,7 @@ export function diagnoseCoverage(targetText) {
   const recognized = [...stripMarkup(String(targetText ?? '')).matchAll(COUNT_CLAIM_RE)];
   if (recognized.length > 0) return null;
   return {
-    reason: 'no-count-claims-recognized',
+    reason: COVERAGE_REASONS[0],
     message:
       `${spans.length} count-like claims are present but none matched the metric extractor, whose noun ` +
       'list covers English, German and French only — so no count in this document was checked against your sources. ' +
@@ -2281,6 +2404,9 @@ export function diagnoseCoverage(targetText) {
     spans,
   };
 }
+
+/** Every value `coverage.reason` can take. The app's sync test reads it. */
+export const COVERAGE_REASONS = Object.freeze(['no-count-claims-recognized', 'scope-not-checked']);
 
 /**
  * Build the allow-list a metric claim is checked against.
@@ -2299,12 +2425,84 @@ export function diagnoseCoverage(targetText) {
  * instead of widening them. The union can only ever allow more, never less.
  */
 function allowedMetricSet(sourceText, allowMetrics) {
-  const allowed = sourceMetricClaims(sourceText);
+  // The base set is cached with the source and read in place: copying it per
+  // call cost as much as the source is large. allow_metrics entries, and their
+  // variants, go in a set of their own.
+  const base = fromSource(sourceText, sourceMetricBase);
+  const extra = new Set();
   for (const entry of allowMetrics || []) {
-    allowed.add(normalizeClaim(entry));
-    for (const canonical of sourceMetricClaims(String(entry))) allowed.add(canonical);
+    for (const claim of [normalizeClaim(entry), ...sourceMetricClaims(String(entry))]) {
+      extra.add(claim);
+      for (const variant of countVariants(claim)) extra.add(variant);
+    }
   }
+  return { has: (claim) => base.has(claim) || extra.has(claim) };
+}
+
+// A plain number of four to nine digits followed by a word, read in the SOURCE
+// only, one line at a time, on normalizeClaim() text. A number after a
+// currency mark is money, not a count, and a number after a PIN or ZIP label
+// is a postcode; ten digits and up is a phone number or an ID.
+const LABELLED_NUMBER_RE = /(?:[$€£₹]|\b(?:rs|inr|usd|eur|gbp|pin|pincode|zip)\b\.?)\s*\d[\d,.]*/giu;
+const PLAIN_SOURCE_COUNT_RE = /(?<![\p{L}\p{N}.$€£₹-])(?<!(?:[$€£₹]|\b(?:rs|inr|usd|eur|gbp|pin|pincode|zip)\b\.?)\s*)(\d{4,9})(?!\d)\s+(\p{L}[\p{L}\p{M}-]*)/gu;
+
+/**
+ * The metric claims a source supports on its own, before allow_metrics.
+ *
+ * Every claim the source makes, as before. Then, from claims read one source
+ * line at a time, every other spelling of the same quantity (countVariants),
+ * so "10,000 invoices" backs "10k invoices". Only per-line claims get
+ * variants: the count pattern's window crosses a line break, so "Joined in
+ * 2020" over "Customers were served daily" read as "2020 customers", and its
+ * variant "2.02k customers" was support for a figure the source never states.
+ * A large plain number counts the word after it even when that word is no
+ * listed noun. All of this adds support and never raises a claim. No rule
+ * here turns a lakh or crore amount the source states as money ("₹2 crore
+ * budgets") into a bare count claim ("2 crore budgets"); P1-19c rebuilds that.
+ * The count patterns can still read a money figure as a count on both sides
+ * ("₹2 crore from customers" reads as "2crore customers"), as main does.
+ */
+function sourceMetricBase(text) {
+  const allowed = sourceMetricClaims(text);
+  const perLine = new Set();
+  for (const line of stripMarkup(text, { keepLineBreaks: true }).split('\n')) {
+    if (!/\d/.test(line)) continue;
+    // Variants only for counts: a number after a currency mark or a PIN
+    // label is left out, and so is a plain number of ten digits or more.
+    for (const claim of sourceMetricClaims(line.replace(LABELLED_NUMBER_RE, ' '))) {
+      if (!/^\d{10}/.test(claim)) perLine.add(claim);
+    }
+    for (const match of normalizeClaim(line).matchAll(PLAIN_SOURCE_COUNT_RE)) {
+      const claim = `${match[1]} ${match[2]}`;
+      allowed.add(claim);
+      perLine.add(claim);
+    }
+  }
+  for (const claim of perLine) for (const variant of countVariants(claim)) allowed.add(variant);
   return allowed;
+}
+
+// One quantity, however it is written: "10k", "10,000" and "1 lakh" are each
+// the same figure, so a count claim is supported by any spelling of its value
+// (P1-19). Only a value at or above a unit is rewritten in that unit, so "4
+// years" has no variants and "5 lakh customers" is never supported by "5
+// customers".
+const COUNT_UNITS = [['k', 1e3], ['m', 1e6], ['b', 1e9], ['lakh', 1e5], ['crore', 1e7]];
+const COUNT_CLAIM_KEY_RE = /^(\d+(?:\.\d+)?)(k|m|b|lakh|crore)? (\p{L}[\p{L}\p{M}\s-]*)$/u;
+function countVariants(claim) {
+  const match = COUNT_CLAIM_KEY_RE.exec(claim);
+  if (!match) return [];
+  const unit = match[2] ? COUNT_UNITS.find(([name]) => name === match[2])[1] : 1;
+  const value = Math.round(Number(match[1]) * unit);
+  if (!Number.isSafeInteger(value) || value < 1000) return [];
+  const noun = match[3];
+  const variants = [`${value} ${noun}`];
+  for (const [name, size] of COUNT_UNITS) {
+    if (value < size) continue;
+    const scaled = Math.round((value / size) * 100) / 100;
+    if (Math.abs(scaled * size - value) < 0.5) variants.push(`${scaled}${name} ${noun}`);
+  }
+  return variants;
 }
 
 // normalizeTextForATS in generate-pdf.mjs prints € and £ as currency codes, and
@@ -2424,9 +2622,11 @@ function looksEnglish(text) {
  *
  * @returns {string|null}
  */
+const sourceLooksEnglish = (text) => looksEnglish(fromSource(text, strippedSource));
+
 function scopeLanguageGap(targetText, sourceText) {
   const targetEnglish = looksEnglish(stripMarkup(targetText));
-  const sourceEnglish = looksEnglish(stripMarkup(sourceText));
+  const sourceEnglish = fromSource(sourceText, sourceLooksEnglish);
   if (targetEnglish && sourceEnglish) return null;
   const subject = !targetEnglish && !sourceEnglish
     ? 'The document and its sources are'
@@ -2537,9 +2737,14 @@ export function verifyFactsFromText(targetText, {
   const targetClaims = metricClaims(targetText);
   const planned = plannedClaims(targetText, planTexts);
   const invented = [...targetClaims].filter(claim => !allowed.has(claim) && !planned.has(claim));
-  const sourceNormalized = normalizeFact(stripMarkup(sourceText));
+  const sourceNormalized = fromSource(sourceText, normalizedSource);
   const allowedFacts = new Set(config.allow_facts.map(normalizeFact));
-  const unsourced = ({ value }) => !sourceContainsFact(sourceNormalized, value) && !allowedFacts.has(value);
+  // "SQL/Power BI/Excel" is a slash-joined list, not one tool. It is supported
+  // when the source has the whole string or has every part of it, so an
+  // honest "SQL/Excel" passes and "SQL/Docker" still fails on "docker".
+  const slashListSourced = ({ kind, value }) => kind === 'tool' && value.includes('/')
+    && value.split('/').every(part => part.trim() && (sourceContainsFact(sourceNormalized, part.trim()) || allowedFacts.has(part.trim())));
+  const unsourced = (claim) => !sourceContainsFact(sourceNormalized, claim.value) && !allowedFacts.has(claim.value) && !slashListSourced(claim);
   const fieldClaims = structuredFieldClaims(targetText).filter(unsourced);
   const namedFacts = [
     ...factClaims(targetText, sourceNormalized),
@@ -2597,7 +2802,7 @@ export function verifyFactsFromText(targetText, {
   const countGap = diagnoseCoverage(targetText);
   const coverage = !languageGap ? countGap
     : countGap ? { ...countGap, message: `${countGap.message} ${languageGap}` }
-      : { reason: 'scope-not-checked', message: languageGap, spans: [] };
+      : { reason: COVERAGE_REASONS[1], message: languageGap, spans: [] };
   const blocked = invented.length || unsupportedFacts.length || forbidden.length;
   return {
     verdict: blocked ? 'block' : (warnings.length || advisoryFacts.length || coverage) ? 'warn' : 'pass',
@@ -2812,6 +3017,27 @@ function runSelfTest() {
   equal('truthful multiplier', auditClaims('Partners earned 2x more', source).invented, []);
   equal('noun synonym', auditClaims('Authored 80 articles', source).invented, []);
   equal('ordinary year is ignored', auditClaims('Joined the team in 2013', source).invented, []);
+
+  // P1-19: Indian-format magnitudes, scope verbs and claim words.
+  equal('lakh is a magnitude for counts', auditClaims('Served 5 lakh customers', 'Served 5 customers').invented, ['5lakh customers']);
+  equal('crore is a magnitude for counts', auditClaims('Handled 3 crore transactions', 'Handled 3 transactions').invented, ['3crore transactions']);
+  equal('10k is not 1,000', auditClaims('Processed 10k invoices', 'Processed 1,000 invoices').invented, ['10k invoices']);
+  equal('10k equals 10,000', auditClaims('Processed 10k invoices', 'Processed 10,000 invoices').invented, []);
+  equal('magnitude names the word after it', [...metricClaims('Processed 14M evaluations for users')].includes('14m evaluations'), true);
+  const p1Scope = (line, from) => verifyFactsFromText(line, { sourceText: from }).unsupportedFacts.filter(f => f.kind === 'scope').length;
+  equal('led over assisted', p1Scope('Led vendor contracts', 'Assisted with vendor contracts'), 1);
+  equal('in charge of over involved in', p1Scope('Was in charge of vendor contracts', 'Involved in vendor contracts'), 1);
+  equal('managed over assisted is not tier-3', p1Scope('Managed vendor contracts', 'Assisted with vendor contracts'), 0);
+  const p1Words = (line) => verifyFactsFromText(line, { sourceText: 'Analyst.' }).unsupportedFacts.map(f => f.value);
+  equal('pan-india is a scope word', p1Words('Pan-India reporting'), ['pan-india']);
+  equal('general manager is seniority', p1Words('General Manager, reporting').includes('general manager'), true);
+  equal('executive summary is exempt', p1Words('Wrote the executive summary'), []);
+  equal('award-winning is exempt', p1Words('Award-winning close team'), []);
+  equal('plural lakhs is a magnitude', auditClaims('Served 5 lakhs customers', 'Served 5 customers').invented, ['5lakh customers']);
+  equal('crore money does not back another noun', auditClaims('Managed 2 crore customers', 'Handled budgets of ₹2 crore').invented, ['2crore customers']);
+  equal('a rupee figure is no count', auditClaims('Processed 50k invoices', 'Budget Rs 50000 invoices').invented, ['50k invoices']);
+  equal('no count across a line break', auditClaims('Served 2.02k customers', 'Joined in 2020\nCustomers were served daily').invented, ['2.02k customers']);
+  equal('cxos is a claim word', p1Words('Presented to CXOs'), ['cxos']);
 
   // The number binds to the NEAREST noun in the window, not the farthest (#3414).
   // Greedy, each of these bound the wrong noun while the SAME fact worded plainly
