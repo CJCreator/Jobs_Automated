@@ -296,3 +296,10 @@ The orchestrator appends one line per merged task: task ID, task branch, advisor
   - "all rate-limit records are deleted with your account";
   - that hashed records "cannot be linked" to a person.
 - **Regression from P1-19, caught by engine CI at `107585c`:** `verify-cv-facts-leading-article.test.mjs` blocks "a C-suite narrative" and "a C-suite sponsor", because P1-19 added the c-suite claim family. The fix is added to P1-19c's scope (an audience-noun exemption), and P1-20 must mirror it. Engine CI was at 19,712 pass and 2 fail.
+- **P1-20 review round 1 (CHANGES).** Round 2 goes to Opus, per the plan. Owner decisions: add the new rank, language, credential and tenure words Fable found, and have the unreadable-text message name the exact token. Holes recorded for later:
+  - **Engine coverage-reason masking.** When a line has both a language gap and a count gap, the reason reported is `no-count-claims-recognized`. The language gap should win. This goes to P1-19c.
+  - **Phase 2 gate work:**
+    - Hinglish, French and other Latin-script non-English lines;
+    - seniority words "finance head", "team leader", "supervisor", "in-charge", "partner" and "controller";
+    - accented look-alikes such as "sénior";
+    - a phrase-valued attest for seniority words that appear in the user's own bullet.
