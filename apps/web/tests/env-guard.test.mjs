@@ -117,3 +117,27 @@ test("only 1 turns ROLEWRIGHT_DEPLOYED on; any non-empty K_SERVICE counts", () =
 test("deployed never comes from a request header", () => {
   assert.equal(isDeployed({ "x-forwarded-host": "app.example", "x-rolewright-deployed": "1", host: "app.example" }), false);
 });
+
+// P1-14: sign-up mode and the grievance contact.
+test("an unknown ROLEWRIGHT_SIGNUPS value is a problem on a strict environment only", () => {
+  assert.ok(unsafeEnvProblems(prod({ ROLEWRIGHT_SIGNUPS: "everyone" })).some((p) => /ROLEWRIGHT_SIGNUPS/.test(p)));
+  assert.deepEqual(unsafeEnvProblems({ ROLEWRIGHT_SIGNUPS: "everyone" }), []);
+});
+
+test("ROLEWRIGHT_SIGNUPS=open needs a valid grievance name and email", () => {
+  const has = (env) => unsafeEnvProblems(env).some((p) => /grievance/i.test(p));
+  const open = prod({ ROLEWRIGHT_SIGNUPS: "open" });
+  assert.equal(has(open), true);
+  assert.equal(has({ ...open, ROLEWRIGHT_GRIEVANCE_NAME: "A Person" }), true);
+  assert.equal(has({ ...open, ROLEWRIGHT_GRIEVANCE_EMAIL: "help@example.com" }), true);
+  assert.equal(has({ ...open, ROLEWRIGHT_GRIEVANCE_NAME: "A Person", ROLEWRIGHT_GRIEVANCE_EMAIL: "not-an-address" }), true);
+  assert.equal(has({ ...open, ROLEWRIGHT_GRIEVANCE_NAME: "A Person", ROLEWRIGHT_GRIEVANCE_EMAIL: "help@example.com" }), false);
+  assert.throws(() => assertSafeEnv(open), /grievance contact/);
+});
+
+test("staging values start: allowlist or closed without a grievance contact, or unset", () => {
+  for (const ROLEWRIGHT_SIGNUPS of ["allowlist", "closed", undefined]) {
+    assert.deepEqual(unsafeEnvProblems(prod({ ROLEWRIGHT_SIGNUPS })), []);
+  }
+  assert.deepEqual(unsafeEnvProblems(prod({ ROLEWRIGHT_SIGNUPS: "allowlist", ROLEWRIGHT_SIGNUP_ALLOWLIST: "@example.com" })), []);
+});

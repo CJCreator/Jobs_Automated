@@ -13,6 +13,7 @@ import Resend from "next-auth/providers/resend";
 import { getDb } from "@/lib/db/index.mjs";
 import * as repo from "@/lib/db/repo.mjs";
 import { assertSafeEnv, devLoginEnabled, strictEnv } from "@/lib/server/env-guard.mjs";
+import { maySignIn, signupMode } from "@/lib/server/signup-gate.mjs";
 
 declare module "next-auth" {
   interface Session {
@@ -63,6 +64,11 @@ const orNull = (u: DbUser | null | undefined) => (u ? toAdapterUser(u) : null);
 // Every id handed back is OUR users.id (a UUID), never the one Auth.js proposes.
 const adapter: Adapter = {
   async createUser(user) {
+    // Second layer behind the signIn callback: a path that skipped it still
+    // creates no row for an address the sign-up gate refuses.
+    if (!maySignIn({ email: user.email, existingUser: false }, process.env)) {
+      throw new Error("Sign-ups are closed to this address.");
+    }
     const db = await getDb();
     const created = await repo.upsertUserByEmail(db, {
       email: user.email,
@@ -152,9 +158,31 @@ const config: NextAuthConfig = {
   secret: process.env.AUTH_SECRET || (strictEnv(process.env) ? undefined : DEV_ONLY_SECRET),
   pages: { signIn: "/sign-in", error: "/sign-in" },
   callbacks: {
-    signIn({ account, profile }) {
-      if (account?.provider === "google") return profile?.email_verified === true;
-      return true;
+    // Auth.js calls this twice for an email link: when the link is requested
+    // (before any token is stored or email sent) and when it is opened. Both
+    // calls resolve the same address and ask the same question, so they agree.
+    async signIn({ user, account, profile, email: emailStep }) {
+      // The development sign-in is exempt, and only when it is actually enabled.
+      if (account?.provider === "dev" && devLogin) return true;
+      const google = account?.provider === "google";
+      if (google && profile?.email_verified !== true) return false;
+      const email = String((google ? profile?.email : user?.email) ?? "").trim().toLowerCase();
+      if (!email) return false;
+      // Auth.js signs a linked Google account in by providerAccountId, so look
+      // the user up by account first; their Google address may have changed.
+      const db = await getDb();
+      const linked =
+        google && account?.providerAccountId ? await repo.getUserByAccount(db, "google", account.providerAccountId) : null;
+      const existing = linked ?? (await repo.getUserByEmail(db, email));
+      const allowed = maySignIn({ email, existingUser: Boolean(existing) }, process.env);
+      // In closed mode an unknown address gets the same "check your email"
+      // page as a known one, so the response does not reveal who has an
+      // account. Returning a string makes Auth.js redirect before it creates
+      // a token or sends an email.
+      if (!allowed && account && emailStep?.verificationRequest && signupMode(process.env) === "closed") {
+        return `/api/auth/verify-request?${new URLSearchParams({ provider: account.provider, type: "email" })}`;
+      }
+      return allowed;
     },
     jwt({ token, user }) {
       if (user?.id) token.uid = user.id;

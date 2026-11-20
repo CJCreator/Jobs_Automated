@@ -17,7 +17,7 @@ async function attempt(provider: string, options: Record<string, string>) {
   try {
     await signIn(provider, { ...options, redirectTo: "/app" });
   } catch (e) {
-    if (e instanceof AuthError) redirect("/sign-in?error=1");
+    if (e instanceof AuthError) redirect(e.type === "AccessDenied" ? "/sign-in?error=AccessDenied" : "/sign-in?error=1");
     throw e;
   }
 }
@@ -48,7 +48,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const any = methods.google || methods.email || methods.dev;
   // Auth.js sends a failed sign-in back here with ?error=<code>. The code is
   // never shown; one plain sentence covers every cause.
-  const failed = Boolean((await searchParams).error);
+  const errorParam = (await searchParams).error;
+  const failed = Boolean(errorParam);
+  // The refusal text is the same for every refused address.
+  const denied = errorParam === "AccessDenied";
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto w-full max-w-md space-y-6 px-4 py-12 sm:py-20">
@@ -64,7 +67,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
 
       {failed ? (
         <Notice tone="danger" role="alert" title={t.failedTitle}>
-          {t.failedBody}
+          {denied ? en.signUpGate.invitationOnly : t.failedBody}
         </Notice>
       ) : null}
 

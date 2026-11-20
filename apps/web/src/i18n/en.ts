@@ -393,6 +393,10 @@ export const en = {
     lead: "I agree that Rolewright stores what I enter here, as described in the privacy notice.",
     error: "Tick the box to save your changes.",
   },
+  // P1-14
+  signUpGate: {
+    invitationOnly: "Sign-ups are by invitation for now. If you were invited, use the address the invitation was sent to.",
+  },
 } as const;
 
 export type Strings = typeof en;
