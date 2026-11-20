@@ -163,6 +163,12 @@ export interface Tailoring {
   rewritesReturned?: number | null;
 }
 
+export interface Coverage {
+  before: { covered: number; total: number };
+  after: { covered: number; total: number };
+  missing: string[];
+}
+
 export type SuggestionAction =
   | { action: "accept" }
   | { action: "reject" }
