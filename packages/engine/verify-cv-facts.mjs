@@ -2488,7 +2488,9 @@ function sourceMetricBase(text) {
 // is backed by the same figure as money anywhere in the source. A different
 // figure, or a word the statement never uses ("2 crore customers"), is not.
 const CURRENCY_AMOUNT_RE = /(?:(?:[$€£₹]|\b(?:rs|inr|usd|eur|gbp)\b\.?)\s*(\d[\d.]*)\s*(lakhs?|lacs?|crores?|cr)\b|\b(\d[\d.]*)\s*(lakhs?|lacs?|crores?|cr)\s+(?:rupees?|inr|rs)\b)/gu;
-const AMOUNT_WORDS = ['worth', 'annually', 'annual', 'yearly', 'monthly', 'quarterly', 'total', 'overall', 'approximately', 'approx'];
+// Only words that cannot stand before a noun: "2 crore monthly invoices"
+// binds "monthly", so an adjective here would back a count of anything.
+const AMOUNT_WORDS = ['worth', 'annually'];
 
 /** Singular and plural spellings of a word, and its NOUN_SYNONYMS form. */
 function nounForms(word) {

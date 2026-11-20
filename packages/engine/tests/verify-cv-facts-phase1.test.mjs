@@ -108,6 +108,10 @@ test('plural Indian magnitudes are magnitudes, not modifiers', () => {
   assert.ok(blocks('Handled 3 crores transactions', 'Handled 3 transactions'));
   assert.equal(blocks('Served 5 lakhs customers', 'Served 5 lakh customers'), false);
   assert.equal(blocks('Handled 3 crores transactions', 'Handled 3 crore transactions'), false);
+  // Glued to the number.
+  assert.ok(blocks('Served 5lakh customers', 'Served 5 customers'));
+  assert.ok(blocks('Served 3crores customers', 'Served 3 customers'));
+  assert.equal(blocks('Served 5lakh customers', 'Served 5 lakh customers'), false);
 });
 
 test('a crore or lakh amount without a currency mark is backed by the same amount in the facts', () => {
@@ -120,7 +124,10 @@ test('a crore or lakh amount without a currency mark is backed by the same amoun
   // A different noun, or a different amount, is not backed. The non-noun
   // branch ("worth", "annually") still needs the same amount.
   for (const line of ['Managed 2 crore customers', 'Handled 20 crore budgets', 'Managed 20 crore worth of budgets',
-    'Managed budgets totalling 20 crore annually', 'Handled 2 lakh budgets']) {
+    'Managed budgets totalling 20 crore annually', 'Handled 2 lakh budgets',
+    // An adjective after the figure is not an amount word: these count invoices.
+    'Processed 2 crore monthly invoices', 'Raised 2 crore total invoices', 'Processed 2 crore annual invoices',
+    'Handled 2 crore overall invoices']) {
     assert.ok(verdict(line).invented.length > 0, line);
   }
 });
