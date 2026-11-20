@@ -1,7 +1,24 @@
-import { test } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { register } from "node:module";
+import { pathToFileURL } from "node:url";
 import { clientIp, emailSubject, ipSubject } from "../src/lib/server/client-ip.mjs";
+
+// http.ts is TypeScript with an "@/" alias. A small resolver hook lets node load it
+// as it is, so the 503 test below goes through the real route wrapper.
+const src = new URL("../src/", import.meta.url).href;
+const hook = `
+export async function resolve(specifier, context, next) {
+  if (specifier.startsWith("@/")) return next(${JSON.stringify(src)} + specifier.slice(2), context);
+  return next(specifier, context);
+}`;
+register("data:text/javascript," + encodeURIComponent(hook), pathToFileURL("./"));
+
+let route;
+before(async () => {
+  ({ route } = await import("../src/lib/server/http.ts"));
+});
 
 const h = (xff) => new Headers(xff == null ? {} : { "x-forwarded-for": xff });
 
@@ -58,14 +75,14 @@ test("the key changes the output", () => {
   );
 });
 
-test("emailSubject ignores case and spaces, and differs from the IP hash of the same text", () => {
+test("emailSubject ignores case and spaces, and is a keyed hash, not plain SHA-256", () => {
   const env = { ROLEWRIGHT_RATE_LIMIT_KEY: KEY_A };
   assert.equal(emailSubject(" A@Example.com ", env), emailSubject("a@example.com", env));
   assert.notEqual(emailSubject("a@example.com", env), createHash("sha256").update("a@example.com").digest("hex"));
 });
 
 test("strict environment: a missing or short key fails closed with 503", () => {
-  for (const key of [undefined, "", "short", "x".repeat(31)]) {
+  for (const key of [undefined, "", "short", "x".repeat(31), " ".repeat(32), "x".repeat(31) + "   "]) {
     const env = { NODE_ENV: "production", ROLEWRIGHT_RATE_LIMIT_KEY: key };
     for (const call of [() => ipSubject("1.2.3.4", env), () => emailSubject("a@example.com", env)]) {
       assert.throws(call, (err) => err.status === 503 && err.code === "rate_limit_unavailable");
@@ -78,4 +95,26 @@ test("non-strict environment falls back to a dev key", () => {
   const a = ipSubject("1.2.3.4", { NODE_ENV: "development" });
   assert.match(a, /^[0-9a-f]{64}$/);
   assert.equal(a, ipSubject("1.2.3.4", {}));
+});
+
+test("strict environment without a key: a route answers 503 rate_limit_unavailable, not 500", async () => {
+  const handler = route("test.client-ip", async () => {
+    ipSubject("1.2.3.4", { NODE_ENV: "production" });
+    return new Response("unreachable");
+  });
+  const saved = console.error;
+  const savedWarn = console.warn;
+  console.error = () => {};
+  console.warn = () => {};
+  let res;
+  try {
+    res = await handler(new Request("http://localhost/api/test"), { params: Promise.resolve({}) });
+  } finally {
+    console.error = saved;
+    console.warn = savedWarn;
+  }
+  assert.equal(res.status, 503);
+  const body = await res.json();
+  assert.equal(body.error.code, "rate_limit_unavailable");
+  assert.equal(body.error.message, "Rolewright could not check its usage limits just now. Try again in a moment.");
 });

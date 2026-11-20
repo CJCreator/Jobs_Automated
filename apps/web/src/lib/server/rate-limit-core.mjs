@@ -34,7 +34,7 @@ export function decide({ max, windowMs }, usedCost, oldestAtMs, nowMs) {
 /** Raised when the count cannot be made. The caller refuses the request (fail closed). */
 export class RateLimitUnavailableError extends Error {
   constructor() {
-    super("The rate limit could not be checked.");
+    super("Rolewright could not check its usage limits just now. Try again in a moment.");
     this.name = "RateLimitUnavailableError";
     this.status = 503;
     this.code = "rate_limit_unavailable";

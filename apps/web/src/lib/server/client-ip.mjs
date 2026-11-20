@@ -36,7 +36,7 @@ const DEV_KEY = "rolewright-dev-only-rate-limit-key-not-a-secret";
 const MIN_KEY_LENGTH = 32;
 
 function subjectKey(env) {
-  const key = String(env?.ROLEWRIGHT_RATE_LIMIT_KEY ?? "");
+  const key = String(env?.ROLEWRIGHT_RATE_LIMIT_KEY ?? "").trim();
   if (key.length >= MIN_KEY_LENGTH) return key;
   if (strictEnv(env)) {
     // A short or missing key would make the hashes guessable, so refuse (fail closed, 503).

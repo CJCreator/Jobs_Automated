@@ -1,5 +1,5 @@
 // Shared rate-limit counts in Postgres (system table rate_events, through db.system).
-// The subject is a user id or a SHA-256 hex of an IP or email address, never a raw one.
+// The subject is a user id or a keyed HMAC-SHA-256 hex of an IP or email address, never a raw one.
 //
 // db.system has no transaction and runs one statement per call, so advisory locks are
 // not available here. Instead each take inserts its event first (autocommit), then
