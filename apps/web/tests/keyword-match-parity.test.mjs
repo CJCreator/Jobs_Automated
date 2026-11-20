@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { importEngineFile } from "../src/lib/server/engine.mjs";
+import { importEngineFile, engineCodeRoot } from "../src/lib/server/engine.mjs";
 import * as port from "../src/lib/keyword-match.mjs";
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "keyword-match");
@@ -93,4 +93,23 @@ test("the port imports nothing", () => {
   const src = fs.readFileSync(path.join(DIR, "..", "..", "..", "src", "lib", "keyword-match.mjs"), "utf8");
   assert.doesNotMatch(src, /^\s*import\s/m);
   assert.doesNotMatch(src, /\bfetch\(|node:fs|child_process/);
+});
+
+function vocabularyBlock(source) {
+  const start = source.indexOf("export const SKILL_TOKENS = [");
+  const fn = source.indexOf("export function extractSkills");
+  const end = source.indexOf("return found;\n}", fn) + "return found;\n}".length;
+  assert.ok(start >= 0 && fn > start && end > fn, "block markers not found");
+  return source.slice(start, end);
+}
+
+test("the copied skill vocabulary is identical to the engine's", () => {
+  const engineSrc = fs.readFileSync(path.join(engineCodeRoot(), "skill-extract.mjs"), "utf8");
+  const portSrc = fs.readFileSync(path.join(DIR, "..", "..", "..", "src", "lib", "keyword-match.mjs"), "utf8");
+  const a = vocabularyBlock(engineSrc);
+  const b = vocabularyBlock(portSrc);
+  assert.ok(a.length > 5000 && b.length > 5000);
+  assert.equal(b, a, "skill-extract.mjs changed: copy the block into apps/web/src/lib/keyword-match.mjs");
+  const jd = "SAFe certified; Go and fine-tuning LLMs; Hugging Face";
+  assert.deepEqual(port.keywordsFromJdText(jd), engine.keywordsFromJdText(jd));
 });

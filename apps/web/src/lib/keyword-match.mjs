@@ -11,7 +11,12 @@
 // patterns, never turned into a RegExp as it stands.
 //
 // Difference from the engine, on purpose: analyzeCoverage refuses oversized
-// input (RangeError) so a caller cannot stall the process.
+// input (RangeError) so a caller cannot stall the process. keywordsFromJdText
+// and htmlToText are not capped, and htmlToText is quadratic on unclosed `<` or
+// `<!--`, so the caller must bound their input.
+//
+// The vocabulary block (SKILL_TOKENS through extractSkills) is checked
+// text-for-text against the engine's skill-extract.mjs by the parity test.
 
 /** Longest text analyzeCoverage accepts, in characters. */
 export const MAX_TEXT_CHARS = 60_000;
@@ -605,6 +610,9 @@ export function keywordsFromJdText(jdText) {
  * (e.g. /tmp/cv-{candidate}-{company}.html from pdf mode) can be scanned as the
  * final, sent document. Removes script/style blocks, drops tags, and decodes
  * the handful of entities that appear in CV templates.
+ *
+ * Not capped, and quadratic on unclosed `<` or `<!--`: the caller must bound
+ * its input.
  *
  * @param {string} html - HTML source.
  * @returns {string} Visible text.
